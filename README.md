@@ -4,6 +4,8 @@ A small Python 3.11 demo: plain functions, CSV files, Pydantic, and a local Fast
 
 ## Flow
 
+[View the workflow diagram](docs/architecture.md).
+
 ```text
 RAW CSV
   -> rename columns + clean text
