@@ -1,0 +1,27 @@
+# One English definition for each standardized input field.
+ROW_ID: Unique incident identifier kept locally to link the input row to its result.
+INCIDENT_CONFIGURATION_ITEM: The affected application, service, device, or other configuration item recorded for
+  the incident.
+INCIDENT_ASSIGNMENT_GROUP: The support group assigned to handle the incident, which does not by itself establish
+  responsibility.
+INCIDENT_PROBLEM_TICKET_ID: The identifier of the problem ticket linked to the incident.
+PROBLEM_TASK_ID: The identifier of a task linked to the problem investigation or resolution.
+INCIDENT_SUMMARY: A short title summarizing the reported incident.
+INCIDENT_DESCRIPTION: A detailed account of the incident, including reported symptoms and impact.
+PROBLEM_DESCRIPTION: A description of the underlying problem being investigated in relation to the incident.
+INCIDENT_RESOLUTION_DESCRIPTION: A summary of how the incident was resolved or service was restored.
+INCIDENT_RESOLUTION_DETAILS: Additional details of the actions taken to resolve the incident.
+PROBLEM_ROOT_CAUSE: The underlying cause recorded in the problem investigation.
+PROBLEM_RESOLUTION_DETAILS: The recorded actions taken or proposed to resolve the underlying problem.
+PROBLEM_TASK_CAUSE_CODE: The cause category or code recorded for the problem task.
+PROBLEM_TASK_CAUSE_NOTES: Notes explaining the cause identified during the problem task investigation.
+INCIDENT_WORK_NOTES: Operational updates, investigation steps, and observations recorded on the incident.
+PROBLEM_WORK_NOTES: Investigation updates and technical observations recorded on the problem ticket.
+ADDITIONAL_COMMENTS: Supplementary comments that provide context about the incident or problem.
+FINDINGS: Recorded findings or conclusions from the incident or problem investigation.
+SERVICENOW_ASSIGNMENT: The assignment or responsibility recorded in ServiceNow.
+ARCHITECT_ROOT_CAUSE: The Helix architect's reference assessment of the root cause, to be compared with the incident
+  evidence.
+ARCHITECT_PRODUCT: The product identified in the Helix architect's reference assessment.
+ARCHITECT_CAPABILITY: The capability identified in the Helix architect's reference assessment.
+ARCHITECT_CHALLENGE_REASON: The Helix architect's explanation for challenging an existing assignment or assessment.
