@@ -1,11 +1,11 @@
 # Local demo boundaries
 
-Credentials remain in the ignored .env and are never printed.
+Secrets belong in the ignored .env and are never printed. llm_connection.py selects the configured provider and closes the client and any Azure credential resources.
 
-The pipeline keeps ROW_ID local, removes ordinary emails, and standardizes column names before saving CLEANED.csv and sending values to the model. This limited cleanup is not complete anonymization; raw and cleaned records can still contain sensitive information.
+Cleaning removes invisible special characters only. Emails, links, HTML markup, and punctuation are retained as requested. This is not anonymization. INCIDENT_ID stays local; the other configured fields are sent to the selected model service.
 
-The UI renders CSV values as text. Writes require same-origin JSON and are validated with Pydantic. Only pending definite classifications can be approved or rejected; rejection requires a reason.
+CSV values, evidence, prompts, and user reasons are rendered as text. Write requests require same-origin JSON and Pydantic validation. Every final decision requires an HSBC/SUPPLIER choice and a nonblank reason. No LLM outcome is finalized automatically.
 
-Use one local worker and keep batch outputs closed in Excel while saving. Atomic replacement protects existing files from interrupted writes. This demo has no authentication or multi-user deployment.
+Run one local worker. A lock serializes writes, record versions reject stale submissions, and finalized IDs cannot be submitted again. CSV replacement is atomic. Keep CSV outputs closed in Excel while saving.
 
-Demo assessments and confidence scores are hand-authored. Prompt rules remain draft interpretations, not approved HSBC policy.
+The demo has no user login or cloud hosting. Model assessments and confidence scores in the mockup are hand-authored. No model-quality or production-readiness claim is made.

@@ -3,6 +3,13 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class ColumnDefinition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    original_name: str = Field(min_length=1)
+    new_name: str = Field(min_length=1)
+    description: str = Field(min_length=1)
+
+
 class InputField(BaseModel):
     name: str
     description: str = Field(min_length=1)

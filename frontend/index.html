@@ -33,16 +33,17 @@
     <span class="mode" id="mode">Connecting…</span>
   </header>
 <main>
+  <nav class="page-nav" aria-label="Application"><a href="/" aria-current="page">Review queue</a><a href="/dashboard">Final decisions dashboard</a></nav>
   <section class="page-heading">
-    <div><p class="eyebrow">HUMAN OVERSIGHT / WS4</p><h1>Incident decisions</h1><p class="subtitle">Review the decision. Open the details when you need them.</p></div>
+    <div><p class="eyebrow">HUMAN OVERSIGHT / WS4</p><h1>Incident decisions</h1><p class="subtitle">Confirm, correct, or resolve a model decision. Explain your choice to finalize it.</p></div>
     <button type="button" class="button" id="reload">Reload results</button>
   </section>
   <p id="demo-note" class="demo-note" hidden>Demo: five synthetic incidents and hand-authored model assessments. No LLM was called.</p>
   <div id="message" class="message" role="status" aria-live="polite" hidden></div>
   <section class="stats" aria-label="Review counts">
-    <div class="stat"><strong id="pending-count">—</strong><span>Awaiting approval</span></div>
-    <div class="stat"><strong id="human_review-count">—</strong><span>Human review</span></div>
-    <div class="stat"><strong id="approved-count">—</strong><span>Approved</span></div>
+    <div class="stat"><strong id="pending-count">—</strong><span>Awaiting decision</span></div>
+    <div class="stat"><strong id="finalized-count">—</strong><span>Finalized</span></div>
+    <div class="stat"><strong id="undecided-count">—</strong><span>LLM undecided · pending</span></div>
     <span id="loaded-count" class="loaded"></span>
   </section>
   <p id="failed-note" class="failed-note" hidden></p>
@@ -50,38 +51,36 @@
     <aside class="queue-panel" aria-label="Incident queue">
       <div class="queue-heading"><h2>Records</h2><span id="queue-count" class="queue-count"></span></div>
       <label for="queue-filter">Show</label>
-      <select id="queue-filter"><option value="pending">Awaiting approval</option><option value="human">Human review</option><option value="approved">Approved</option><option value="all">All records</option></select>
+      <select id="queue-filter"><option value="pending">All awaiting decisions</option><option value="HSBC">LLM: HSBC · pending</option><option value="SUPPLIER">LLM: SUPPLIER · pending</option><option value="UNDECIDED">LLM: Undecided · pending</option><option value="finalized">Finalized</option><option value="all">All records</option></select>
       <nav id="queue" aria-label="Incident records"></nav>
     </aside>
     <section class="detail-panel" aria-label="Selected incident">
-      <div id="empty-state" class="empty-state"><h2 id="empty-title">Loading results</h2><p>Select another queue or reload your classification results.</p></div>
+      <div id="empty-state" class="empty-state"><h2 id="empty-title">Loading results</h2><p>Choose another queue or open the final decisions dashboard.</p></div>
       <article id="record" hidden>
         <div class="record-heading"><span id="record-id"></span><span id="review-status"></span></div>
         <h2 id="record-title"></h2><p id="record-service" class="record-service"></p>
         <div id="assessment" class="assessment"><p class="eyebrow">LLM CLASSIFICATION</p><p id="classification"></p><p id="confidence" class="field-note"></p></div>
         <p id="rationale-label" class="rationale-label"></p><p id="rationale" class="record-text"></p>
-        <p id="routing-note" class="routing-note" hidden></p>
-        <section id="actions" class="actions" aria-label="Your decision" hidden>
-          <div class="action-row"><button type="button" class="button button-primary" id="approve">Approve classification</button><button type="button" class="button" id="reject">Reject</button><span class="action-note">Your decision is saved immediately.</span></div>
-          <div id="rejection-panel" class="rejection-panel" hidden>
-            <label for="rejection-reason">Why do you disagree? <span>(required)</span></label>
-            <textarea id="rejection-reason" rows="3" maxlength="2000" placeholder="Explain what needs a human review."></textarea>
-            <div class="rejection-buttons"><button type="button" class="button" id="cancel-reject">Cancel</button><button type="button" class="button button-primary" id="confirm-reject">Send to human review</button></div>
-          </div>
-        </section>
+        <form id="decision-form" class="actions">
+          <h3>Your final decision</h3>
+          <label for="final-class">Accountable party <span>(required)</span></label>
+          <select id="final-class" required><option value="">Choose a class</option><option value="HSBC">HSBC</option><option value="SUPPLIER">SUPPLIER</option></select>
+          <label for="user-reason">Your reason <span>(required for every decision)</span></label>
+          <textarea id="user-reason" rows="3" maxlength="2000" required placeholder="Explain which evidence supports your final decision."></textarea>
+          <p id="action-hint" class="field-note"></p>
+          <div class="action-row"><button type="submit" class="button button-primary" id="finalize">Save final decision</button><span class="action-note">Stays pending until the save is confirmed.</span></div>
+        </form>
+        <section id="final-decision" class="final-decision" hidden><p class="eyebrow">HUMAN FINAL DECISION</p><h3 id="saved-final-class"></h3><p id="saved-user-reason" class="record-text"></p><p id="saved-review-action" class="field-note"></p><a href="/dashboard">View the dashboard</a></section>
         <div class="details-stack">
-          <details><summary><span>Source fields <small id="field-count"></small></span></summary><div class="detail-content"><label for="field-selector">Choose a field</label><select id="field-selector"></select><p id="field-value"></p><p class="field-note">Cleaned values with standardized column names.</p></div></details>
-          <details><summary><span>Supporting evidence</span></summary><div id="supporting-evidence" class="detail-content record-text"></div></details>
-          <details><summary><span>Classification details</span></summary><div class="detail-content">
-            <section><h3>Key root cause</h3><p id="root-cause" class="record-text"></p></section>
-            <section class="analysis-text"><h3>Decision rationale</h3><p id="decision-detail" class="record-text"></p></section>
-            <p class="field-note">Confidence is the model's own assessment of its selected label, including UNDECIDED. It is not measured accuracy.</p>
-          </div></details>
+          <details open><summary><span>Supporting evidence</span></summary><div id="supporting-evidence" class="detail-content record-text"></div></details>
+          <details id="source-details"><summary><span>All model input fields <small id="field-count"></small></span></summary><div class="detail-content"><p class="field-note">Exact names, definitions, and values saved when this record was classified. INCIDENT_ID stays local.</p><div id="model-input" class="model-input"></div></div></details>
+          <details><summary><span>Classification details</span></summary><div class="detail-content"><section><h3>Key root cause</h3><p id="root-cause" class="record-text"></p></section><section class="analysis-text"><h3>Decision rationale</h3><p id="decision-detail" class="record-text"></p></section><p class="field-note">Confidence is the model's self-assessment, not measured accuracy.</p></div></details>
+          <details><summary><span>Prompt sent to the model</span></summary><div class="detail-content"><p id="model-prompt" class="record-text"></p></div></details>
         </div>
       </article>
     </section>
   </div>
-  <footer><span>HSBC · Incident classification / WS4</span><span>Human review makes no LLM calls.</span></footer>
+  <footer><span>HSBC · Incident classification / WS4</span><span>Review makes no LLM calls.</span></footer>
 </main>
 </body>
 </html>

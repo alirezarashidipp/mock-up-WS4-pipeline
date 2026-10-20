@@ -1,4 +1,0 @@
-Record ID,Issue Description,Supplier Response,Bank Action
-0001,Invoice is missing the purchase order reference.,We omitted the reference. Please contact supplier@example.com.,Requested a corrected invoice.
-0002,Payment was delayed after complete documents were received.,All required documents were submitted on time.,Our internal approval workflow failed. Contact bank@example.com.
-0003,Payment is delayed.,We are investigating.,We are investigating.

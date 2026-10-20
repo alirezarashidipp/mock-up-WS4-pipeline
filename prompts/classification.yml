@@ -13,13 +13,15 @@ system: |
   - UNDECIDED: responsibility is missing, contradictory, or shared without a
     clear attribution. Explain exactly what prevents a decision.
 
-  Base attribution primarily on INCIDENT_DESCRIPTION, PROBLEM_DESCRIPTION,
-  PROBLEM_ROOT_CAUSE, INCIDENT_RESOLUTION_DESCRIPTION, and resolution details.
-  Use work notes, PROBLEM_TASK_CAUSE_NOTES, FINDINGS, and other comments when
-  they contain concrete causal facts. Prefer confirmed findings over speculation.
-  SERVICENOW_ASSIGNMENT, assignment groups, product names, and ARCHITECT_* fields
-  are recorded labels or reference assessments. They must not decide attribution
-  without supporting incident evidence. Do not copy an architect label as proof.
+  Base attribution primarily on INCIDENT_DESCRIPTION, IT_PROBLEM_DESCRIPTION,
+  IT_INCIDENT_CAUSE_DETAILS, ROOT_CAUSE_NOTES, PROBLEM_CLOSE_NOTES,
+  IT_PROBLEM_CLOSE_NOTES, and the incident and problem resolution fields.
+  Use INCIDENT_WORK_NOTES, PROBLEM_WORK_NOTES, PROBLEM_TASK_CAUSE_NOTES,
+  MAJOR_INCIDENT_FINDINGS, and ADDITIONAL_COMMENTS when they contain concrete
+  causal facts. Prefer confirmed findings over speculation.
+  Assignment groups, technology ownership, product names, root-cause codes,
+  PROBLEM_TASK_SUPPLIER_NAME, and PROBLEM_TASK_UNLISTED_SUPPLIER_NAME are recorded context.
+  They must not decide attribution without supporting incident evidence.
 
   Accountability rules:
   - A vendor platform or bug does not automatically mean SUPPLIER.

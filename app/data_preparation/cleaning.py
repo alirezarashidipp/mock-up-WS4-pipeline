@@ -1,8 +1,9 @@
-import re
+import unicodedata
 
 
-# shortcut: covers ordinary email addresses; extend if unusual formats appear.
-EMAIL_PATTERN = re.compile(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")
+def clean_text(value: str) -> str:
+    # Remove invisible control/format characters while retaining normal text and whitespace.
+    return "".join(char for char in value if char in "\t\n\r" or unicodedata.category(char) not in ("Cc", "Cf"))
 
 
 def clean_rows(rows: list[dict[str, str]]) -> list[dict[str, str]]:
@@ -10,7 +11,7 @@ def clean_rows(rows: list[dict[str, str]]) -> list[dict[str, str]]:
     for row in rows:
         cleaned = row.copy()
         for name, value in row.items():
-            if name != "ROW_ID":
-                cleaned[name] = EMAIL_PATTERN.sub("[EMAIL]", value).strip()
+            if name != "INCIDENT_ID":
+                cleaned[name] = clean_text(value)
         cleaned_rows.append(cleaned)
     return cleaned_rows

@@ -13,11 +13,11 @@ def read_records(path: Path, optional: bool = False) -> tuple[list[dict], str]:
         reader = csv.DictReader(file, strict=True)
         headers = reader.fieldnames or []
         rows = list(reader)
-    if not rows or "ROW_ID" not in headers or len(headers) != len(set(headers)):
-        return [], f"{path.name} requires data, unique columns, and ROW_ID."
+    if not rows or "INCIDENT_ID" not in headers or len(headers) != len(set(headers)):
+        return [], f"{path.name} requires data, unique columns, and INCIDENT_ID."
     if any(None in row or None in row.values() for row in rows):
         return [], f"{path.name} contains a malformed row."
-    ids = [row["ROW_ID"] for row in rows]
+    ids = [row["INCIDENT_ID"] for row in rows]
     if any(not value.strip() for value in ids) or len(ids) != len(set(ids)):
         return [], f"{path.name} requires unique, nonempty identifiers."
     return rows, ""
@@ -30,9 +30,9 @@ def append_record(path: Path, record: dict) -> tuple[bool, str]:
         return False, error
     if rows and set(rows[0]) != set(record):
         return False, f"{path.name} belongs to a different schema. Use a new batch folder."
-    previous = next((row for row in rows if row["ROW_ID"] == record["ROW_ID"]), None)
+    previous = next((row for row in rows if row["INCIDENT_ID"] == record["INCIDENT_ID"]), None)
     if previous is not None:
-        return (True, "") if previous == record else (False, f"{path.name} already contains a different decision for this ROW_ID.")
+        return (True, "") if previous == record else (False, f"{path.name} already contains a different decision for this INCIDENT_ID.")
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
     try:

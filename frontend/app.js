@@ -1,123 +1,142 @@
 const $ = id => document.getElementById(id);
-let records = [], selectedId = null, busy = false, unavailable = true;
+let records = [], selectedId = null, formIncidentId = null, busy = false, unavailable = true;
+
 function text(id, value) { $(id).textContent = value || "Not provided"; }
 function message(value, error = false) {
   $("message").textContent = value;
   $("message").className = "message" + (error ? " error" : "");
   $("message").hidden = !value;
 }
-function selected() { return records.find(row => row.row_id === selectedId); }
-function actionable(row) { return row && row.review_status === "Pending Review" && ["SUPPLIER", "HSBC"].includes(row.result.classification); }
+function selected() { return records.find(row => row.incident_id === selectedId); }
+function actionable(row) { return row && row.review_status === "PENDING_REVIEW"; }
 function setControls() {
   $("reload").disabled = busy;
   $("queue-filter").disabled = busy;
   for (const button of $("queue").querySelectorAll("button")) button.disabled = busy;
-  for (const id of ["approve", "reject", "confirm-reject", "cancel-reject"]) $(id).disabled = busy || unavailable || !actionable(selected());
-  $("rejection-reason").disabled = busy;
+  for (const id of ["final-class", "user-reason", "finalize"]) {
+    $(id).disabled = busy || unavailable || !actionable(selected());
+  }
 }
 function visibleRows() {
   const view = $("queue-filter").value;
   return records.filter(row => view === "all" ||
-    (view === "pending" && row.review_status === "Pending Review") ||
-    (view === "approved" && row.review_status === "Approved") ||
-    (view === "human" && ["Rejected", "Needs Human Review"].includes(row.review_status)));
+    (view === "pending" && actionable(row)) ||
+    (view === "finalized" && row.review_status === "FINALIZED") ||
+    (actionable(row) && row.result.classification === view));
 }
-function closeRejection() { $("rejection-panel").hidden = true; $("rejection-reason").value = ""; }
-function showField() {
-  const row = selected();
-  text("field-value", row?.input[$("field-selector").value]);
+function updateActionHint() {
+  const row = selected(), choice = $("final-class").value;
+  if (!row || !choice) { text("action-hint", "Choose the accountable party and explain your decision."); return; }
+  const original = row.result.classification;
+  const action = original === "UNDECIDED" ? "Resolve the model's uncertainty" : choice === original ? "Confirm the model's decision" : "Correct the model's decision";
+  text("action-hint", action + " as " + choice + ". Your reason is required.");
 }
-function renderEvidence(id, raw) {
-  const container = $(id); container.replaceChildren();
-  let items = [];
-  try { items = JSON.parse(raw || "[]"); } catch { }
-  if (!Array.isArray(items) || !items.length) { container.textContent = "No supporting evidence supplied."; return; }
+function renderEvidence(raw) {
+  const container = $("supporting-evidence"); container.replaceChildren();
+  const items = JSON.parse(raw || "[]");
+  if (!items.length) { container.textContent = "No supporting evidence supplied."; return; }
   for (const item of items) {
     const quote = document.createElement("blockquote"), value = document.createElement("p"), source = document.createElement("cite");
     value.textContent = item.quote; source.textContent = item.column;
     quote.append(value, source); container.append(quote);
   }
 }
+function renderInputs(row) {
+  $("model-input").replaceChildren();
+  for (const field of row.model_input) {
+    const section = document.createElement("section");
+    const name = document.createElement("h3"), definition = document.createElement("p"), value = document.createElement("p");
+    name.textContent = field.name;
+    definition.className = "field-definition"; definition.textContent = field.description;
+    value.className = "source-value"; value.textContent = field.value || "(empty)";
+    section.append(name, definition, value); $("model-input").append(section);
+  }
+  text("field-count", String(row.model_input.length) + " fields");
+  text("model-prompt", row.prompt);
+  $("source-details").open = row.result.classification === "UNDECIDED";
+}
 function render() {
   const visible = visibleRows();
-  if (!visible.some(row => row.row_id === selectedId)) { selectedId = visible[0]?.row_id || null; closeRejection(); }
-  $("queue").replaceChildren();
-  text("queue-count", String(visible.length));
+  if (!visible.some(row => row.incident_id === selectedId)) selectedId = visible[0]?.incident_id || null;
+  $("queue").replaceChildren(); text("queue-count", String(visible.length));
   for (const row of visible) {
     const button = document.createElement("button"); button.className = "queue-item"; button.type = "button";
-    button.setAttribute("aria-current", String(row.row_id === selectedId));
-    for (const [className, value] of [["queue-id", row.row_id], ["queue-title", row.input.INCIDENT_SUMMARY], ["queue-meta", row.result.classification === "UNDECIDED" ? "I am not sure" : row.result.classification]]) {
+    button.setAttribute("aria-current", String(row.incident_id === selectedId));
+    const label = row.result.classification === "UNDECIDED" ? "LLM: I am not sure" : "LLM: " + row.result.classification;
+    for (const [className, value] of [["queue-id", row.incident_id], ["queue-title", row.input.INCIDENT_SHORT_DESCRIPTION], ["queue-meta", label + (row.final_class ? " → Final: " + row.final_class : "")]]) {
       const span = document.createElement("span"); span.className = className; span.textContent = value || "Untitled incident"; button.append(span);
     }
-    button.addEventListener("click", () => { selectedId = row.row_id; closeRejection(); render(); });
+    button.addEventListener("click", () => { selectedId = row.incident_id; render(); });
     $("queue").append(button);
   }
   const row = selected();
   $("record").hidden = !row; $("empty-state").hidden = !!row;
-  if (!row) { text("empty-title", unavailable ? "Results unavailable" : "Nothing in this queue"); setControls(); return; }
-  text("record-id", row.row_id); text("record-title", row.input.INCIDENT_SUMMARY);
-  text("record-service", row.input.INCIDENT_CONFIGURATION_ITEM);
-  text("review-status", row.review_status + (row.review_date ? " · " + row.review_date : ""));
+  if (!row) { text("empty-title", unavailable ? "Results unavailable" : "Nothing in this queue"); formIncidentId = null; setControls(); return; }
+  text("record-id", row.incident_id); text("record-title", row.input.INCIDENT_SHORT_DESCRIPTION);
+  text("record-service", row.input.CONFIGURATION_ITEM_NAME);
+  text("review-status", row.review_status === "FINALIZED" ? "Finalized · " + new Date(row.review_date).toLocaleString() : "Awaiting your decision");
   const uncertain = row.result.classification === "UNDECIDED";
   text("classification", uncertain ? "I am not sure" : row.result.classification);
   $("assessment").classList.toggle("uncertain", uncertain);
   text("rationale-label", uncertain ? "Why the model could not decide" : "Decision rationale");
   text("rationale", uncertain ? row.result.uncertainty_reason : row.result.decision_rationale);
   text("confidence", "LLM confidence: " + row.result.llm_confidence + "/100");
-  const routed = ["Rejected", "Needs Human Review"].includes(row.review_status);
-  $("routing-note").hidden = !routed;
-  text("routing-note", row.review_source === "USER_REJECTED" ? "User rejected: " + row.reason_of_rejection : "Automatically sent to human review. A human decision is required.");
-  $("actions").hidden = !actionable(row);
-  $("field-selector").replaceChildren();
-  for (const key of Object.keys(row.input)) {
-    const option = document.createElement("option"); option.value = key; option.textContent = key; $("field-selector").append(option);
-  }
-  $("field-selector").value = "INCIDENT_DESCRIPTION" in row.input ? "INCIDENT_DESCRIPTION" : Object.keys(row.input)[0];
-  showField(); text("field-count", String(Object.keys(row.input).length) + " fields");
-  renderEvidence("supporting-evidence", row.result.supporting_evidence);
   text("root-cause", row.result.key_root_cause || "Root cause has not been established.");
   text("decision-detail", row.result.decision_rationale);
-  setControls();
+  renderEvidence(row.result.supporting_evidence); renderInputs(row);
+  const finalized = row.review_status === "FINALIZED";
+  $("decision-form").hidden = finalized; $("final-decision").hidden = !finalized;
+  if (finalized) {
+    text("saved-final-class", row.final_class);
+    text("saved-user-reason", row.user_reason);
+    text("saved-review-action", row.review_action.replaceAll("_", " "));
+  } else if (formIncidentId !== row.incident_id) {
+    $("final-class").value = uncertain ? "" : row.result.classification;
+    $("user-reason").value = "";
+  }
+  formIncidentId = row.incident_id;
+  updateActionHint(); setControls();
 }
-async function loadQueue(sync = false) {
+async function loadQueue() {
   busy = true; setControls();
   try {
-    const response = await fetch(sync ? "/api/reload" : "/api/review", sync ? {method:"POST",headers:{"Content-Type":"application/json"},body:"{}"} : {cache:"no-store"});
+    const response = await fetch("/api/review", {cache: "no-store"});
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Could not read classification results.");
     records = data.records; unavailable = false;
     text("mode", data.demo ? "Demo · synthetic data" : "Classification results");
     $("demo-note").hidden = !data.demo;
-    for (const name of ["pending","human_review","approved"]) text(name + "-count", String(data.counts[name]));
+    for (const name of ["pending", "finalized", "undecided"]) text(name + "-count", String(data.counts[name]));
     text("loaded-count", String(records.length + data.counts.failed) + " records loaded");
     $("failed-note").hidden = !data.counts.failed;
-    text("failed-note", String(data.counts.failed) + " records failed classification and require a pipeline rerun.");
+    text("failed-note", String(data.counts.failed) + " pipeline failures require a new classification run.");
   } catch (error) { unavailable = true; message(error.message, true); }
   finally { busy = false; render(); }
 }
-async function saveDecision(decision) {
-  const row = selected();
+async function saveDecision(event) {
+  event.preventDefault();
+  const row = selected(), finalClass = $("final-class").value, reason = $("user-reason").value.trim();
   if (busy || unavailable || !actionable(row)) return;
-  const reason = $("rejection-reason").value.trim();
-  if (decision === "Rejected" && !reason) { message("Add a reason before sending this record to human review.", true); $("rejection-reason").focus(); return; }
-  busy = true; setControls(); message("Saving your decision…");
+  if (!finalClass || !reason) { message("Choose HSBC or SUPPLIER and provide a reason.", true); return; }
+  busy = true; setControls(); message("Saving your final decision…");
   try {
-    const response = await fetch("/api/review", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({row_id:row.row_id,version:row.version,decision,reason_of_rejection:decision === "Rejected" ? reason : ""})});
+    const response = await fetch("/api/review", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({incident_id: row.incident_id, version: row.version, final_class: finalClass, user_reason: reason})
+    });
     const data = await response.json();
     if (!response.ok) {
-      message(data.error || "The decision could not be saved.", true);
+      message(data.error || "The final decision could not be saved.", true);
       if (response.status === 409) await loadQueue();
       return;
     }
-    message(data.message); closeRejection(); await loadQueue();
-  } catch { unavailable = true; message("Save could not be confirmed. Your reason is kept; reload before retrying.", true); }
-  finally { busy = false; setControls(); }
+    message(data.message); formIncidentId = null; await loadQueue();
+  } catch {
+    unavailable = true; message("Save could not be confirmed. Your reason is kept; reload to check the saved state.", true);
+  } finally { busy = false; setControls(); }
 }
-$("queue-filter").addEventListener("change", () => { closeRejection(); render(); });
-$("field-selector").addEventListener("change", showField);
-$("reload").addEventListener("click", () => { message(""); loadQueue(true); });
-$("approve").addEventListener("click", () => saveDecision("Approved"));
-$("reject").addEventListener("click", () => { $("rejection-panel").hidden = false; $("rejection-reason").focus(); });
-$("cancel-reject").addEventListener("click", closeRejection);
-$("confirm-reject").addEventListener("click", () => saveDecision("Rejected"));
+$("decision-form").addEventListener("submit", saveDecision);
+$("final-class").addEventListener("change", updateActionHint);
+$("queue-filter").addEventListener("change", render);
+$("reload").addEventListener("click", () => { message(""); loadQueue(); });
 loadQueue();

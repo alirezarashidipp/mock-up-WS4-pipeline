@@ -1,8 +1,10 @@
 # API integration
 
-The manual pipeline sends one incident per OpenAI request using the existing Responses API and Pydantic structured output. The review app uses FastAPI and makes no model calls.
+The manual pipeline sends one incident per Chat Completions request with a strict JSON schema and validates the response locally with Pydantic. `app/llm_connection.py` selects OpenAI API-key authentication or Azure service-principal authentication using `LLM_PROVIDER`. The review app uses FastAPI and makes no model calls.
 
-Input column mapping is in `fields/column_mapping.csv`; definitions are in `fields/definitions.yml`. Each supplied field has its standardized UPPERCASE name, definition, and cleaned value. `ROW_ID` stays local.
+Azure's supported JSON Schema subset omits some length and range constraints. The request schema omits those keywords for both providers, while the original Pydantic model still enforces them on the response. See [Microsoft's structured-output documentation](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/structured-outputs).
+
+Input mapping and definitions are together in `fields/columns.yaml`. Each supplied field has its standardized UPPERCASE name, definition, and cleaned value. `INCIDENT_ID` stays local.
 
 ## Classification response
 
@@ -25,12 +27,12 @@ ServiceNow and architect labels are context, not sufficient proof. Architect fie
 
 ## FastAPI review API
 
-- GET `/api/review` returns successful records and counts for pending, human review, approved, and failed rows.
-- POST `/api/reload` synchronizes undecided records into HUMAN_REVIEW and returns fresh records.
-- POST `/api/review` accepts `row_id`, `version`, `decision` (Approved or Rejected), and `reason_of_rejection`.
+- GET /api/review returns all successful records and counts for pending, finalized, undecided-pending, and failed rows. GET requests do not write files.
+- POST /api/review accepts incident_id, version, final_class (HSBC or SUPPLIER), and user_reason. All successful model classes can be finalized; a nonblank reason is required in every case.
+- GET /api/dashboard reads FINAL.csv only and returns final-class counts, percentages, review-action counts, and finalized incident summaries.
 
-Rejection requires a reason. Stale or already-routed records return 409. Approval writes `FINAL.csv`; rejection writes `HUMAN_REVIEW.csv`. Automatic routing uses `LLM_UNDECIDED`; user rejection uses `USER_REJECTED`.
+Review exposes the exact saved model_input list and prompt so changes to the YAML do not rewrite what the original model saw. UNDECIDED records stay pending and can be resolved by the user. No automatic HUMAN_REVIEW routing remains.
 
-All write requests require same-origin JSON. Run one local worker. CSVs using the earlier ten-field response need a new classification run in a separate batch folder; they are not silently relabelled.
+Finalization preserves the full original result and adds FINAL_CLASS, USER_REASON, REVIEW_ACTION, REVIEW_DATE, and STATUS=FINALIZED. Conflicting, stale, or duplicate decisions return 409. Invalid JSON fields return 422; a whitespace-only reason returns 400.
 
-HUMAN_REVIEW.csv stores only cleaned input columns plus STATUS, REVIEW_DATE, REJECTION_REASON, and LLM_UNCERTAINTY_REASON. FINAL.csv retains the model results too. Review responses expose review_date for display; timestamps are UTC and recorded when a row is first routed or reviewed. The mockup uses data/mockup/ and the manual pipeline defaults to data/run/.
+Writes require same-origin JSON. CSV values are rendered as text. Run one local worker. The review and dashboard make no model calls.

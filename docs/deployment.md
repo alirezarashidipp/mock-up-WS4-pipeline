@@ -1,15 +1,24 @@
-# Local execution
+# Local demo
 
-Install requirements into the existing virtual environment. Run the pipeline manually, then start FastAPI:
+From the project root in PowerShell:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m app.main
-.\.venv\Scripts\python.exe -m app.review
+.\run_pipeline.ps1
+.\run_frontend.ps1
 ```
 
-Open http://127.0.0.1:8765/. The first command that runs `app.main` calls OpenAI using the local ignored `.env`. Review makes no model calls. Set paths in `app/main.py`; approved and human-review outputs go beside the results.
+Configure .env and a source CSV matching fields/columns.yaml before the first command. The pipeline makes model calls and writes CLEAN.csv and LLM_OUTPUT.csv. Wait for it to finish, then start the frontend. Open http://127.0.0.1:8765/ for review and http://127.0.0.1:8765/dashboard for finalized decisions. The frontend makes no model calls. The dashboard is initially empty until the user saves a decision.
 
-For the five-record hand-authored demo, run `python -m app.review --demo` instead. Stop the server with Ctrl+C. Run one worker locally; authentication, cloud hosting, and multi-process storage are outside this PoC.
+For a manual real model run, configure .env and set INPUT_FILE and OUTPUT_FILE in app/main.py:
 
-Python 3.11 is the target. The existing environment is Python 3.14; execution on Python 3.11 is unverified. Tests are not run when the user asks to skip them.
+```powershell
+.\run_pipeline.ps1
+.\run_frontend.ps1
+```
+
+The default raw input is data/mockup/RAW.csv; outputs go in data/run/. A new run creates CLEAN.csv and LLM_OUTPUT.csv. Existing batch outputs are preserved; choose a new output folder for another batch. Review and dashboard make no model calls.
+
+The provider, model/deployment, temperature, credentials, and optional proxy settings are described in .env.example and README.md. Stop and restart the pipeline after changing them.
+
+Run one worker locally and finish classification before review. Stop with Ctrl+C. The target is Python 3.11; the existing virtual environment is Python 3.14. Offline checks use mocked model responses.
