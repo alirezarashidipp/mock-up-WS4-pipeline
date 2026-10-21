@@ -28,11 +28,12 @@ class PythonTests(unittest.TestCase):
             clean = Path(folder) / "CLEAN.csv"
             source = "incident_id,incident_description\n001,<b>Example</b> demo@example.com!\u200b\n"
             raw.write_text(source, encoding="utf-8")
+            clean.write_text("Old generated output", encoding="utf-8")
 
             with patch.object(preparation, "INPUT_FILE", raw), patch.object(preparation, "CLEAN_FILE", clean):
                 self.assertEqual(preparation.run_pipeline(), 0)
                 previous = clean.read_bytes()
-                self.assertEqual(preparation.run_pipeline(), 1)
+                self.assertEqual(preparation.run_pipeline(), 0)
                 self.assertEqual(clean.read_bytes(), previous)
 
             rows, error = read_records(clean)

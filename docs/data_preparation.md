@@ -18,7 +18,7 @@ data/mockup/RAW.csv -> read -> rename -> clean -> data/run/CLEAN.csv
 
 - This stage makes no LLM calls and does not load prompts or column definitions.
 - No ID presence/uniqueness checks or mapping-collision checks run here. Headers that resolve to the same name overwrite earlier values in that row.
-- Empty input returns exit code `1` without creating output. Existing `CLEAN.csv` also returns `1` without overwriting it; move the previous output aside or change `CLEAN_FILE` before rerunning.
+- Empty input returns exit code `1` without creating or changing output. With data rows, each run replaces `CLEAN.csv` with the newly prepared rows, including when the file already exists.
 - Success returns `0` and prints `Output:` with the saved path. Runtime errors print the exception type and exit with `1`; non-UTF-8 input can cause `UnicodeDecodeError`.
 - Handoff: `app.llm.pipeline` reads `CLEAN.csv`; its request flow and separate checks are documented in [llm.md](llm.md).
 

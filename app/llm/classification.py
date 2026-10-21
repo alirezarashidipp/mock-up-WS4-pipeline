@@ -6,7 +6,7 @@ import yaml
 from openai import OpenAI, OpenAIError
 from pydantic import ValidationError
 
-from app.data_preparation.prepare_fields import prepare_fields
+from app.llm.prepare_fields import prepare_fields
 from app.llm.llm_connection import llm_connection
 from app.models import Classification
 from app.llm.save_csv import save_result

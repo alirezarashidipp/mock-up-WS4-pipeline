@@ -65,7 +65,7 @@ All model outcomes (`HSBC`, `SUPPLIER`, `UNDECIDED`) await a user's final class 
 
 Frontend files are separate: `frontend/review/` and `frontend/dashboard/`. Both use the shared `frontend/style.css` and logo artwork in `frontend/pictures/`.
 
-Preparation preserves an existing CLEAN.csv. The LLM pipeline can start with existing output files and appends new incident IDs; conflicting results for an existing ID are still rejected when saving. Use a separate output folder for a fresh batch. CSV files and credentials are excluded from Git.
+Preparation replaces CLEAN.csv with the newly prepared data on each nonempty run. The LLM pipeline can start with existing output files and appends new incident IDs; conflicting results for an existing ID are still rejected when saving. Use a separate output folder for a fresh batch. CSV files and credentials are excluded from Git.
 
 ## Stage documentation
 

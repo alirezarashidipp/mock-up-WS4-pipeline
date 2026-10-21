@@ -10,7 +10,7 @@ CLEAN.csv -> one row per request -> validate response -> save LLM_OUTPUT.csv
 
 1. Take the next row from `data/run/CLEAN.csv`, in file order.
 2. Keep `INCIDENT_ID` locally to associate the result with its source row.
-3. Build a JSON array for the other columns: `{name, description, value}`. Resolve each description by standardized column name from `fields/definitions.yml`.
+3. `app/llm/prepare_fields.py` builds a JSON array for the other columns: `{name, description, value}`. Resolve each description by standardized column name from `fields/definitions.yml`.
 4. Send two messages: `system` = the `system` value from `prompts/classification.yml`; `user` = the JSON array for this row. Repeat the prompt and definitions in every request. Requests contain no earlier rows or conversation history.
 5. Request a structured JSON response using the `Classification` schema in `app/models.py`:
    - `classification`: `HSBC`, `SUPPLIER`, or `UNDECIDED`.

@@ -20,14 +20,10 @@ def is_evidence_column(name):
 
 
 def append_record(path, record):
-    record = dict(record)
-    for name, value in record.items():
-        record[name] = "" if value is None else str(value)
+    record = {name: "" if value is None else str(value) for name, value in record.items()}
     if not record.get("INCIDENT_ID", "").strip():
         return False, "Every record requires a nonempty INCIDENT_ID."
-    rows, error = read_records(path, optional=True)
-    if error:
-        return False, error
+    rows, _ = read_records(path, optional=True)
     if rows:
         different_columns = set(rows[0]) ^ set(record)
         if any(not is_evidence_column(name) for name in different_columns):
