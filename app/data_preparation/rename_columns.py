@@ -1,4 +1,6 @@
 def rename_columns(rows: list[dict[str, str]], column_names: list[dict[str, str]]) -> list[dict[str, str]]:
+    if not rows:
+        return []
     mapping = {}
     for field in column_names:
         mapping[field["original_name"]] = field["new_name"].upper()

@@ -1,10 +1,10 @@
 # API integration
 
-The manual pipeline sends one incident per Chat Completions request with a strict JSON schema and validates the response locally with Pydantic. `app/llm_connection.py` selects OpenAI API-key authentication or Azure service-principal authentication using `LLM_PROVIDER`. The review app uses FastAPI and makes no model calls.
+The manual pipeline sends one incident per Chat Completions request with a strict JSON schema and validates the response locally with Pydantic. `app/llm/llm_connection.py` selects OpenAI API-key authentication or Azure service-principal authentication using `LLM_PROVIDER`. The review app uses FastAPI and makes no model calls.
 
 Azure's supported JSON Schema subset omits some length and range constraints. The request schema omits those keywords for both providers, while the original Pydantic model still enforces them on the response. See [Microsoft's structured-output documentation](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/structured-outputs).
 
-Input mapping and definitions are together in `fields/columns.yaml`. Each supplied field has its standardized UPPERCASE name, definition, and cleaned value. `INCIDENT_ID` stays local.
+The preparation pipeline uses `fields/columns.yaml` for renaming and writes CLEAN.csv. The separate LLM pipeline reads CLEAN.csv and `fields/definitions.yml`. Each supplied field has its standardized UPPERCASE name, definition, and cleaned value. `INCIDENT_ID` stays local.
 
 ## Classification response
 
@@ -25,11 +25,11 @@ The draft prompt distinguishes technical cause from accountability. A vendor def
 
 ServiceNow and architect labels are context, not sufficient proof. Architect fields remain visible as supplied context, so this is not a blind evaluation. No labelled few-shot examples were supplied or added.
 
-## FastAPI review API
+## Independent FastAPI apps
 
-- GET /api/review returns all successful records and counts for pending, finalized, undecided-pending, and failed rows. GET requests do not write files.
-- POST /api/review accepts incident_id, version, final_class (HSBC or SUPPLIER), and user_reason. All successful model classes can be finalized; a nonblank reason is required in every case.
-- GET /api/dashboard reads FINAL.csv only and returns final-class counts, percentages, review-action counts, and finalized incident summaries.
+- Review app, port 8765: GET /api/review returns all successful records and counts for pending, finalized, undecided-pending, and failed rows. GET requests do not write files.
+- Review app, port 8765: POST /api/review accepts incident_id, version, final_class (HSBC or SUPPLIER), and user_reason. All successful model classes can be finalized; a nonblank reason is required in every case.
+- Dashboard app, port 8766: GET /api/dashboard reads FINAL.csv only and returns final-class counts, percentages, review-action counts, and finalized incident summaries. This app has no review or save API and works without the review process or LLM_OUTPUT.csv.
 
 Review exposes the exact saved model_input list and prompt so changes to the YAML do not rewrite what the original model saw. UNDECIDED records stay pending and can be resolved by the user. No automatic HUMAN_REVIEW routing remains.
 

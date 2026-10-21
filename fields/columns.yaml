@@ -1,225 +1,146 @@
-# Draft definitions inferred from the supplied screenshots and sample content.
-# Source headers are preserved exactly; standardized names are UPPERCASE.
-# All values remain text; duration units, code scales, and timezone are unspecified.
+# Original CSV headers mapped to meaningful UPPERCASE names.
 columns:
 - original_name: incident_id
   new_name: INCIDENT_ID
-  description: Unique identifier of the incident, preserved locally to link its source data, model result, and final human decision.
 - original_name: incident_short_description
   new_name: INCIDENT_SHORT_DESCRIPTION
-  description: A short summary of the reported incident and its main symptoms.
 - original_name: incident_description
   new_name: INCIDENT_DESCRIPTION
-  description: A detailed incident narrative describing symptoms, timing, impact, and investigation context.
 - original_name: incident_resolution_description
   new_name: INCIDENT_RESOLUTION_DESCRIPTION
-  description: The recorded method used to restore service, which does not by itself establish who caused the incident.
 - original_name: it_incident_cause_details
   new_name: IT_INCIDENT_CAUSE_DETAILS
-  description: Recorded details about suspected or established incident causes.
 - original_name: incident_resolution_notes
   new_name: INCIDENT_RESOLUTION_NOTES
-  description: Free-text incident resolution notes that may also describe contributing causes.
 - original_name: it_incident_open_datetime
   new_name: IT_INCIDENT_OPEN_DATETIME
-  description: The recorded date and time when the incident was opened.
 - original_name: it_incident_closed_datetime
   new_name: IT_INCIDENT_CLOSED_DATETIME
-  description: The recorded date and time when the incident was closed.
 - original_name: it_incident_last_modified_datetime
   new_name: IT_INCIDENT_LAST_MODIFIED_DATETIME
-  description: The recorded date and time of the incident record's latest update.
 - original_name: incident_category
   new_name: INCIDENT_CATEGORY
-  description: The high-level incident category recorded in the source system.
 - original_name: incident_subcategory
   new_name: INCIDENT_SUBCATEGORY
-  description: The more specific incident category recorded beneath the main category.
 - original_name: incident_assignment_group_name
   new_name: INCIDENT_ASSIGNMENT_GROUP_NAME
-  description: The support group assigned to the incident, which does not by itself establish causal responsibility.
 - original_name: causing_change_id
   new_name: CAUSING_CHANGE_ID
-  description: The identifier of a change linked in the source system as a possible or recorded cause of the incident.
 - original_name: it_incident_close_code
   new_name: IT_INCIDENT_CLOSE_CODE
-  description: The code or label used to categorize how the incident was closed.
 - original_name: configuration_item_name
   new_name: CONFIGURATION_ITEM_NAME
-  description: The application, service, or configuration item associated with the incident.
 - original_name: incident_created_datetime
   new_name: INCIDENT_CREATED_DATETIME
-  description: The recorded date and time when the incident record was created.
 - original_name: it_incident_duration
   new_name: IT_INCIDENT_DURATION
-  description: The incident duration recorded as text, with its measurement unit unspecified in the supplied sample.
 - original_name: impacted_business_service_name
   new_name: IMPACTED_BUSINESS_SERVICE_NAME
-  description: The business service recorded as affected by the incident.
 - original_name: impacted_location_name
   new_name: IMPACTED_LOCATION_NAME
-  description: The location or locations recorded as affected by the incident.
 - original_name: problem_id
   new_name: PROBLEM_ID
-  description: The identifier of the problem record associated with the incident.
 - original_name: root_cause_severity_code
   new_name: ROOT_CAUSE_SEVERITY_CODE
-  description: The source-system severity code associated with the root-cause record, whose scale is not defined
-    here.
 - original_name: incident_status
   new_name: INCIDENT_STATUS
-  description: The incident's recorded lifecycle status, such as open or closed.
 - original_name: major_incident_findings
   new_name: MAJOR_INCIDENT_FINDINGS
-  description: Recorded findings from the major-incident investigation.
 - original_name: major_incident_summary
   new_name: MAJOR_INCIDENT_SUMMARY
-  description: A narrative summary of the major incident, including key events, symptoms, and impact.
 - original_name: it_incident_parent_id
   new_name: IT_INCIDENT_PARENT_ID
-  description: The identifier of the parent incident linked to this incident.
 - original_name: it_incident_disruption_flag
   new_name: IT_INCIDENT_DISRUPTION_FLAG
-  description: The recorded flag indicating whether the incident is associated with a disruption.
 - original_name: it_incident_disruption_name
   new_name: IT_INCIDENT_DISRUPTION_NAME
-  description: The name or label of the disruption associated with the incident.
 - original_name: incident_business_impact
   new_name: INCIDENT_BUSINESS_IMPACT
-  description: A description of the effects on business services, transactions, customers, or regions.
 - original_name: it_problem_summary
   new_name: IT_PROBLEM_SUMMARY
-  description: A short summary of the problem linked to the incident.
 - original_name: it_problem_description
   new_name: IT_PROBLEM_DESCRIPTION
-  description: A description of the underlying problem, its symptoms, and investigation context.
 - original_name: problem_close_notes
   new_name: PROBLEM_CLOSE_NOTES
-  description: Problem closure notes that may summarize the investigation, root cause, and conclusions.
 - original_name: it_problem_resolution_description
   new_name: IT_PROBLEM_RESOLUTION_DESCRIPTION
-  description: A summary of the recorded resolution for the underlying problem.
 - original_name: it_problem_resolution_details
   new_name: IT_PROBLEM_RESOLUTION_DETAILS
-  description: Detailed background, investigation steps, and resolution information recorded for the problem.
 - original_name: it_problem_open_datetime
   new_name: IT_PROBLEM_OPEN_DATETIME
-  description: The recorded date and time when the problem record was opened.
 - original_name: it_problem_close_datetime
   new_name: IT_PROBLEM_CLOSE_DATETIME
-  description: The recorded date and time when the problem record was closed.
 - original_name: it_problem_last_modified_datetime
   new_name: IT_PROBLEM_LAST_MODIFIED_DATETIME
-  description: The recorded date and time of the problem record's latest update.
 - original_name: it_problem_related_incident_id
   new_name: IT_PROBLEM_RELATED_INCIDENT_ID
-  description: The identifier of an incident linked from the problem record.
 - original_name: it_problem_ticket_status_name
   new_name: IT_PROBLEM_TICKET_STATUS_NAME
-  description: The lifecycle status name recorded for the linked problem ticket.
 - original_name: it_problem_configuration_item_name
   new_name: IT_PROBLEM_CONFIGURATION_ITEM_NAME
-  description: The application, service, or configuration item associated with the problem record.
 - original_name: it_problem_risk_details
   new_name: IT_PROBLEM_RISK_DETAILS
-  description: Recorded information about risks associated with the problem or its resolution.
 - original_name: problem_task_workaround
   new_name: PROBLEM_TASK_WORKAROUND
-  description: A temporary workaround recorded on the problem task.
 - original_name: it_problem_close_notes
   new_name: IT_PROBLEM_CLOSE_NOTES
-  description: Additional IT problem closure notes preserved separately from the source field problem_close_notes.
 - original_name: problem_task_id
   new_name: PROBLEM_TASK_ID
-  description: The identifier of the task used to investigate or resolve the linked problem.
 - original_name: problem_task_problem_id
   new_name: PROBLEM_TASK_PROBLEM_ID
-  description: The identifier of the parent problem linked from the problem task.
 - original_name: problem_task_short_description
   new_name: PROBLEM_TASK_SHORT_DESCRIPTION
-  description: A short summary of the problem task and the issue it addresses.
 - original_name: root_cause_code
   new_name: ROOT_CAUSE_CODE
-  description: The recorded root-cause category or label, which should be interpreted alongside the supporting narrative.
 - original_name: problem_task_close_notes
   new_name: PROBLEM_TASK_CLOSE_NOTES
-  description: Problem-task closure notes that may include findings, resolution details, and preventive recommendations.
 - original_name: problem_task_business_service_name
   new_name: PROBLEM_TASK_BUSINESS_SERVICE_NAME
-  description: The business service associated with the problem task.
 - original_name: root_cause_notes
   new_name: ROOT_CAUSE_NOTES
-  description: The recorded explanation of the root cause, contributing conditions, and causal mechanism.
 - original_name: problem_task_first_reported_incident_id
   new_name: PROBLEM_TASK_FIRST_REPORTED_INCIDENT_ID
-  description: The incident identifier recorded as the first reported incident for the problem task.
 - original_name: root_cause_task_active_flag
   new_name: ROOT_CAUSE_TASK_ACTIVE_FLAG
-  description: The recorded flag indicating whether the root-cause investigation task is active.
 - original_name: root_cause_technology_owning_org_l2_name
   new_name: ROOT_CAUSE_TECHNOLOGY_OWNING_ORG_L2_NAME
-  description: The level-two technology organization recorded as owning the root-cause task, without implying causal
-    responsibility.
 - original_name: problem_task_assignment_group_name
   new_name: PROBLEM_TASK_ASSIGNMENT_GROUP_NAME
-  description: The support group assigned to the problem task, which does not by itself establish causal responsibility.
 - original_name: problem_task_category_name
   new_name: PROBLEM_TASK_CATEGORY_NAME
-  description: The category recorded for the problem task.
 - original_name: problem_task_status
   new_name: PROBLEM_TASK_STATUS
-  description: The recorded lifecycle status of the problem task.
 - original_name: problem_task_type
   new_name: PROBLEM_TASK_TYPE
-  description: The type of problem task, such as root-cause analysis.
 - original_name: problem_task_unlisted_supplier_name
   new_name: PROBLEM_TASK_UNLISTED_SUPPLIER_NAME
-  description: A supplier name recorded outside the listed supplier selection on the problem task.
 - original_name: problem_task_supplier_name
   new_name: PROBLEM_TASK_SUPPLIER_NAME
-  description: The supplier associated with the problem task, whose presence does not by itself establish responsibility.
 - original_name: problem_status_code
   new_name: PROBLEM_STATUS_CODE
-  description: The status code or label recorded for the problem.
 - original_name: problem_impact
   new_name: PROBLEM_IMPACT
-  description: The source-system impact value for the problem, whose scale is not defined here.
 - original_name: problem_priority_code
   new_name: PROBLEM_PRIORITY_CODE
-  description: The priority code or label assigned to the problem.
 - original_name: problem_urgency_code
   new_name: PROBLEM_URGENCY_CODE
-  description: The urgency code or label assigned to the problem.
 - original_name: problem_task_resolution_code
   new_name: PROBLEM_TASK_RESOLUTION_CODE
-  description: The code or label describing the resolution status or outcome of the problem task.
 - original_name: problem_task_description
   new_name: PROBLEM_TASK_DESCRIPTION
-  description: The detailed description of the issue and work covered by the problem task.
 - original_name: problem_task_fix_notes
   new_name: PROBLEM_TASK_FIX_NOTES
-  description: Recorded fix instructions, corrective actions, or preventive recommendations for the problem task.
 - original_name: problem_task_read_across_action_flag
   new_name: PROBLEM_TASK_READ_ACROSS_ACTION_FLAG
-  description: The recorded flag for read-across actions concerning similar services or systems.
 - original_name: problem_task_read_across_details
   new_name: PROBLEM_TASK_READ_ACROSS_DETAILS
-  description: Recorded details about applying the investigation findings or corrective actions to similar services
-    or systems.
 - original_name: problem_task_cause_notes
   new_name: PROBLEM_TASK_CAUSE_NOTES
-  description: Problem-task investigation notes describing causal findings, errors, or supporting observations.
 - original_name: problem_task_cmdb_ci_name
   new_name: PROBLEM_TASK_CMDB_CI_NAME
-  description: The configuration item name or identifier recorded in the CMDB reference for the problem task.
 - original_name: incident_work_notes
   new_name: INCIDENT_WORK_NOTES
-  description: Timestamped incident work-log entries containing operational updates, investigation observations,
-    and impact details.
 - original_name: problem_work_notes
   new_name: PROBLEM_WORK_NOTES
-  description: Timestamped problem work-log entries containing investigation updates, task notifications, and progress
-    details.
 - original_name: additional_comments
   new_name: ADDITIONAL_COMMENTS
-  description: Additional recorded comments providing incident context, communications, or follow-up information.

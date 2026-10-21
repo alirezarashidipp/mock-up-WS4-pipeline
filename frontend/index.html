@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Incident review | HSBC</title>
-  <link rel="stylesheet" href="/style.css">
-  <script src="/app.js" defer></script>
+  <link rel="stylesheet" href="/assets/style.css">
+  <script src="/assets/app.js" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -33,7 +33,7 @@
     <span class="mode" id="mode">Connecting…</span>
   </header>
 <main>
-  <nav class="page-nav" aria-label="Application"><a href="/" aria-current="page">Review queue</a><a href="/dashboard">Final decisions dashboard</a></nav>
+  <nav class="page-nav" aria-label="Application"><a href="/" aria-current="page">Review queue</a><a href="http://127.0.0.1:8766/">Final decisions dashboard</a></nav>
   <section class="page-heading">
     <div><p class="eyebrow">HUMAN OVERSIGHT / WS4</p><h1>Incident decisions</h1><p class="subtitle">Confirm, correct, or resolve a model decision. Explain your choice to finalize it.</p></div>
     <button type="button" class="button" id="reload">Reload results</button>
@@ -70,7 +70,7 @@
           <p id="action-hint" class="field-note"></p>
           <div class="action-row"><button type="submit" class="button button-primary" id="finalize">Save final decision</button><span class="action-note">Stays pending until the save is confirmed.</span></div>
         </form>
-        <section id="final-decision" class="final-decision" hidden><p class="eyebrow">HUMAN FINAL DECISION</p><h3 id="saved-final-class"></h3><p id="saved-user-reason" class="record-text"></p><p id="saved-review-action" class="field-note"></p><a href="/dashboard">View the dashboard</a></section>
+        <section id="final-decision" class="final-decision" hidden><p class="eyebrow">HUMAN FINAL DECISION</p><h3 id="saved-final-class"></h3><p id="saved-user-reason" class="record-text"></p><p id="saved-review-action" class="field-note"></p><a href="http://127.0.0.1:8766/">View the dashboard</a></section>
         <div class="details-stack">
           <details open><summary><span>Supporting evidence</span></summary><div id="supporting-evidence" class="detail-content record-text"></div></details>
           <details id="source-details"><summary><span>All model input fields <small id="field-count"></small></span></summary><div class="detail-content"><p class="field-note">Exact names, definitions, and values saved when this record was classified. INCIDENT_ID stays local.</p><div id="model-input" class="model-input"></div></div></details>

@@ -4,13 +4,13 @@
 - Use plain functions and direct library calls. Keep Python code in `app/` and preparation steps in `app/data_preparation/`.
 - Preserve source CSV files and identifiers. Credentials belong in the ignored `.env` file; never print them.
 - Keep sample data and example classification rules clearly labelled as examples.
-- Keep each column's original name, new name, and definition together in `fields/columns.yaml`; model instructions belong in `prompts/classification.yml`.
+- Keep original-to-standardized names in `fields/columns.yaml`, definitions keyed by standardized names in `fields/definitions.yml`, and model instructions in `prompts/classification.yml`.
 - Keep all project instructions in this root `AGENTS.md`; do not create additional `AGENTS.md` files in subfolders.
-- Verify changes with `python -m unittest discover -s tests -v`. Distinguish offline checks from live API results.
+- Verify changes with a lightweight check of the affected code. Distinguish offline checks from live API results.
 
 ## Python code
 
-- Keep `main.py` readable from top to bottom: read, rename, clean, prepare, classify, save.
+- Keep `app/data_preparation/pipeline.py` linear: read, rename, clean, save CLEAN.csv. Keep `app/llm/pipeline.py` separate: read CLEAN.csv, load definitions, classify, save LLM_OUTPUT.csv.
 - Use Pydantic for the fields sent to the model and the structured response.
 - Exclude row IDs from model input. Cleaning removes invisible control/format characters only; preserve punctuation, emails, HTML, and normal whitespace.
 - Keep essential checks for CSV shape, unique IDs, mapping collisions, and evidence quotes.
@@ -19,6 +19,7 @@
 ## Frontend
 
 - Keep the HSBC review UI minimal, English, and dependency-free.
+- Run review and dashboard as independent apps: `app/review_app.py` on port 8765 and `app/dashboard_app.py` on port 8766.
 - Display source fields, evidence, and analysis in collapsible sections; render CSV values as text.
 - Keep every successful model result, including UNDECIDED, pending until a user selects HSBC or SUPPLIER and provides a reason.
 - Save the original model result and the user's final class, reason, action, UTC date, and FINALIZED status in FINAL.csv.

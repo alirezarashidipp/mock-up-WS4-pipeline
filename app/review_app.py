@@ -1,12 +1,12 @@
-import argparse
 from threading import Lock
 
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
-from app.main import OUTPUT_FILE, ROOT
-from app.review_store import ReviewDecision, get_dashboard_data, get_review_data, submit_review
+from app.llm.pipeline import OUTPUT_FILE, ROOT
+from app.review_store import ReviewDecision, get_review_data, submit_review
 
 
 app = FastAPI(title="HSBC Incident Review", docs_url=None, redoc_url=None, openapi_url=None)
@@ -18,12 +18,16 @@ review_lock = Lock()  # One local worker serializes CSV writes.
 
 @app.middleware("http")
 async def local_requests(request: Request, call_next):
-    if request.headers.get("host") not in ("127.0.0.1:8765", "localhost:8765"):
+    host = request.headers.get("host")
+    if host not in ("127.0.0.1:8765", "localhost:8765"):
         return JSONResponse({"error": "Use http://127.0.0.1:8765."}, status_code=403)
     if request.method == "POST":
-        if request.headers.get("origin") != str(request.base_url).rstrip("/"):
+        origin = request.headers.get("origin")
+        local_origin = str(request.base_url).rstrip("/")
+        if origin != local_origin:
             return JSONResponse({"error": "Submit decisions from this local application."}, status_code=403)
-        if request.headers.get("content-type", "").split(";")[0] != "application/json":
+        content_type = request.headers.get("content-type", "").split(";")[0]
+        if content_type != "application/json":
             return JSONResponse({"error": "Expected JSON."}, status_code=415)
     response = await call_next(request)
     response.headers["Cache-Control"] = "no-store"
@@ -38,42 +42,17 @@ async def save_error(request: Request, error: OSError):
 
 
 @app.get("/")
-def index():
+def review_page():
     return FileResponse(ROOT / "frontend/index.html")
-
-
-@app.get("/dashboard")
-def dashboard():
-    return FileResponse(ROOT / "frontend/dashboard.html")
-
-
-@app.get("/style.css")
-def stylesheet():
-    return FileResponse(ROOT / "frontend/style.css")
-
-
-@app.get("/app.js")
-def javascript():
-    return FileResponse(ROOT / "frontend/app.js")
-
-
-@app.get("/dashboard.js")
-def dashboard_javascript():
-    return FileResponse(ROOT / "frontend/dashboard.js")
 
 
 @app.get("/api/review")
 def review_data():
     with review_lock:
         data = get_review_data(app.state.results_file, app.state.output_dir)
-    return JSONResponse({"demo": app.state.demo, **data}, status_code=400 if "error" in data else 200)
-
-
-@app.get("/api/dashboard")
-def dashboard_data():
-    with review_lock:
-        data = get_dashboard_data(app.state.output_dir)
-    return JSONResponse({"demo": app.state.demo, **data}, status_code=400 if "error" in data else 200)
+    data["demo"] = app.state.demo
+    status = 400 if "error" in data else 200
+    return JSONResponse(data, status_code=status)
 
 
 @app.post("/api/review")
@@ -83,16 +62,8 @@ def save_decision(decision: ReviewDecision):
     return JSONResponse(data, status_code=status)
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Review incidents and display finalized decisions.")
-    parser.add_argument("--demo", action="store_true")
-    args = parser.parse_args()
-    if args.demo:
-        app.state.results_file = ROOT / "data/mockup/LLM_OUTPUT.csv"
-        app.state.output_dir = ROOT / "data/mockup"
-        app.state.demo = True
-    uvicorn.run(app, host="127.0.0.1", port=8765, access_log=False)
+app.mount("/assets", StaticFiles(directory=ROOT / "frontend"), name="assets")
 
 
 if __name__ == "__main__":
-    main()
+    uvicorn.run(app, host="127.0.0.1", port=8765, access_log=False)

@@ -1,9 +1,46 @@
 import json
 import os
+from pathlib import Path
 
-from openai import OpenAI
+import yaml
+from openai import OpenAI, OpenAIError
+from pydantic import ValidationError
 
+from app.data_preparation.prepare_fields import prepare_fields
+from app.llm.llm_connection import llm_connection
 from app.models import Classification
+from app.llm.save_csv import save_result
+
+
+def classify_rows(rows, definitions, output_file):
+    if not rows:
+        return 1
+    if any(path.exists() for path in (output_file, output_file.parent / "FINAL.csv")):
+        print("Batch files already exist. Choose a new output folder to preserve earlier results.")
+        return 1
+    missing = set(rows[0]) - {"INCIDENT_ID"} - definitions.keys()
+    if missing:
+        print("Add definitions for: " + ", ".join(sorted(missing)))
+        return 1
+    prompt_file = Path(__file__).resolve().parents[2] / "prompts/classification.yml"
+    prompt = yaml.safe_load(prompt_file.read_text(encoding="utf-8"))["system"]
+
+    with llm_connection() as (client, model):
+        for row in rows:
+            fields = prepare_fields(row, definitions)
+            try:
+                result = classify_row(client, model, fields, prompt)
+            except (OpenAIError, ValidationError) as error:
+                save_result(output_file, row, None, fields, prompt, type(error).__name__)
+                print(f"Stopped: {type(error).__name__}. Earlier results are saved.")
+                return 1
+            saved = save_result(output_file, row, result, fields, prompt)
+            if not saved or result is None:
+                print("Stopped. Check the saved results.")
+                return 1
+            print(f"Saved incident {row['INCIDENT_ID']}")
+    print(f"Output: {output_file}")
+    return 0
 
 
 def classification_schema() -> dict:

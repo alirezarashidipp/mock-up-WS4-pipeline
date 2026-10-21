@@ -1,24 +1,34 @@
-# Local demo
+# Run locally
 
-From the project root in PowerShell:
+Install requirements once from the project root:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\run_pipeline.ps1
-.\run_frontend.ps1
 ```
 
-Configure .env and a source CSV matching fields/columns.yaml before the first command. The pipeline makes model calls and writes CLEAN.csv and LLM_OUTPUT.csv. Wait for it to finish, then start the frontend. Open http://127.0.0.1:8765/ for review and http://127.0.0.1:8765/dashboard for finalized decisions. The frontend makes no model calls. The dashboard is initially empty until the user saves a decision.
-
-For a manual real model run, configure .env and set INPUT_FILE and OUTPUT_FILE in app/main.py:
+Prepare RAW.csv into CLEAN.csv, then classify CLEAN.csv into LLM_OUTPUT.csv:
 
 ```powershell
-.\run_pipeline.ps1
-.\run_frontend.ps1
+.\.venv\Scripts\python.exe -m app.data_preparation.pipeline
+.\.venv\Scripts\python.exe -m app.llm.pipeline
 ```
 
-The default raw input is data/mockup/RAW.csv; outputs go in data/run/. A new run creates CLEAN.csv and LLM_OUTPUT.csv. Existing batch outputs are preserved; choose a new output folder for another batch. Review and dashboard make no model calls.
+Set INPUT_FILE and CLEAN_FILE in app/data_preparation/pipeline.py, and INPUT_FILE and OUTPUT_FILE in app/llm/pipeline.py. The source CSV must match fields/columns.yaml. Configure .env before the LLM step. Preparation makes no model calls. Existing output CSVs are preserved; use a new output folder for a new batch.
 
-The provider, model/deployment, temperature, credentials, and optional proxy settings are described in .env.example and README.md. Stop and restart the pipeline after changing them.
+After classification, start review in one terminal:
 
-Run one worker locally and finish classification before review. Stop with Ctrl+C. The target is Python 3.11; the existing virtual environment is Python 3.14. Offline checks use mocked model responses.
+```powershell
+.\run_review_app.ps1
+```
+
+Open http://127.0.0.1:8765/. Users confirm or change the LLM decision, give a reason, and save to FINAL.csv.
+
+Start the dashboard in another terminal:
+
+```powershell
+.\run_dashboard_app.ps1
+```
+
+Open http://127.0.0.1:8766/. This independent app reads FINAL.csv only and shows three counts and a small table. Set FINAL_FILE in app/dashboard_app.py if using a different batch folder. It works without the review process or LLM_OUTPUT.csv. Click Refresh to reload saved decisions.
+
+Both apps make no model calls. Run one worker per app, keep output CSVs closed in Excel, and stop each app with Ctrl+C in its terminal. The target is Python 3.11; the existing virtual environment is Python 3.14.

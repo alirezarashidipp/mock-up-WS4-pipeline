@@ -1,0 +1,81 @@
+# Draft definitions inferred from the supplied screenshots and sample content.
+# Keys are standardized column names; duration units, code scales, and timezone are unspecified.
+INCIDENT_ID: Unique identifier of the incident, preserved locally to link its source data, model result, and final human decision.
+INCIDENT_SHORT_DESCRIPTION: A short summary of the reported incident and its main symptoms.
+INCIDENT_DESCRIPTION: A detailed incident narrative describing symptoms, timing, impact, and investigation context.
+INCIDENT_RESOLUTION_DESCRIPTION: The recorded method used to restore service, which does not by itself establish who caused
+  the incident.
+IT_INCIDENT_CAUSE_DETAILS: Recorded details about suspected or established incident causes.
+INCIDENT_RESOLUTION_NOTES: Free-text incident resolution notes that may also describe contributing causes.
+IT_INCIDENT_OPEN_DATETIME: The recorded date and time when the incident was opened.
+IT_INCIDENT_CLOSED_DATETIME: The recorded date and time when the incident was closed.
+IT_INCIDENT_LAST_MODIFIED_DATETIME: The recorded date and time of the incident record's latest update.
+INCIDENT_CATEGORY: The high-level incident category recorded in the source system.
+INCIDENT_SUBCATEGORY: The more specific incident category recorded beneath the main category.
+INCIDENT_ASSIGNMENT_GROUP_NAME: The support group assigned to the incident, which does not by itself establish causal responsibility.
+CAUSING_CHANGE_ID: The identifier of a change linked in the source system as a possible or recorded cause of the incident.
+IT_INCIDENT_CLOSE_CODE: The code or label used to categorize how the incident was closed.
+CONFIGURATION_ITEM_NAME: The application, service, or configuration item associated with the incident.
+INCIDENT_CREATED_DATETIME: The recorded date and time when the incident record was created.
+IT_INCIDENT_DURATION: The incident duration recorded as text, with its measurement unit unspecified in the supplied sample.
+IMPACTED_BUSINESS_SERVICE_NAME: The business service recorded as affected by the incident.
+IMPACTED_LOCATION_NAME: The location or locations recorded as affected by the incident.
+PROBLEM_ID: The identifier of the problem record associated with the incident.
+ROOT_CAUSE_SEVERITY_CODE: The source-system severity code associated with the root-cause record, whose scale is not defined
+  here.
+INCIDENT_STATUS: The incident's recorded lifecycle status, such as open or closed.
+MAJOR_INCIDENT_FINDINGS: Recorded findings from the major-incident investigation.
+MAJOR_INCIDENT_SUMMARY: A narrative summary of the major incident, including key events, symptoms, and impact.
+IT_INCIDENT_PARENT_ID: The identifier of the parent incident linked to this incident.
+IT_INCIDENT_DISRUPTION_FLAG: The recorded flag indicating whether the incident is associated with a disruption.
+IT_INCIDENT_DISRUPTION_NAME: The name or label of the disruption associated with the incident.
+INCIDENT_BUSINESS_IMPACT: A description of the effects on business services, transactions, customers, or regions.
+IT_PROBLEM_SUMMARY: A short summary of the problem linked to the incident.
+IT_PROBLEM_DESCRIPTION: A description of the underlying problem, its symptoms, and investigation context.
+PROBLEM_CLOSE_NOTES: Problem closure notes that may summarize the investigation, root cause, and conclusions.
+IT_PROBLEM_RESOLUTION_DESCRIPTION: A summary of the recorded resolution for the underlying problem.
+IT_PROBLEM_RESOLUTION_DETAILS: Detailed background, investigation steps, and resolution information recorded for the problem.
+IT_PROBLEM_OPEN_DATETIME: The recorded date and time when the problem record was opened.
+IT_PROBLEM_CLOSE_DATETIME: The recorded date and time when the problem record was closed.
+IT_PROBLEM_LAST_MODIFIED_DATETIME: The recorded date and time of the problem record's latest update.
+IT_PROBLEM_RELATED_INCIDENT_ID: The identifier of an incident linked from the problem record.
+IT_PROBLEM_TICKET_STATUS_NAME: The lifecycle status name recorded for the linked problem ticket.
+IT_PROBLEM_CONFIGURATION_ITEM_NAME: The application, service, or configuration item associated with the problem record.
+IT_PROBLEM_RISK_DETAILS: Recorded information about risks associated with the problem or its resolution.
+PROBLEM_TASK_WORKAROUND: A temporary workaround recorded on the problem task.
+IT_PROBLEM_CLOSE_NOTES: Additional IT problem closure notes preserved separately from the source field problem_close_notes.
+PROBLEM_TASK_ID: The identifier of the task used to investigate or resolve the linked problem.
+PROBLEM_TASK_PROBLEM_ID: The identifier of the parent problem linked from the problem task.
+PROBLEM_TASK_SHORT_DESCRIPTION: A short summary of the problem task and the issue it addresses.
+ROOT_CAUSE_CODE: The recorded root-cause category or label, which should be interpreted alongside the supporting narrative.
+PROBLEM_TASK_CLOSE_NOTES: Problem-task closure notes that may include findings, resolution details, and preventive recommendations.
+PROBLEM_TASK_BUSINESS_SERVICE_NAME: The business service associated with the problem task.
+ROOT_CAUSE_NOTES: The recorded explanation of the root cause, contributing conditions, and causal mechanism.
+PROBLEM_TASK_FIRST_REPORTED_INCIDENT_ID: The incident identifier recorded as the first reported incident for the problem task.
+ROOT_CAUSE_TASK_ACTIVE_FLAG: The recorded flag indicating whether the root-cause investigation task is active.
+ROOT_CAUSE_TECHNOLOGY_OWNING_ORG_L2_NAME: The level-two technology organization recorded as owning the root-cause task, without
+  implying causal responsibility.
+PROBLEM_TASK_ASSIGNMENT_GROUP_NAME: The support group assigned to the problem task, which does not by itself establish causal
+  responsibility.
+PROBLEM_TASK_CATEGORY_NAME: The category recorded for the problem task.
+PROBLEM_TASK_STATUS: The recorded lifecycle status of the problem task.
+PROBLEM_TASK_TYPE: The type of problem task, such as root-cause analysis.
+PROBLEM_TASK_UNLISTED_SUPPLIER_NAME: A supplier name recorded outside the listed supplier selection on the problem task.
+PROBLEM_TASK_SUPPLIER_NAME: The supplier associated with the problem task, whose presence does not by itself establish responsibility.
+PROBLEM_STATUS_CODE: The status code or label recorded for the problem.
+PROBLEM_IMPACT: The source-system impact value for the problem, whose scale is not defined here.
+PROBLEM_PRIORITY_CODE: The priority code or label assigned to the problem.
+PROBLEM_URGENCY_CODE: The urgency code or label assigned to the problem.
+PROBLEM_TASK_RESOLUTION_CODE: The code or label describing the resolution status or outcome of the problem task.
+PROBLEM_TASK_DESCRIPTION: The detailed description of the issue and work covered by the problem task.
+PROBLEM_TASK_FIX_NOTES: Recorded fix instructions, corrective actions, or preventive recommendations for the problem task.
+PROBLEM_TASK_READ_ACROSS_ACTION_FLAG: The recorded flag for read-across actions concerning similar services or systems.
+PROBLEM_TASK_READ_ACROSS_DETAILS: Recorded details about applying the investigation findings or corrective actions to similar
+  services or systems.
+PROBLEM_TASK_CAUSE_NOTES: Problem-task investigation notes describing causal findings, errors, or supporting observations.
+PROBLEM_TASK_CMDB_CI_NAME: The configuration item name or identifier recorded in the CMDB reference for the problem task.
+INCIDENT_WORK_NOTES: Timestamped incident work-log entries containing operational updates, investigation observations, and
+  impact details.
+PROBLEM_WORK_NOTES: Timestamped problem work-log entries containing investigation updates, task notifications, and progress
+  details.
+ADDITIONAL_COMMENTS: Additional recorded comments providing incident context, communications, or follow-up information.

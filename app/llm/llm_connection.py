@@ -11,7 +11,7 @@ from openai import AzureOpenAI, OpenAI, OpenAIError
 @contextmanager
 def llm_connection():
     """Yield a client and model name, then close the connection resources."""
-    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env")
     provider = os.getenv("LLM_PROVIDER", "openai").strip().lower()
     if provider not in ("openai", "azure"):
         raise ValueError("LLM_PROVIDER must be openai or azure.")
