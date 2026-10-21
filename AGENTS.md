@@ -7,13 +7,26 @@
 - Keep original-to-standardized names in `fields/columns.yaml`, definitions keyed by standardized names in `fields/definitions.yml`, and model instructions in `prompts/classification.yml`.
 - Keep all project instructions in this root `AGENTS.md`; do not create additional `AGENTS.md` files in subfolders.
 - Verify changes with a lightweight check of the affected code. Distinguish offline checks from live API results.
+- Keep project code, configuration, documentation, and UI text in English. Keep CSV files, `data/`, and credentials out of Git.
+- Use lightweight inline checks; create test files only when the user asks.
+
+## Read the relevant docs first
+
+Before explaining or changing a stage, read its document and inspect the current implementation:
+
+- Data preparation, renaming, or cleaning: [docs/data_preparation.md](docs/data_preparation.md).
+- LLM requests, response schema, or result storage: [docs/llm.md](docs/llm.md).
+- Review UI, `review_store.py`, or user decisions: [docs/review_app.md](docs/review_app.md).
+- Dashboard input, counts, or display: [docs/dashboard_app.md](docs/dashboard_app.md).
+
+Read only the documents relevant to the task. Keep the affected document aligned with behavior changes. Use [README.md](README.md) for setup and run commands.
 
 ## Python code
 
 - Keep `app/data_preparation/pipeline.py` linear: read, rename, clean, save CLEAN.csv. Keep `app/llm/pipeline.py` separate: read CLEAN.csv, load definitions, classify, save LLM_OUTPUT.csv.
 - Use Pydantic for the fields sent to the model and the structured response.
 - Exclude row IDs from model input. Cleaning removes invisible control/format characters only; preserve punctuation, emails, HTML, and normal whitespace.
-- Keep essential checks for CSV shape, unique IDs, mapping collisions, and evidence quotes.
+- Data preparation retains empty/repeated IDs and uppercases unmapped headers; do not add ID, CSV-shape, or mapping-collision validation to this stage. Preserve existing downstream checks for model responses, evidence quotes, and safe review saves.
 - Use short functions and clear early returns; avoid custom exception layers.
 
 ## Frontend
@@ -24,6 +37,6 @@
 - Keep every successful model result, including UNDECIDED, pending until a user selects HSBC or SUPPLIER and provides a reason.
 - Save the original model result and the user's final class, reason, action, UTC date, and FINALIZED status in FINAL.csv.
 - Show evidence and saved input definitions/values to reviewers; expand all model input fields for UNDECIDED.
-- The dashboard reads FINAL.csv only and counts the user's FINAL_CLASS. Review never writes HUMAN_REVIEW.csv.
+- The dashboard reads FINAL.csv directly, counts the user's FINAL_CLASS, and imports no review or LLM modules. It runs without the other processes. Review never writes HUMAN_REVIEW.csv.
 - Do not remove or mark records complete until the API confirms a save.
 - Keep synthetic demo data visibly disclosed. Review makes no LLM calls.

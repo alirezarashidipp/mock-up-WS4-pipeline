@@ -59,61 +59,45 @@ def valid_result(row):
     return True
 
 
-def load_results(path):
+def load_batch(results_file, output_dir):
+    final_file = output_dir / "FINAL.csv"
+    if results_file.resolve() == final_file.resolve():
+        return [], [], "Model results and final decisions must be separate files."
+
     try:
-        rows, error = read_records(path)
+        rows, error = read_records(results_file)
         if error:
-            return [], error
+            return [], [], error
+        finalized, error = read_records(final_file, optional=True)
+        if error:
+            return [], [], error
+
         if not rows or not set(COLUMNS) <= set(rows[0]) or FINAL_COLUMNS & set(rows[0]):
-            return [], "Results use an older or invalid schema. Generate a new batch with input snapshots."
+            return [], [], "Generate LLM_OUTPUT.csv with the current input snapshots."
         for row in rows:
             if row["processing_status"] == "failed":
                 continue
             if row["processing_status"] != "success" or not valid_result(row):
-                return [], "A model result or its input snapshot is invalid."
-        return rows, ""
+                return [], [], "A model result or its input snapshot is invalid."
+
+        by_id = {row["INCIDENT_ID"]: row for row in rows}
+        for saved in finalized:
+            current = by_id.get(saved["INCIDENT_ID"])
+            if current is None or set(saved) != set(current) | FINAL_COLUMNS:
+                return [], [], "FINAL.csv belongs to a different batch."
+            original = {name: saved[name] for name in current}
+            if original != current or current["processing_status"] != "success":
+                return [], [], "A finalized incident changed. Use a separate batch folder."
+            if saved["STATUS"] != "FINALIZED" or saved["FINAL_CLASS"] not in ("HSBC", "SUPPLIER"):
+                return [], [], "FINAL.csv contains an invalid final decision."
+            if not saved["USER_REASON"].strip() or len(saved["USER_REASON"]) > 2000:
+                return [], [], "Every final decision requires a user reason."
+            date = datetime.fromisoformat(saved["REVIEW_DATE"].replace("Z", "+00:00"))
+            action = review_action(current["classification"], saved["FINAL_CLASS"])
+            if date.tzinfo is None or saved["REVIEW_ACTION"] != action:
+                return [], [], "A final decision has an invalid date or review action."
     except (OSError, csv.Error, KeyError, TypeError, ValueError):
-        return [], "Could not read or validate LLM_OUTPUT.csv."
-
-
-def load_final(output_dir):
-    try:
-        rows, error = read_records(output_dir / "FINAL.csv", optional=True)
-        if error:
-            return [], error
-        for row in rows:
-            if not (set(COLUMNS) | FINAL_COLUMNS) <= set(row):
-                return [], "FINAL.csv uses an older or invalid schema. Keep it in its original batch folder."
-            if row["STATUS"] != "FINALIZED" or row["FINAL_CLASS"] not in ("HSBC", "SUPPLIER"):
-                return [], "FINAL.csv contains an invalid final decision."
-            if not row["USER_REASON"].strip() or len(row["USER_REASON"]) > 2000:
-                return [], "Every final decision requires a user reason."
-            date = datetime.fromisoformat(row["REVIEW_DATE"].replace("Z", "+00:00"))
-            if date.tzinfo is None or row["REVIEW_ACTION"] != review_action(row["classification"], row["FINAL_CLASS"]):
-                return [], "A final decision has an invalid date or review action."
-            if row["processing_status"] != "success" or not valid_result(row):
-                return [], "A finalized model result or its input snapshot is invalid."
-        return rows, ""
-    except (OSError, csv.Error, KeyError, TypeError, ValueError):
-        return [], "Could not read or validate FINAL.csv."
-
-
-def load_batch(results_file, output_dir):
-    if results_file.resolve() == (output_dir / "FINAL.csv").resolve():
-        return [], [], "Model results and final decisions must be separate files."
-    rows, error = load_results(results_file)
-    if error:
-        return [], [], error
-    finalized, error = load_final(output_dir)
-    if error:
-        return [], [], error
-    by_id = {row["INCIDENT_ID"]: row for row in rows}
-    for saved in finalized:
-        current = by_id.get(saved["INCIDENT_ID"])
-        if current is None or set(saved) != set(current) | FINAL_COLUMNS:
-            return [], [], "FINAL.csv belongs to a different batch."
-        if any(saved[name] != value for name, value in current.items()):
-            return [], [], "A finalized incident changed. Use a separate batch folder."
+        return [], [], "Could not read or validate the review CSV files."
     return rows, finalized, ""
 
 
@@ -177,31 +161,4 @@ def submit_review(results_file, output_dir, decision):
     ok, error = append_record(output_dir / "FINAL.csv", saved)
     if not ok:
         return {"error": error}, 409
-    return {"message": "Final decision saved. The dashboard now includes this incident."}, 200
-
-
-def get_dashboard_data(output_dir):
-    # The dashboard reads FINAL.csv only; pending model results are never counted.
-    rows, error = load_final(output_dir)
-    if error:
-        return {"error": error}
-    counts = {"total": len(rows), "HSBC": 0, "SUPPLIER": 0,
-              "CONFIRMED": 0, "CORRECTED": 0, "RESOLVED_UNDECIDED": 0}
-    records = []
-    for row in rows:
-        counts[row["FINAL_CLASS"]] += 1
-        counts[row["REVIEW_ACTION"]] += 1
-        records.append({
-            "incident_id": row["INCIDENT_ID"],
-            "summary": row.get("INCIDENT_SHORT_DESCRIPTION", ""),
-            "llm_class": row["classification"],
-            "final_class": row["FINAL_CLASS"],
-            "user_reason": row["USER_REASON"],
-            "review_action": row["REVIEW_ACTION"],
-            "review_date": row["REVIEW_DATE"],
-        })
-    percentages = {"HSBC": 0, "SUPPLIER": 0}
-    if rows:
-        for name in percentages:
-            percentages[name] = round(100 * counts[name] / len(rows), 1)
-    return {"records": records, "counts": counts, "percentages": percentages}
+    return {"message": "Final decision saved to FINAL.csv."}, 200

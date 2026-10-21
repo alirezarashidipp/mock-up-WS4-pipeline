@@ -2,6 +2,8 @@ import unicodedata
 
 
 def clean_text(value: str) -> str:
+    if value is None:
+        return ""
     # Remove invisible control/format characters while retaining normal text and whitespace.
     return "".join(char for char in value if char in "\t\n\r" or unicodedata.category(char) not in ("Cc", "Cf"))
 
