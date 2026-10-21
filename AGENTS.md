@@ -32,7 +32,8 @@ Read only the documents relevant to the task. Keep the affected document aligned
 ## Frontend
 
 - Keep the HSBC review UI minimal, English, and dependency-free.
-- Run review and dashboard as independent apps: `app/review_app.py` on port 8765 and `app/dashboard_app.py` on port 8766.
+- Keep review HTML/JavaScript in `frontend/review/` and dashboard HTML/JavaScript in `frontend/dashboard/`; share `frontend/style.css` and `frontend/pictures/`.
+- Keep the UI apps and review storage logic in `app/ui/`. Run `app/ui/review_app.py` on port 8765 and `app/ui/dashboard_app.py` on port 8766 as independent apps.
 - Display source fields, evidence, and analysis in collapsible sections; render CSV values as text.
 - Keep every successful model result, including UNDECIDED, pending until a user selects HSBC or SUPPLIER and provides a reason.
 - Save the original model result and the user's final class, reason, action, UTC date, and FINALIZED status in FINAL.csv.

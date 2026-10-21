@@ -1,6 +1,6 @@
 # Review flow
 
-Run `python -m app.review_app` from the project root after LLM results are saved. Open `http://127.0.0.1:8765/`.
+Run `python -m app.ui.review_app` from the project root after LLM results are saved. Open `http://127.0.0.1:8765/`.
 
 ```text
 LLM_OUTPUT.csv + existing FINAL.csv -> review UI -> user decision -> append FINAL.csv
@@ -8,8 +8,8 @@ LLM_OUTPUT.csv + existing FINAL.csv -> review UI -> user decision -> append FINA
 
 ## Read and display
 
-1. `GET /` serves `frontend/index.html`; `frontend/app.js` requests `GET /api/review`.
-2. `review_app.py` calls `review_store.get_review_data`. Read `data/run/LLM_OUTPUT.csv` and optional `data/run/FINAL.csv` from the same batch.
+1. `GET /` serves `frontend/review/index.html`; `frontend/review/app.js` requests `GET /api/review`. Shared styling and logo artwork remain in `frontend/style.css` and `frontend/pictures/`.
+2. `app/ui/review_app.py` calls `app/ui/review_store.py` (`get_review_data`). Read `data/run/LLM_OUTPUT.csv` and optional `data/run/FINAL.csv` from the same batch.
 3. Validate model results, input snapshots, evidence quotes, and existing final decisions. Failed model rows are counted but excluded from review records.
 4. Return source fields, saved model input definitions/values, prompt, result, row version, and review state. Successful results remain `PENDING_REVIEW` until a matching final decision exists, including `UNDECIDED`.
 5. Display source data, evidence, and analysis in collapsible sections. Expand model inputs for `UNDECIDED`; render CSV values as text.

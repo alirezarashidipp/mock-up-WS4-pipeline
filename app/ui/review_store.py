@@ -7,8 +7,8 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.csv_files import append_record, read_records
-from app.models import Classification, InputField
 from app.llm.save_csv import COLUMNS
+from app.models import Classification, InputField
 
 
 FINAL_COLUMNS = {"FINAL_CLASS", "USER_REASON", "REVIEW_ACTION", "REVIEW_DATE", "STATUS"}

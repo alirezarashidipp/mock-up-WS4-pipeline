@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 FINAL_FILE = ROOT / "data/run/FINAL.csv"
 app = FastAPI(title="HSBC Final Dashboard", docs_url=None, redoc_url=None, openapi_url=None)
 app.state.final_file = FINAL_FILE
@@ -52,7 +52,7 @@ async def local_requests(request: Request, call_next):
 
 @app.get("/")
 def dashboard_page():
-    return FileResponse(ROOT / "frontend/dashboard.html")
+    return FileResponse(ROOT / "frontend/dashboard/index.html")
 
 
 @app.get("/api/dashboard")

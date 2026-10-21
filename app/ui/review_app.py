@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.llm.pipeline import OUTPUT_FILE, ROOT
-from app.review_store import ReviewDecision, get_review_data, submit_review
+from app.ui.review_store import ReviewDecision, get_review_data, submit_review
 
 
 app = FastAPI(title="HSBC Incident Review", docs_url=None, redoc_url=None, openapi_url=None)
@@ -43,7 +43,7 @@ async def save_error(request: Request, error: OSError):
 
 @app.get("/")
 def review_page():
-    return FileResponse(ROOT / "frontend/index.html")
+    return FileResponse(ROOT / "frontend/review/index.html")
 
 
 @app.get("/api/review")
