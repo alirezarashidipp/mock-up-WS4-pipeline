@@ -20,7 +20,15 @@ CLEAN.csv -> one row per request -> validate response -> save LLM_OUTPUT.csv
    - `llm_confidence`: integer 0-100; model-reported confidence, not measured accuracy.
    - `uncertainty_reason`: required nonblank text for `UNDECIDED`; `null` otherwise.
 6. Validate with Pydantic and verify evidence quotes against this row. `HSBC` and `SUPPLIER` require supporting evidence.
-7. Save the source row, response fields, `llm_input` snapshot, `llm_prompt`, and processing/review metadata to `data/run/LLM_OUTPUT.csv` before processing the next row.
+7. Call `app/llm/save_csv.py:save_result` immediately after validation, before requesting the next row. Save the source values, response fields, prompt, and processing/review metadata to `data/run/LLM_OUTPUT.csv`.
+
+## CSV columns
+
+- Each source value and scalar response field has its own column.
+- Evidence uses five pairs: `evidence_1_column`, `evidence_1_quote`, through `evidence_5_column`, `evidence_5_quote`. Unused pairs are empty.
+- Keep definitions only in `fields/definitions.yml`; send them to the model but omit them from CSV storage. Save source values in their own columns and the prompt as plain text in `llm_prompt`.
+- Store no JSON blobs, arrays, or dictionaries in CSV cells. JSON is used only for API requests/responses in memory. Review reconstructs input fields from saved values plus the current definitions YAML, and evidence from the separate columns.
+- Older outputs containing `llm_input` or JSON evidence are left unchanged; generate a new batch for review with this schema.
 
 ## Batch behavior
 

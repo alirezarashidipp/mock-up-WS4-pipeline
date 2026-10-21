@@ -2,12 +2,14 @@ import csv
 import hashlib
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Literal
 
+import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.csv_files import append_record, read_records
-from app.llm.save_csv import COLUMNS
+from app.llm.save_csv import COLUMNS, RESULT_COLUMNS
 from app.models import Classification, InputField
 
 
@@ -28,6 +30,25 @@ def cleaned_values(row):
     return {name: value for name, value in row.items() if name not in metadata}
 
 
+def read_input_fields(row, definitions):
+    fields = []
+    for name, value in cleaned_values(row).items():
+        if name != "INCIDENT_ID":
+            field = InputField(name=name, description=definitions[name], value=value)
+            fields.append(field.model_dump())
+    return fields
+
+
+def read_evidence(row):
+    evidence = []
+    for number in range(1, 6):
+        column = row[f"evidence_{number}_column"]
+        quote = row[f"evidence_{number}_quote"]
+        if column or quote:
+            evidence.append({"column": column, "quote": quote})
+    return evidence
+
+
 def review_action(llm_class, final_class):
     if llm_class == "UNDECIDED":
         return "RESOLVED_UNDECIDED"
@@ -37,15 +58,11 @@ def review_action(llm_class, final_class):
 
 
 def valid_result(row):
-    values = {name: row[name] or None for name in Classification.model_fields}
-    values["supporting_evidence"] = json.loads(row["supporting_evidence"])
+    values = {name: row[name] or None for name in RESULT_COLUMNS}
+    values["supporting_evidence"] = read_evidence(row)
     result = Classification.model_validate(values)
-    input_fields = [InputField.model_validate(field) for field in json.loads(row["llm_input"])]
-    input_values = {field.name: field.value for field in input_fields}
-    source_values = cleaned_values(row)
-    del source_values["INCIDENT_ID"]
-    if len(input_values) != len(input_fields) or input_values != source_values:
-        return False
+    input_values = cleaned_values(row)
+    del input_values["INCIDENT_ID"]
     if not row["llm_prompt"].strip():
         return False
     if result.classification == "UNDECIDED":
@@ -73,7 +90,7 @@ def load_batch(results_file, output_dir):
             return [], [], error
 
         if not rows or not set(COLUMNS) <= set(rows[0]) or FINAL_COLUMNS & set(rows[0]):
-            return [], [], "Generate LLM_OUTPUT.csv with the current input snapshots."
+            return [], [], "Generate a new LLM_OUTPUT.csv with separate evidence columns."
         for row in rows:
             if row["processing_status"] == "failed":
                 continue
@@ -110,6 +127,11 @@ def get_review_data(results_file, output_dir):
     rows, finalized, error = load_batch(results_file, output_dir)
     if error:
         return {"error": error}
+    definitions_file = Path(__file__).resolve().parents[2] / "fields/definitions.yml"
+    try:
+        definitions = yaml.safe_load(definitions_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError, yaml.YAMLError):
+        return {"error": "Could not read fields/definitions.yml."}
     decisions = {row["INCIDENT_ID"]: row for row in finalized}
     records = []
     counts = {"pending": 0, "finalized": len(finalized), "undecided": 0, "failed": 0}
@@ -122,13 +144,15 @@ def get_review_data(results_file, output_dir):
             counts["pending"] += 1
             if row["classification"] == "UNDECIDED":
                 counts["undecided"] += 1
+        result = {name: row[name] for name in RESULT_COLUMNS}
+        result["supporting_evidence"] = read_evidence(row)
         records.append({
             "incident_id": row["INCIDENT_ID"],
             "version": row_version(row),
             "input": cleaned_values(row),
-            "model_input": json.loads(row["llm_input"]),
+            "model_input": read_input_fields(row, definitions),
             "prompt": row["llm_prompt"],
-            "result": {key: row[key] for key in COLUMNS},
+            "result": result,
             "review_status": "FINALIZED" if decision else "PENDING_REVIEW",
             "final_class": decision.get("FINAL_CLASS", ""),
             "user_reason": decision.get("USER_REASON", ""),

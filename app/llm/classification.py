@@ -31,10 +31,10 @@ def classify_rows(rows, definitions, output_file):
             try:
                 result = classify_row(client, model, fields, prompt)
             except (OpenAIError, ValidationError) as error:
-                save_result(output_file, row, None, fields, prompt, type(error).__name__)
+                save_result(output_file, row, None, prompt, type(error).__name__)
                 print(f"Stopped: {type(error).__name__}. Earlier results are saved.")
                 return 1
-            saved = save_result(output_file, row, result, fields, prompt)
+            saved = save_result(output_file, row, result, prompt)
             if not saved or result is None:
                 print("Stopped. Check the saved results.")
                 return 1

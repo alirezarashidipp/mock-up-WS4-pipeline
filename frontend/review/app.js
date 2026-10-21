@@ -31,9 +31,8 @@ function updateActionHint() {
   const action = original === "UNDECIDED" ? "Resolve the model's uncertainty" : choice === original ? "Confirm the model's decision" : "Correct the model's decision";
   text("action-hint", action + " as " + choice + ". Your reason is required.");
 }
-function renderEvidence(raw) {
+function renderEvidence(items) {
   const container = $("supporting-evidence"); container.replaceChildren();
-  const items = JSON.parse(raw || "[]");
   if (!items.length) { container.textContent = "No supporting evidence supplied."; return; }
   for (const item of items) {
     const quote = document.createElement("blockquote"), value = document.createElement("p"), source = document.createElement("cite");

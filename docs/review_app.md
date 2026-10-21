@@ -10,8 +10,8 @@ LLM_OUTPUT.csv + existing FINAL.csv -> review UI -> user decision -> append FINA
 
 1. `GET /` serves `frontend/review/index.html`; `frontend/review/app.js` requests `GET /api/review`. Shared styling and logo artwork remain in `frontend/style.css` and `frontend/pictures/`.
 2. `app/ui/review_app.py` calls `app/ui/review_store.py` (`get_review_data`). Read `data/run/LLM_OUTPUT.csv` and optional `data/run/FINAL.csv` from the same batch.
-3. Validate model results, input snapshots, evidence quotes, and existing final decisions. Failed model rows are counted but excluded from review records.
-4. Return source fields, saved model input definitions/values, prompt, result, row version, and review state. Successful results remain `PENDING_REVIEW` until a matching final decision exists, including `UNDECIDED`.
+3. Reconstruct model inputs from saved source values and the current `fields/definitions.yml`, and evidence from the five `evidence_N_column`/`evidence_N_quote` pairs. Validate results, quotes, and existing final decisions. Failed model rows are counted but excluded from review records.
+4. Return source fields, current definitions, saved input values, prompt, result, row version, and review state. Definitions are not stored in CSV; changing the YAML changes their review display. Successful results remain `PENDING_REVIEW` until a matching final decision exists, including `UNDECIDED`.
 5. Display source data, evidence, and analysis in collapsible sections. Expand model inputs for `UNDECIDED`; render CSV values as text.
 
 ## Save a decision
@@ -26,5 +26,6 @@ LLM_OUTPUT.csv + existing FINAL.csv -> review UI -> user decision -> append FINA
 ## Boundaries
 
 - Review makes no LLM calls and preserves `LLM_OUTPUT.csv`. It never writes `HUMAN_REVIEW.csv`.
+- CSV storage uses separate columns, without JSON blobs. The review API returns ordinary JSON objects/arrays for the frontend; evidence arrives as an array, not a JSON-encoded string.
 - One local worker serializes review access with a lock. Invalid input/batches return errors; missing, finalized, stale, or conflicting decisions return HTTP 409.
 - The dashboard runs independently. Its only data input is the saved `FINAL.csv`; see [dashboard_app.md](dashboard_app.md).
