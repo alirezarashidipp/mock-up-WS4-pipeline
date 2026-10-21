@@ -10,8 +10,8 @@ LLM_OUTPUT.csv + existing FINAL.csv -> review UI -> user decision -> append FINA
 
 1. `GET /` serves `frontend/review/index.html`; `frontend/review/app.js` requests `GET /api/review`. Shared styling and logo artwork remain in `frontend/style.css` and `frontend/pictures/`.
 2. `app/ui/review_app.py` calls `app/ui/review_store.py` (`get_review_data`). Read `data/run/LLM_OUTPUT.csv` and optional `data/run/FINAL.csv` from the same batch.
-3. Reconstruct model inputs from saved source values and the current `fields/definitions.yml`, and evidence from the five `evidence_N_column`/`evidence_N_quote` pairs. Validate results, quotes, and existing final decisions. Failed model rows are counted but excluded from review records.
-4. Return source fields, current definitions, saved input values, prompt, result, row version, and review state. Definitions are not stored in CSV; changing the YAML changes their review display. Successful results remain `PENDING_REVIEW` until a matching final decision exists, including `UNDECIDED`.
+3. Reconstruct model inputs from saved source values and the current `fields/definitions.yml`, and evidence from all `evidence_N_column`/`evidence_N_quote` pairs. Validate result structure and existing final decisions; extra empty evidence pairs from header expansion do not invalidate earlier decisions. Display evidence as returned without comparing it with source text. Failed model rows are counted but excluded from review records.
+4. Return source fields, current definitions, saved input values, result, row version, and review state. Definitions are not stored in CSV; changing the YAML changes their review display. Successful results remain `PENDING_REVIEW` until a matching final decision exists, including `UNDECIDED`. The prompt is neither stored nor displayed.
 5. Display source data, evidence, and analysis in collapsible sections. Expand model inputs for `UNDECIDED`; render CSV values as text.
 
 ## Save a decision

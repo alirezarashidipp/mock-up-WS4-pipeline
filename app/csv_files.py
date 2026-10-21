@@ -1,5 +1,6 @@
 import csv
 import os
+import re
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
@@ -14,6 +15,10 @@ def read_records(path, optional=False):
     return rows, ""
 
 
+def is_evidence_column(name):
+    return re.fullmatch(r"evidence_[1-9]\d*_(column|quote)", name) is not None
+
+
 def append_record(path, record):
     record = dict(record)
     for name, value in record.items():
@@ -23,8 +28,16 @@ def append_record(path, record):
     rows, error = read_records(path, optional=True)
     if error:
         return False, error
-    if rows and set(rows[0]) != set(record):
-        return False, f"{path.name} belongs to a different schema. Use a new batch folder."
+    if rows:
+        different_columns = set(rows[0]) ^ set(record)
+        if any(not is_evidence_column(name) for name in different_columns):
+            return False, f"{path.name} belongs to a different schema. Use a new batch folder."
+        # Evidence counts vary by row; retain every pair and fill unused cells.
+        for row in rows:
+            for name in record:
+                row.setdefault(name, "")
+        for name in rows[0]:
+            record.setdefault(name, "")
     for row in rows:
         if row["INCIDENT_ID"] == record["INCIDENT_ID"]:
             if row == record:

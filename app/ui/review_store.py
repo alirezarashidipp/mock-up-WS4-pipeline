@@ -8,7 +8,7 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.csv_files import append_record, read_records
+from app.csv_files import append_record, is_evidence_column, read_records
 from app.llm.save_csv import COLUMNS, RESULT_COLUMNS
 from app.models import Classification, InputField
 
@@ -27,7 +27,7 @@ class ReviewDecision(BaseModel):
 def cleaned_values(row):
     metadata = set(COLUMNS) | FINAL_COLUMNS
     metadata.remove("INCIDENT_ID")
-    return {name: value for name, value in row.items() if name not in metadata}
+    return {name: value for name, value in row.items() if name not in metadata and not is_evidence_column(name)}
 
 
 def read_input_fields(row, definitions):
@@ -41,9 +41,11 @@ def read_input_fields(row, definitions):
 
 def read_evidence(row):
     evidence = []
-    for number in range(1, 6):
-        column = row[f"evidence_{number}_column"]
-        quote = row[f"evidence_{number}_quote"]
+    for name in row:
+        if not is_evidence_column(name) or not name.endswith("_column"):
+            continue
+        column = row[name]
+        quote = row[name.removesuffix("_column") + "_quote"]
         if column or quote:
             evidence.append({"column": column, "quote": quote})
     return evidence
@@ -61,18 +63,11 @@ def valid_result(row):
     values = {name: row[name] or None for name in RESULT_COLUMNS}
     values["supporting_evidence"] = read_evidence(row)
     result = Classification.model_validate(values)
-    input_values = cleaned_values(row)
-    del input_values["INCIDENT_ID"]
-    if not row["llm_prompt"].strip():
-        return False
     if result.classification == "UNDECIDED":
         if not (result.uncertainty_reason or "").strip():
             return False
     elif not result.supporting_evidence or result.uncertainty_reason is not None:
         return False
-    for evidence in result.supporting_evidence:
-        if not evidence.quote.strip() or evidence.quote not in input_values.get(evidence.column, ""):
-            return False
     return True
 
 
@@ -100,10 +95,11 @@ def load_batch(results_file, output_dir):
         by_id = {row["INCIDENT_ID"]: row for row in rows}
         for saved in finalized:
             current = by_id.get(saved["INCIDENT_ID"])
-            if current is None or set(saved) != set(current) | FINAL_COLUMNS:
+            if current is None:
                 return [], [], "FINAL.csv belongs to a different batch."
-            original = {name: saved[name] for name in current}
-            if original != current or current["processing_status"] != "success":
+            original = {name: value for name, value in saved.items() if name not in FINAL_COLUMNS and not is_evidence_column(name)}
+            current_values = {name: value for name, value in current.items() if not is_evidence_column(name)}
+            if original != current_values or read_evidence(saved) != read_evidence(current) or current["processing_status"] != "success":
                 return [], [], "A finalized incident changed. Use a separate batch folder."
             if saved["STATUS"] != "FINALIZED" or saved["FINAL_CLASS"] not in ("HSBC", "SUPPLIER"):
                 return [], [], "FINAL.csv contains an invalid final decision."
@@ -151,7 +147,6 @@ def get_review_data(results_file, output_dir):
             "version": row_version(row),
             "input": cleaned_values(row),
             "model_input": read_input_fields(row, definitions),
-            "prompt": row["llm_prompt"],
             "result": result,
             "review_status": "FINALIZED" if decision else "PENDING_REVIEW",
             "final_class": decision.get("FINAL_CLASS", ""),

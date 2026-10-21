@@ -51,7 +51,7 @@ system: |
     the evidence. Mention relevant counterevidence or limitations. Include the
     recorded restoration action and actor only if known and relevant.
     Give a concise decision summary, not a step-by-step internal thought process.
-  - supporting_evidence: zero to five objects containing column and quote.
+  - supporting_evidence: a list of objects containing column and quote.
     Use exact nonempty quotes from the supplied cleaned values and their
     standardized column names. Include material contrary evidence, if present.
     SUPPLIER and HSBC require at least one quote containing a concrete causal

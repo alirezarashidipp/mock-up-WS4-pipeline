@@ -15,9 +15,6 @@ from app.llm.save_csv import save_result
 def classify_rows(rows, definitions, output_file):
     if not rows:
         return 1
-    if any(path.exists() for path in (output_file, output_file.parent / "FINAL.csv")):
-        print("Batch files already exist. Choose a new output folder to preserve earlier results.")
-        return 1
     missing = set(rows[0]) - {"INCIDENT_ID"} - definitions.keys()
     if missing:
         print("Add definitions for: " + ", ".join(sorted(missing)))
@@ -31,10 +28,10 @@ def classify_rows(rows, definitions, output_file):
             try:
                 result = classify_row(client, model, fields, prompt)
             except (OpenAIError, ValidationError) as error:
-                save_result(output_file, row, None, prompt, type(error).__name__)
+                save_result(output_file, row, None, type(error).__name__)
                 print(f"Stopped: {type(error).__name__}. Earlier results are saved.")
                 return 1
-            saved = save_result(output_file, row, result, prompt)
+            saved = save_result(output_file, row, result)
             if not saved or result is None:
                 print("Stopped. Check the saved results.")
                 return 1
@@ -58,10 +55,7 @@ def classify_row(client: OpenAI, model: str, fields: list[dict], prompt: str) ->
     options = {}
     temperature = os.getenv("LLM_TEMPERATURE", "").strip()
     if temperature:
-        value = float(temperature)
-        if not 0 <= value <= 2:
-            raise ValueError("LLM_TEMPERATURE must be between 0 and 2.")
-        options["temperature"] = value
+        options["temperature"] = float(temperature)
 
     response = client.chat.completions.create(
         model=model,
@@ -90,8 +84,4 @@ def classify_row(client: OpenAI, model: str, fields: list[dict], prompt: str) ->
     if result.classification != "UNDECIDED" and result.uncertainty_reason is not None:
         return None
 
-    values = {field["name"]: field["value"] for field in fields}
-    for evidence in result.supporting_evidence:
-        if not evidence.quote.strip() or evidence.quote not in values.get(evidence.column, ""):
-            return None
     return result

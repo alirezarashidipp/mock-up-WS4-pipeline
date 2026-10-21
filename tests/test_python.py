@@ -57,6 +57,8 @@ class PythonTests(unittest.TestCase):
             }
             if label == "HSBC":
                 result["supporting_evidence"] = [{"column": "INCIDENT_DESCRIPTION", "quote": word} for word in ("Example", "cause", "service", "recovered", "Check")]
+            if label == "SUPPLIER":
+                result["supporting_evidence"] = [{"column": "INCIDENT_DESCRIPTION", "quote": "Supplier-side service issue (model summary)."} for _ in range(6)]
             if label == "UNDECIDED":
                 result["supporting_evidence"] = []
             message = SimpleNamespace(content=json.dumps(result), refusal=None)
@@ -79,7 +81,7 @@ class PythonTests(unittest.TestCase):
                 return responses[index]
 
             client.chat.completions.create.side_effect = respond
-            with patch.object(classification, "llm_connection", return_value=connection), patch.dict(os.environ, {"LLM_TEMPERATURE": ""}):
+            with patch.object(classification, "llm_connection", return_value=connection), patch.dict(os.environ, {"LLM_TEMPERATURE": "3"}):
                 self.assertEqual(classification.classify_rows(rows, definitions, output), 0)
 
             self.assertEqual(client.chat.completions.create.call_count, 3)
@@ -91,19 +93,26 @@ class PythonTests(unittest.TestCase):
                 self.assertEqual(len(fields), 1)
                 self.assertEqual(fields[0]["value"], rows[index]["INCIDENT_DESCRIPTION"])
                 self.assertEqual(fields[0]["description"], definitions["INCIDENT_DESCRIPTION"])
+                self.assertEqual(call.kwargs["temperature"], 3.0)
 
             saved_rows, _ = read_records(output)
             self.assertNotIn("llm_input", saved_rows[0])
+            self.assertNotIn("llm_prompt", saved_rows[0])
             self.assertNotIn("supporting_evidence", saved_rows[0])
             self.assertEqual(saved_rows[0]["evidence_5_quote"], "Check")
-            self.assertEqual(saved_rows[1]["evidence_2_quote"], "")
+            self.assertEqual(saved_rows[1]["evidence_1_quote"], "Supplier-side service issue (model summary).")
+            self.assertEqual(saved_rows[0]["evidence_6_quote"], "")
+            self.assertEqual(saved_rows[1]["evidence_6_quote"], "Supplier-side service issue (model summary).")
             self.assertEqual(saved_rows[2]["evidence_1_quote"], "")
             self.assertEqual(saved_rows[0]["INCIDENT_DESCRIPTION"], rows[0]["INCIDENT_DESCRIPTION"])
             self.assertFalse(any(name.startswith("definition_") for name in saved_rows[0]))
             original = output.read_bytes()
             queue = get_review_data(output, folder)
             self.assertEqual(queue["counts"]["pending"], 3)
+            self.assertNotIn("prompt", queue["records"][0])
             self.assertEqual(len(queue["records"][0]["result"]["supporting_evidence"]), 5)
+            self.assertEqual(len(queue["records"][1]["result"]["supporting_evidence"]), 6)
+            self.assertEqual(queue["records"][1]["result"]["supporting_evidence"][0]["quote"], saved_rows[1]["evidence_1_quote"])
             self.assertEqual(queue["records"][0]["model_input"][0]["value"], rows[0]["INCIDENT_DESCRIPTION"])
             self.assertEqual(queue["records"][0]["model_input"][0]["description"], definitions["INCIDENT_DESCRIPTION"])
             for record, final_class in zip(queue["records"], ["HSBC", "HSBC", "SUPPLIER"]):
@@ -113,10 +122,23 @@ class PythonTests(unittest.TestCase):
 
             self.assertEqual(get_review_data(output, folder)["counts"]["pending"], 0)
             final_rows, _ = read_records(folder / "FINAL.csv")
+            self.assertNotIn("llm_prompt", final_rows[0])
             self.assertFalse(any(name.startswith("definition_") for name in final_rows[0]))
             self.assertEqual([row["REVIEW_ACTION"] for row in final_rows], ["CONFIRMED", "CORRECTED", "RESOLVED_UNDECIDED"])
             self.assertTrue(all(row["STATUS"] == "FINALIZED" and row["REVIEW_DATE"].endswith("Z") for row in final_rows))
             self.assertEqual(output.read_bytes(), original)
+
+            # Existing model output and final decisions do not block another request.
+            result = json.loads(responses[1].choices[0].message.content)
+            result["supporting_evidence"].append({"column": "INCIDENT_DESCRIPTION", "quote": "Seventh example signal."})
+            client.chat.completions.create.side_effect = None
+            client.chat.completions.create.return_value = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps(result), refusal=None), finish_reason="stop")])
+            with patch.object(classification, "llm_connection", return_value=nullcontext((client, "example-model"))), patch.dict(os.environ, {"LLM_TEMPERATURE": ""}):
+                self.assertEqual(classification.classify_rows([{"INCIDENT_ID": "004", "INCIDENT_DESCRIPTION": "New synthetic incident."}], definitions, output), 0)
+            updated_queue = get_review_data(output, folder)
+            self.assertEqual(updated_queue["counts"]["pending"], 1)
+            self.assertEqual(updated_queue["counts"]["finalized"], 3)
+            self.assertEqual(len(updated_queue["records"][-1]["result"]["supporting_evidence"]), 7)
             output.unlink()
             self.assertEqual(get_dashboard_data(folder / "FINAL.csv")["counts"], {"total": 3, "HSBC": 2, "SUPPLIER": 1})
 

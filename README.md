@@ -43,7 +43,7 @@ Reads `data/mockup/RAW.csv`, renames columns, cleans values, and saves `data/run
 
 Reads `CLEAN.csv`, sends one row per request with definitions and prompt, and saves inputs and responses to `data/run/LLM_OUTPUT.csv`. Wait for completion before step 3.
 
-`app/llm/save_csv.py` saves each result immediately. CSV cells contain plain source values, model fields and separate evidence column/quote pairs, without JSON blobs. Definitions stay in `fields/definitions.yml`; review reads them from that file.
+`app/llm/save_csv.py` saves each result immediately. CSV cells contain plain source values, model fields and separate evidence column/quote pairs, without JSON blobs or prompt text. Definitions stay in `fields/definitions.yml`; review reads them from that file.
 
 ### 3. Start the review frontend
 
@@ -65,7 +65,7 @@ All model outcomes (`HSBC`, `SUPPLIER`, `UNDECIDED`) await a user's final class 
 
 Frontend files are separate: `frontend/review/` and `frontend/dashboard/`. Both use the shared `frontend/style.css` and logo artwork in `frontend/pictures/`.
 
-Existing batch outputs are preserved. Move earlier outputs aside or configure a new batch folder before rerunning the pipelines. CSV files and credentials are excluded from Git.
+Preparation preserves an existing CLEAN.csv. The LLM pipeline can start with existing output files and appends new incident IDs; conflicting results for an existing ID are still rejected when saving. Use a separate output folder for a fresh batch. CSV files and credentials are excluded from Git.
 
 ## Stage documentation
 

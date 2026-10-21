@@ -51,7 +51,6 @@ function renderInputs(row) {
     section.append(name, definition, value); $("model-input").append(section);
   }
   text("field-count", String(row.model_input.length) + " fields");
-  text("model-prompt", row.prompt);
   $("source-details").open = row.result.classification === "UNDECIDED";
 }
 function render() {

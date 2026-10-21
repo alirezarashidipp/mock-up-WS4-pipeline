@@ -25,9 +25,10 @@ Read only the documents relevant to the task. Keep the affected document aligned
 
 - Keep `app/data_preparation/pipeline.py` linear: read, rename, clean, save CLEAN.csv. Keep `app/llm/pipeline.py` separate: read CLEAN.csv, load definitions, classify, save LLM_OUTPUT.csv.
 - Use Pydantic for the fields sent to the model and the structured response.
-- Keep LLM CSV saving in `app/llm/save_csv.py`; save each result before requesting the next row. Store source values, scalar fields, and five evidence column/quote pairs in separate CSV columns, without JSON blobs or definition columns. Keep definitions in `fields/definitions.yml`; review reads the current YAML. Reconstruct arrays only for the review API.
+- Keep LLM CSV saving in `app/llm/save_csv.py`; save each result before requesting the next row. Store source values, scalar fields, and numbered evidence column/quote pairs in separate CSV columns, without JSON blobs, definition columns, or prompt text. Evidence has no count limit; expand CSV headers as needed. Keep definitions in `fields/definitions.yml`; review reads the current YAML. Reconstruct arrays only for the review API.
+- Pass a configured numeric temperature to the provider without a local range check. Existing LLM_OUTPUT.csv or FINAL.csv does not block starting the LLM pipeline; preserve existing records and retain conflicting-ID checks when saving.
 - Exclude row IDs from model input. Cleaning removes invisible control/format characters only; preserve punctuation, emails, HTML, and normal whitespace.
-- Data preparation retains empty/repeated IDs and uppercases unmapped headers; do not add ID, CSV-shape, or mapping-collision validation to this stage. Preserve existing downstream checks for model responses, evidence quotes, and safe review saves.
+- Data preparation retains empty/repeated IDs and uppercases unmapped headers; do not add ID, CSV-shape, or mapping-collision validation to this stage. Preserve downstream response-structure checks and safe review saves. Store and display evidence as returned; do not compare quotes with source text in classification or review.
 - Use short functions and clear early returns; avoid custom exception layers.
 
 ## Frontend

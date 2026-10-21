@@ -35,7 +35,7 @@ class Classification(BaseModel):
         min_length=1, description="A short evidence-based explanation of the accountability decision."
     )
     supporting_evidence: list[Evidence] = Field(
-        max_length=5, description="Up to five exact input quotes supporting the decision, including material counterevidence."
+        description="Evidence supporting the decision, including material counterevidence."
     )
     llm_confidence: int = Field(
         ge=0, le=100, description="Self-reported confidence in the selected label from 0 to 100, not measured accuracy."
