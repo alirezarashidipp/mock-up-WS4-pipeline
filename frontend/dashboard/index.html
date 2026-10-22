@@ -37,7 +37,12 @@
   <p id="demo-note" class="demo-note" hidden>Demo: synthetic incidents and example model results.</p>
   <div id="message" class="message" role="status" aria-live="polite" hidden></div>
   <section class="stats" aria-label="Classification counts"><div class="stat"><strong id="total-count">—</strong><span>Classified incidents</span></div><div class="stat"><strong id="HSBC-count">—</strong><span>HSBC</span></div><div class="stat"><strong id="SUPPLIER-count">—</strong><span>SUPPLIER</span></div><div class="stat"><strong id="failed-count">—</strong><span>Processing failures</span></div></section>
-  <section class="dashboard-card"><h2>Model results</h2><p id="dashboard-empty" class="field-note">LLM_OUTPUT.csv has no successful results yet.</p><div class="table-scroll"><table id="final-table" hidden><caption class="field-note">Saved LLM results. Open a record's details to inspect the explanation and source evidence. Confidence is model-reported, not measured accuracy.</caption><thead><tr><th scope="col">Incident</th><th scope="col">Summary</th><th scope="col">LLM tag</th><th scope="col">Supplier</th><th scope="col">Product / service</th><th scope="col">Confidence</th></tr></thead><tbody id="final-rows"></tbody></table></div></section>
+  <section aria-labelledby="results-heading">
+    <h2 id="results-heading">Model results</h2>
+    <p class="field-note">Confidence is model-reported, not measured accuracy. Open the details to inspect decision sources and processing status.</p>
+    <p id="dashboard-empty" class="field-note">LLM_OUTPUT.csv has no successful results yet.</p>
+    <div id="incident-list" class="incident-list"></div>
+  </section>
   <footer><span>HSBC · Incident classification / WS4</span><span>Source: LLM_OUTPUT.csv</span></footer>
 </main>
 </body>

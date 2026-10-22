@@ -37,18 +37,14 @@ details[open] > summary::after { content:"−"; }
 .field-note { color:var(--muted); font-size:11px; margin:10px 0 0; }
 h3 { font-size:12px; font-weight:600; margin:0 0 8px; color:var(--ink); }
 footer { margin-top:25px; display:flex; justify-content:space-between; gap:15px; font-size:11px; color:var(--muted); }
-.dashboard-card { background:white; padding:24px; border:1px solid var(--line); min-width:0; }
-.dashboard-card h2 { font-size:16px; margin-bottom:20px; }
-.table-scroll { overflow-x:auto; }
-table { width:100%; border-collapse:collapse; text-align:left; font-size:12px; }
-caption { text-align:left; margin-bottom:12px; }
-th { font-weight:600; color:var(--muted); white-space:nowrap; }
-th,td { padding:12px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
-td { white-space:pre-wrap; overflow-wrap:anywhere; max-width:290px; min-width:90px; }
+.incident-list { display:grid; gap:22px; margin-top:18px; }
+.incident-card { display:grid; gap:20px; min-width:0; padding:24px; background:white; border:1px solid var(--line); }
+.incident-heading { padding-left:14px; border-left:3px solid var(--red); }
+.incident-id { margin:0 0 5px; color:var(--muted); font-size:12px; }
+.incident-title { margin:0; font-size:18px; font-weight:500; line-height:1.5; overflow-wrap:anywhere; }
+.incident-decision { display:grid; grid-template-columns:1fr 1fr; gap:20px; padding-bottom:18px; border-bottom:1px solid var(--line); }
+.incident-decision .record-text { font-size:20px; font-weight:600; color:var(--ink); }
+.supplier-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px 24px; }
+.incident-secondary { display:grid; gap:18px; padding:0 0 20px; }
 @media(max-width:1000px) { main { padding:28px 24px; } .topbar { padding:16px 24px; } .stats { gap:22px; } }
-@media(max-width:700px) { .topbar { padding:14px 16px; min-height:72px; } .brand-logo { width:118px; } .brand-divider,.brand-caption { display:none; } .mode { font-size:10px; } main { padding:24px 16px; } h1 { font-size:26px; } .stats { flex-wrap:wrap; gap:12px 22px; } .stat { gap:7px; } .stat span { font-size:11px; } .page-heading { align-items:flex-start; } .page-heading .button { font-size:11px; padding:8px 11px; } .dashboard-card { padding:20px; } footer { flex-wrap:wrap; } }
-.dashboard-details > td { padding-top:0; white-space:normal; }
-.dashboard-detail-content { display:grid; gap:18px; padding:0 0 20px; }
-.dashboard-detail-content > section { max-width:1100px; }
-.dashboard-detail-content h3 { margin-bottom:6px; }
-.dashboard-detail-content details section { margin-bottom:18px; }
+@media(max-width:700px) { .topbar { padding:14px 16px; min-height:72px; } .brand-logo { width:118px; } .brand-divider,.brand-caption { display:none; } .mode { font-size:10px; } main { padding:24px 16px; } h1 { font-size:26px; } .stats { flex-wrap:wrap; gap:12px 22px; } .stat { gap:7px; } .stat span { font-size:11px; } .page-heading { align-items:flex-start; } .page-heading .button { font-size:11px; padding:8px 11px; } .incident-card { padding:20px; } .supplier-grid { grid-template-columns:1fr; } footer { flex-wrap:wrap; } }

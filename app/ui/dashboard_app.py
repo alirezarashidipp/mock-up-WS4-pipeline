@@ -35,6 +35,7 @@ def get_dashboard_data(path):
                 "incident_id": row["INCIDENT_ID"],
                 "summary": row.get("INCIDENT_SHORT_DESCRIPTION", ""),
                 "classification": classification,
+                "processing_status": row["processing_status"],
                 "input": {name: value for name, value in row.items() if name.isupper()},
                 "supporting_evidence": [],
             }

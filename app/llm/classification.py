@@ -46,7 +46,7 @@ def classification_schema() -> dict:
     # Azure's schema subset omits these limits; Pydantic still validates them locally.
     for field in fields:
         for variant in [field, *field.get("anyOf", [])]:
-            for keyword in ("minLength", "maxItems", "minimum", "maximum"):
+            for keyword in ("minLength", "minItems", "maxItems", "minimum", "maximum"):
                 variant.pop(keyword, None)
     return schema
 

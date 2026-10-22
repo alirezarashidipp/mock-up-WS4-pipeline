@@ -111,6 +111,7 @@ class PythonTests(unittest.TestCase):
             dashboard = get_dashboard_data(output)
             self.assertEqual(dashboard["counts"], {"total": 2, "HSBC": 1, "SUPPLIER": 1, "failed": 0})
             self.assertEqual(dashboard["records"][1]["supplier_name"], "Unknown")
+            self.assertEqual(dashboard["records"][1]["processing_status"], "success")
             self.assertEqual(dashboard["records"][0]["supporting_evidence"], ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"])
             expected_names = json.loads(responses[1].choices[0].message.content)["supporting_evidence"]
             self.assertEqual(dashboard["records"][1]["supporting_evidence"], expected_names)
@@ -145,7 +146,6 @@ class PythonTests(unittest.TestCase):
         self.assertEqual(set(labels), {"HSBC", "SUPPLIER"})
         for label in ("HSBC", "SUPPLIER"):
             result = json.loads(example_response(label).choices[0].message.content)
-            result["supporting_evidence"] = []
             for name in SUPPLIER_FIELDS:
                 result[name] = "Unneeded supplier text" if label == "HSBC" else None
             if label == "SUPPLIER":
@@ -161,17 +161,19 @@ class PythonTests(unittest.TestCase):
                 expected = None if label == "HSBC" or name == "supplier_more_info" else "Unknown"
                 self.assertEqual(getattr(classified, name), expected)
 
-    def test_evidence_is_optional_and_capped_at_ten(self):
+    def test_evidence_count_is_one_to_ten(self):
         result = json.loads(example_response("SUPPLIER").choices[0].message.content)
         evidence = result["supporting_evidence"][0]
-        for count in (0, 1, 2, 8, 10):
+        for count in (1, 2, 8, 10):
             with self.subTest(count=count):
                 result["supporting_evidence"] = [evidence] * count
                 parsed = Classification.model_validate(result)
                 self.assertEqual(len(parsed.supporting_evidence), count)
-        result["supporting_evidence"] = [evidence] * 11
-        with self.assertRaises(ValidationError):
-            Classification.model_validate(result)
+        for count in (0, 11):
+            with self.subTest(count=count):
+                result["supporting_evidence"] = [evidence] * count
+                with self.assertRaises(ValidationError):
+                    Classification.model_validate(result)
         result["supporting_evidence"] = [{"column": "INCIDENT_DESCRIPTION", "quote": "Old format"}]
         with self.assertRaises(ValidationError):
             Classification.model_validate(result)

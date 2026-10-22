@@ -8,7 +8,7 @@ CLEAN.csv + Definitions + Prompt -> LLM (one row per request) -> LLM_OUTPUT.csv
 LLM_OUTPUT.csv -> Dashboard
 ```
 
-The LLM tags each incident HSBC or SUPPLIER. For SUPPLIER it also extracts the supplier name, related product/service, action or failure, causal explanation, accountability reason, and supporting source column names without quotes. Extra recorded supplier facts go in `supplier_more_info`, left empty when none exist. Missing core supplier facts are Unknown. Supporting names are optional, with a maximum of ten per incident. The tag is a model assessment; weak evidence is stated in the rationale with low self-reported confidence.
+The LLM tags each incident HSBC or SUPPLIER. For SUPPLIER it also extracts the supplier name, related product/service, action or failure, causal explanation, accountability reason, and supporting source column names without quotes. Extra recorded supplier facts go in `supplier_more_info`, left empty when none exist. Missing core supplier facts are Unknown. Each result needs one to ten supporting names; unused CSV slots stay empty. The dashboard keeps decision and supplier fields visible, with sources and processing status in a dropdown. The tag is a model assessment; weak evidence is stated in the rationale with low self-reported confidence.
 
 ## Setup
 

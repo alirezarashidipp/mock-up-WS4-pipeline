@@ -19,7 +19,7 @@ class FrontendTests(unittest.TestCase):
         for url in urls:
             _, file_info = assets.lookup_path(url)
             self.assertIsNotNone(file_info, f"Missing asset: {url}")
-        for control in ("total-count", "HSBC-count", "SUPPLIER-count", "final-rows", "reload"):
+        for control in ("total-count", "HSBC-count", "SUPPLIER-count", "incident-list", "reload"):
             self.assertIn(f'id="{control}"', html)
 
     def test_dashboard_controls_match_script(self):

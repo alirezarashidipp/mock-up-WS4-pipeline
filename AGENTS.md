@@ -22,7 +22,7 @@ Read only relevant documents and keep them aligned with behavior changes. Use [R
 - Use Pydantic for model inputs and responses. Exclude INCIDENT_ID from model input.
 - Cleaning removes invisible control/format characters only; preserve punctuation, emails, HTML, and normal whitespace. Preparation retains empty/repeated IDs and uppercases unmapped headers; add no ID, CSV-shape, or mapping-collision checks to that stage.
 - Model classification is HSBC or SUPPLIER. Supplier details are null for HSBC; for SUPPLIER extract only documented facts and use Unknown for missing core details. Keep additional nonduplicated supplier facts in supplier_more_info, or null when none exist. State weak or conflicting attribution in the rationale with low self-reported confidence.
-- Save each result in `app/llm/save_csv.py` before requesting the next row. supporting_evidence contains zero to ten standardized source column names as strings. Save names in evidence_1_column through evidence_10_column; unused slots are empty. Keep source values and scalar model fields in their own columns, without evidence quotes, JSON blobs, definitions, or prompt text.
+- Save each result in `app/llm/save_csv.py` before requesting the next row. supporting_evidence contains one to ten standardized source column names as strings. Save names in evidence_1_column through evidence_10_column; unused slots are empty. Keep source values and scalar model fields in their own columns, without evidence quotes, JSON blobs, definitions, or prompt text.
 - Pass configured numeric temperature to the provider without a local range check. Existing output does not block starting the LLM pipeline; preserve records and retain conflicting-ID checks when saving.
 - Preserve response-structure checks and safe CSV writing. Store returned supporting source names as text. Avoid custom exception layers.
 
@@ -31,4 +31,4 @@ Read only relevant documents and keep them aligned with behavior changes. Use [R
 - Human review is removed. There is no approval queue, review API, or new FINAL.csv output. Preserve existing CSV files from earlier versions.
 - Keep the minimal English HSBC frontend in `frontend/dashboard/`, with styling in `frontend/style.css` and logo artwork in `frontend/pictures/`.
 - Run `app/ui/dashboard_app.py` independently on port 8766. Its only data input is LLM_OUTPUT.csv; it imports no LLM modules and makes no model calls or file writes.
-- Count successful model classifications, and report failed rows separately. Display supplier details only for SUPPLIER, along with analysis and evidence/source-column names. Render CSV values as text.
+- Count successful model classifications, and report failed rows separately. Keep classification, rationale, confidence, and all six supplier fields visible on SUPPLIER cards. Keep evidence names, processing_status, and root cause in a closed dropdown; saved input fields have a separate dropdown. Render CSV values as text.

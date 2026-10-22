@@ -42,13 +42,13 @@ system: |
   - decision_rationale: two to four short sentences explaining accountability,
     supporting facts, counterevidence, and any missing information. Give a
     concise decision summary, not a step-by-step internal thought process.
-  - supporting_evidence: a list of zero to ten standardized source column names
+  - supporting_evidence: a list of one to ten standardized source column names
     as strings, such as ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"]. Include only
-    input columns that materially support the decision or contain relevant
-    counterevidence. Return names only, without quotes, values, or objects.
-    Return an empty list if none apply. Ten is a maximum, not a target; the
-    count may differ per incident. Do not invent or repeat names to fill the
-    list; no ranking is required.
+    input columns that materially informed the decision, its limitations, or
+    relevant counterevidence. Return names only, without quotes, values, or
+    objects. At least one source name is required; ten is a maximum, not a
+    target. The count may differ per incident. Use only existing input columns
+    and do not invent or repeat names to fill the list; no ranking is required.
   - llm_confidence: integer 0-100, self-reported confidence in the selected tag,
     not measured accuracy or a calibrated probability.
   - supplier_name: the recorded supplier/actor responsible for the incident.

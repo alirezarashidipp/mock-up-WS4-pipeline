@@ -38,8 +38,9 @@ class Classification(BaseModel):
         min_length=1, description="A short evidence-based explanation of the accountability decision."
     )
     supporting_evidence: list[str] = Field(
+        min_length=1,
         max_length=10,
-        description="Zero to ten standardized source column names supporting the decision; names only, without quotes."
+        description="One to ten standardized source column names that informed the decision; names only, without quotes."
     )
     llm_confidence: int = Field(
         ge=0, le=100, description="Self-reported confidence in the selected label from 0 to 100, not measured accuracy."
