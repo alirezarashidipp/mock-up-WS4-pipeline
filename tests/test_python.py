@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 
 from openai import OpenAIError
 
-from app.csv_files import read_records
+from app.csv_files import read_records, write_records
 from app.data_preparation import pipeline as preparation
 from app.llm import classification
 from app.ui.dashboard_app import get_dashboard_data
@@ -104,6 +104,13 @@ class PythonTests(unittest.TestCase):
             self.assertEqual(len(dashboard["records"][1]["supporting_evidence"]), 6)
             self.assertEqual(output.read_bytes(), before)
             self.assertFalse((Path(folder) / "FINAL.csv").exists())
+            for row in saved:
+                for name in SUPPLIER_FIELDS:
+                    row.pop(name)
+            write_records(output, saved)
+            older_dashboard = get_dashboard_data(output)
+            self.assertEqual(older_dashboard["counts"], dashboard["counts"])
+            self.assertEqual(older_dashboard["records"][1]["supplier_name"], "")
 
     def test_failed_request_is_saved_and_excluded_from_counts(self):
         rows = [{"INCIDENT_ID": "001", "INCIDENT_DESCRIPTION": "Synthetic cause."}, {"INCIDENT_ID": "002", "INCIDENT_DESCRIPTION": "Synthetic failed request."}]

@@ -18,6 +18,6 @@ data/run/LLM_OUTPUT.csv -> read successful model results -> count tags -> displa
 
 - LLM_OUTPUT.csv is the only data input. The app imports no LLM or review modules, makes no model calls, and writes no files.
 - No human approval, correction, final-decision queue, or FINAL.csv input remains. Tags are model assessments, not human-approved outcomes.
-- A missing or empty input produces an empty dashboard. Invalid or older result schemas return an actionable error; never invent supplier details when loading older files.
+- A missing or empty input produces an empty dashboard. Older HSBC/SUPPLIER rows can lack supplier details; display unrecorded details as Unknown without changing the CSV or inventing facts. Invalid processing statuses or other classification labels return an error. REVIEW_STATUS is not used.
 - Refresh rereads the file. There is no automatic polling or notification from the LLM pipeline.
 - Configure the input through `RESULTS_FILE` in `app/ui/dashboard_app.py`. The dashboard can run independently once the CSV exists.

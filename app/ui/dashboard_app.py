@@ -41,7 +41,7 @@ def get_dashboard_data(path):
             for name in ("key_root_cause", "decision_rationale", "llm_confidence", "supplier_name",
                          "supplier_product_or_service", "supplier_action_or_failure",
                          "supplier_causal_explanation", "supplier_accountability_reason"):
-                record[name] = row[name]
+                record[name] = row.get(name, "")
             for name, value in row.items():
                 if name.startswith("evidence_") and name.endswith("_column"):
                     quote = row[name.removesuffix("_column") + "_quote"]
