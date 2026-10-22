@@ -42,7 +42,7 @@ def classify_rows(rows, definitions, output_file):
 
 def classification_schema() -> dict:
     schema = Classification.model_json_schema()
-    fields = list(schema["properties"].values()) + list(schema["$defs"]["Evidence"]["properties"].values())
+    fields = list(schema["properties"].values())
     # Azure's schema subset omits these limits; Pydantic still validates them locally.
     for field in fields:
         for variant in [field, *field.get("anyOf", [])]:
@@ -81,6 +81,7 @@ def classify_row(client: OpenAI, model: str, fields: list[dict], prompt: str) ->
         if result.classification == "HSBC":
             setattr(result, name, None)
         elif not (getattr(result, name) or "").strip():
-            setattr(result, name, "Unknown")
+            empty_value = None if name == "supplier_more_info" else "Unknown"
+            setattr(result, name, empty_value)
 
     return result

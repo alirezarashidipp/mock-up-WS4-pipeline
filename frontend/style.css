@@ -36,9 +36,6 @@ summary::after { content:"+"; font-size:19px; font-weight:400; color:var(--muted
 details[open] > summary::after { content:"−"; }
 .field-note { color:var(--muted); font-size:11px; margin:10px 0 0; }
 h3 { font-size:12px; font-weight:600; margin:0 0 8px; color:var(--ink); }
-blockquote { margin:0 0 14px; padding-left:12px; border-left:2px solid var(--line); }
-blockquote p { margin:0 0 7px; white-space:pre-wrap; overflow-wrap:anywhere; }
-cite { font-style:normal; color:var(--muted); font-size:10px; overflow-wrap:anywhere; }
 footer { margin-top:25px; display:flex; justify-content:space-between; gap:15px; font-size:11px; color:var(--muted); }
 .dashboard-card { background:white; padding:24px; border:1px solid var(--line); min-width:0; }
 .dashboard-card h2 { font-size:16px; margin-bottom:20px; }

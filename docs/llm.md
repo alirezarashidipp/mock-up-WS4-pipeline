@@ -15,13 +15,14 @@ CLEAN.csv -> one row per request -> validate response -> save LLM_OUTPUT.csv -> 
    - `classification`: HSBC or SUPPLIER, representing causal accountability rather than infrastructure ownership.
    - `key_root_cause`, `decision_rationale`, `llm_confidence`: documented cause, concise attribution explanation, and self-reported confidence from 0 to 100.
    - `supplier_name`, `supplier_product_or_service`, `supplier_action_or_failure`, `supplier_causal_explanation`, `supplier_accountability_reason`: null for HSBC; documented details or Unknown for SUPPLIER.
-   - `supporting_evidence`: unlimited `{column, quote}` objects. These carry supporting text and source column names, including supplier signals.
-5. Validate response structure. Normalize supplier fields to null for HSBC and replace blank/missing supplier facts with Unknown for SUPPLIER. Store evidence as returned; do not compare quotes against source values. An empty evidence list is allowed when nothing useful is recorded. Weak, missing, or conflicting attribution belongs in the rationale with low confidence; confidence is not measured accuracy. Absence of supplier evidence alone does not establish HSBC responsibility.
+   - `supplier_more_info`: additional documented supplier facts not covered by the five core fields; null for HSBC or when no extra information exists. Save as one plain-text CSV column.
+   - `supporting_evidence`: zero to ten standardized source column names as strings, for example `["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"]`. No quotes or source values are returned. Ten is a maximum, not a required count; counts can differ between incidents.
+5. Validate response structure and reject more than ten names. Normalize supplier fields to null for HSBC; replace blank core supplier facts with Unknown for SUPPLIER, while empty supplier_more_info stays null. Store returned names as text. An empty list is allowed. Weak, missing, or conflicting attribution belongs in the rationale with low confidence; confidence is not measured accuracy. Absence of supplier evidence alone does not establish HSBC responsibility.
 6. Call `app/llm/save_csv.py:save_result` before requesting the next row. Save source values, scalar response fields, `processing_status`, and `error` to LLM_OUTPUT.csv. There is no human review status or approval step.
 
 ## Storage and failures
 
-- Each source value and scalar result has its own CSV column. Evidence uses numbered `evidence_N_column`/`evidence_N_quote` pairs; headers expand without dropping earlier evidence.
+- Each source value and scalar result has its own CSV column. Save supporting source names in `evidence_1_column` through `evidence_10_column`; unused slots remain empty. There are no evidence quote columns.
 - Keep prompt and definitions in YAML. Store no JSON blobs, definition columns, or prompt text in CSV; arrays are reconstructed only for display/API responses.
 - Process sequentially. Successful rows have `processing_status=success`; failed responses are saved as failed where possible and stop the batch, preserving earlier results.
 - Every non-ID column needs a definition. Nonblank temperature is converted to a number and passed to the provider without a local range check. Connection settings use `.env` via `app/llm/llm_connection.py`.

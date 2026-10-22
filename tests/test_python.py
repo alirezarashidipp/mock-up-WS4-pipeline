@@ -10,15 +10,16 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from openai import OpenAIError
+from pydantic import ValidationError
 
 from app.csv_files import read_records, write_records
 from app.data_preparation import pipeline as preparation
 from app.llm import classification
+from app.models import Classification, SUPPLIER_FIELDS
 from app.ui.dashboard_app import get_dashboard_data
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SUPPLIER_FIELDS = ["supplier_name", "supplier_product_or_service", "supplier_action_or_failure", "supplier_causal_explanation", "supplier_accountability_reason"]
 
 
 def example_response(label):
@@ -26,7 +27,7 @@ def example_response(label):
         "classification": label,
         "key_root_cause": "Synthetic configuration error.",
         "decision_rationale": "Synthetic example explanation.",
-        "supporting_evidence": [{"column": "INCIDENT_DESCRIPTION", "quote": "Model summary of a synthetic cause."}],
+        "supporting_evidence": ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"],
         "llm_confidence": 80,
     }
     for name in SUPPLIER_FIELDS:
@@ -38,8 +39,12 @@ def example_response(label):
             supplier_action_or_failure="Supplier deployed a defective routing change.",
             supplier_causal_explanation="The change interrupted synthetic payment routing.",
             supplier_accountability_reason="The recorded supplier change caused the failure.",
+            supplier_more_info="The synthetic supplier recorded a regional maintenance window.",
         )
-        result["supporting_evidence"] *= 6
+        result["supporting_evidence"].extend([
+            "PROBLEM_CLOSE_NOTES", "IT_PROBLEM_DESCRIPTION", "INCIDENT_RESOLUTION_NOTES",
+            "INCIDENT_WORK_NOTES", "PROBLEM_WORK_NOTES", "MAJOR_INCIDENT_FINDINGS",
+        ])
     message = SimpleNamespace(content=json.dumps(result), refusal=None)
     return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
 
@@ -92,8 +97,13 @@ class PythonTests(unittest.TestCase):
                 self.assertEqual(saved[0][name], "")
                 self.assertTrue(saved[1][name])
             self.assertEqual(saved[1]["supplier_name"], "Unknown")
-            self.assertEqual(saved[0]["evidence_6_quote"], "")
-            self.assertTrue(saved[1]["evidence_6_quote"])
+            self.assertEqual(saved[0]["evidence_3_column"], "")
+            self.assertTrue(saved[1]["evidence_8_column"])
+            self.assertEqual(saved[1]["evidence_9_column"], "")
+            self.assertEqual(saved[1]["evidence_10_column"], "")
+            self.assertNotIn("evidence_11_column", saved[1])
+            self.assertFalse(any(name.endswith("_quote") for name in saved[1]))
+            self.assertEqual(saved[1]["supplier_more_info"], "The synthetic supplier recorded a regional maintenance window.")
             for row in saved:
                 self.assertTrue(all(name not in row for name in ("llm_input", "llm_prompt", "supporting_evidence", "review_status")))
                 self.assertFalse(any(name.startswith("definition_") for name in row))
@@ -101,7 +111,11 @@ class PythonTests(unittest.TestCase):
             dashboard = get_dashboard_data(output)
             self.assertEqual(dashboard["counts"], {"total": 2, "HSBC": 1, "SUPPLIER": 1, "failed": 0})
             self.assertEqual(dashboard["records"][1]["supplier_name"], "Unknown")
-            self.assertEqual(len(dashboard["records"][1]["supporting_evidence"]), 6)
+            self.assertEqual(dashboard["records"][0]["supporting_evidence"], ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"])
+            expected_names = json.loads(responses[1].choices[0].message.content)["supporting_evidence"]
+            self.assertEqual(dashboard["records"][1]["supporting_evidence"], expected_names)
+            self.assertEqual(len(expected_names), 8)
+            self.assertEqual(dashboard["records"][1]["supplier_more_info"], saved[1]["supplier_more_info"])
             self.assertEqual(output.read_bytes(), before)
             self.assertFalse((Path(folder) / "FINAL.csv").exists())
             for row in saved:
@@ -144,7 +158,23 @@ class PythonTests(unittest.TestCase):
                 classified = classification.classify_row(client, "example-model", fields, "Example prompt.")
             self.assertIsNotNone(classified)
             for name in SUPPLIER_FIELDS:
-                self.assertEqual(getattr(classified, name), None if label == "HSBC" else "Unknown")
+                expected = None if label == "HSBC" or name == "supplier_more_info" else "Unknown"
+                self.assertEqual(getattr(classified, name), expected)
+
+    def test_evidence_is_optional_and_capped_at_ten(self):
+        result = json.loads(example_response("SUPPLIER").choices[0].message.content)
+        evidence = result["supporting_evidence"][0]
+        for count in (0, 1, 2, 8, 10):
+            with self.subTest(count=count):
+                result["supporting_evidence"] = [evidence] * count
+                parsed = Classification.model_validate(result)
+                self.assertEqual(len(parsed.supporting_evidence), count)
+        result["supporting_evidence"] = [evidence] * 11
+        with self.assertRaises(ValidationError):
+            Classification.model_validate(result)
+        result["supporting_evidence"] = [{"column": "INCIDENT_DESCRIPTION", "quote": "Old format"}]
+        with self.assertRaises(ValidationError):
+            Classification.model_validate(result)
 
 
 if __name__ == "__main__":

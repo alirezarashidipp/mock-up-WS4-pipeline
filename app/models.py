@@ -9,6 +9,7 @@ SUPPLIER_FIELDS = (
     "supplier_action_or_failure",
     "supplier_causal_explanation",
     "supplier_accountability_reason",
+    "supplier_more_info",
 )
 
 
@@ -24,13 +25,6 @@ class InputField(BaseModel):
     value: str
 
 
-class Evidence(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    column: str = Field(min_length=1)
-    quote: str = Field(min_length=1)
-
-
 class Classification(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -43,8 +37,9 @@ class Classification(BaseModel):
     decision_rationale: str = Field(
         min_length=1, description="A short evidence-based explanation of the accountability decision."
     )
-    supporting_evidence: list[Evidence] = Field(
-        description="Evidence supporting the decision, including material counterevidence."
+    supporting_evidence: list[str] = Field(
+        max_length=10,
+        description="Zero to ten standardized source column names supporting the decision; names only, without quotes."
     )
     llm_confidence: int = Field(
         ge=0, le=100, description="Self-reported confidence in the selected label from 0 to 100, not measured accuracy."
@@ -63,4 +58,7 @@ class Classification(BaseModel):
     )
     supplier_accountability_reason: str | None = Field(
         description="For SUPPLIER, why the record supports assigning responsibility to this actor, or Unknown; null for HSBC."
+    )
+    supplier_more_info: str | None = Field(
+        description="Additional recorded supplier facts not covered by the other fields; null for HSBC or when nothing else is recorded."
     )

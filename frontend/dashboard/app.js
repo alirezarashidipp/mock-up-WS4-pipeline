@@ -28,24 +28,22 @@ function recordDetails(row) {
       ["How it caused the incident or impact", row.supplier_causal_explanation],
       ["Why the supplier is accountable", row.supplier_accountability_reason]
     ]) addField(content, label, value);
+    if (row.supplier_more_info) addField(content, "Additional supplier information", row.supplier_more_info);
   }
   const evidence = document.createElement("section");
   const heading = document.createElement("h3");
-  heading.textContent = "Supporting evidence and source fields";
+  heading.textContent = "Source columns supporting the decision";
   evidence.append(heading);
   if (!row.supporting_evidence.length) {
     const empty = document.createElement("p");
-    empty.textContent = "No supporting evidence returned.";
+    empty.textContent = "No supporting source columns returned.";
     evidence.append(empty);
   }
-  for (const item of row.supporting_evidence) {
-    const quote = document.createElement("blockquote");
+  for (const columnName of row.supporting_evidence) {
     const text = document.createElement("p");
-    const source = document.createElement("cite");
-    text.textContent = item.quote;
-    source.textContent = item.column;
-    quote.append(text, source);
-    evidence.append(quote);
+    text.textContent = columnName;
+    text.className = "record-text";
+    evidence.append(text);
   }
   content.append(evidence);
   const inputs = document.createElement("details");

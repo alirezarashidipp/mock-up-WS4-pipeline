@@ -16,7 +16,7 @@ def read_records(path, optional=False):
 
 
 def is_evidence_column(name):
-    return re.fullmatch(r"evidence_[1-9]\d*_(column|quote)", name) is not None
+    return re.fullmatch(r"evidence_[1-9]\d*_column", name) is not None
 
 
 def append_record(path, record):
@@ -28,7 +28,7 @@ def append_record(path, record):
         different_columns = set(rows[0]) ^ set(record)
         if any(not is_evidence_column(name) for name in different_columns):
             return False, f"{path.name} belongs to a different schema. Use a new batch folder."
-        # Evidence counts vary by row; retain every pair and fill unused cells.
+        # Keep existing evidence columns and fill unused cells.
         for row in rows:
             for name in record:
                 row.setdefault(name, "")

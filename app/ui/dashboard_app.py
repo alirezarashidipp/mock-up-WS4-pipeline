@@ -40,13 +40,11 @@ def get_dashboard_data(path):
             }
             for name in ("key_root_cause", "decision_rationale", "llm_confidence", "supplier_name",
                          "supplier_product_or_service", "supplier_action_or_failure",
-                         "supplier_causal_explanation", "supplier_accountability_reason"):
+                         "supplier_causal_explanation", "supplier_accountability_reason", "supplier_more_info"):
                 record[name] = row.get(name, "")
             for name, value in row.items():
-                if name.startswith("evidence_") and name.endswith("_column"):
-                    quote = row[name.removesuffix("_column") + "_quote"]
-                    if value or quote:
-                        record["supporting_evidence"].append({"column": value, "quote": quote})
+                if name.startswith("evidence_") and name.endswith("_column") and value:
+                    record["supporting_evidence"].append(value)
             records.append(record)
             counts[classification] += 1
         counts["total"] = len(records)

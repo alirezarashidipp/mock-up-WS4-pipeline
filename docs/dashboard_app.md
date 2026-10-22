@@ -11,7 +11,7 @@ data/run/LLM_OUTPUT.csv -> read successful model results -> count tags -> displa
 1. `GET /` serves `frontend/dashboard/index.html`; `frontend/dashboard/app.js` requests `GET /api/dashboard` on load and Refresh.
 2. `get_dashboard_data` reads `app.state.results_file`, initialized from `RESULTS_FILE`, using UTF-8 CSV input.
 3. Count successful HSBC and SUPPLIER rows; count failed processing rows separately. Return successful results as dashboard records.
-4. Show incident ID, summary, model tag, supplier name, product/service, and confidence. Collapsible details expose cause, rationale, supporting evidence/source-column names, and supplier-specific fields for SUPPLIER.
+4. Show incident ID, summary, model tag, supplier name, product/service, and confidence. Collapsible details expose cause, rationale, supporting source column names (without quotes), and supplier-specific fields for SUPPLIER. The API reconstructs supporting_evidence as a list of nonempty names from evidence_N_column cells. Show supplier_more_info when it contains additional recorded facts.
 5. Render CSV values as text. Share `frontend/style.css` and logo artwork in `frontend/pictures/`.
 
 ## Boundaries

@@ -8,7 +8,7 @@ CLEAN.csv + Definitions + Prompt -> LLM (one row per request) -> LLM_OUTPUT.csv
 LLM_OUTPUT.csv -> Dashboard
 ```
 
-The LLM tags each incident HSBC or SUPPLIER. For SUPPLIER it also extracts the supplier name, related product/service, action or failure, causal explanation, accountability reason, and evidence with source column names. Missing supplier facts are Unknown. The tag is a model assessment; weak evidence is stated in the rationale with low self-reported confidence.
+The LLM tags each incident HSBC or SUPPLIER. For SUPPLIER it also extracts the supplier name, related product/service, action or failure, causal explanation, accountability reason, and supporting source column names without quotes. Extra recorded supplier facts go in `supplier_more_info`, left empty when none exist. Missing core supplier facts are Unknown. Supporting names are optional, with a maximum of ten per incident. The tag is a model assessment; weak evidence is stated in the rationale with low self-reported confidence.
 
 ## Setup
 
@@ -45,7 +45,7 @@ py -3.11 -m venv .venv
 
 The dashboard reads LLM_OUTPUT.csv only. Click Refresh to reread results; stop with Ctrl+C. There is no human approval step or new FINAL.csv. Existing CSVs from earlier versions remain untouched.
 
-Preparation replaces CLEAN.csv on nonempty runs. LLM results append for new incident IDs; conflicting results for an existing ID are rejected. For an older output schema, configure a new output folder in `app/llm/pipeline.py` and update `RESULTS_FILE` in `app/ui/dashboard_app.py`. CSV cells contain plain values and numbered evidence pairs, without JSON blobs, prompt text, or definitions. CSVs and credentials stay out of Git.
+Preparation replaces CLEAN.csv on nonempty runs. LLM results append for new incident IDs; conflicting results for an existing ID are rejected. For an older output schema, configure a new output folder in `app/llm/pipeline.py` and update `RESULTS_FILE` in `app/ui/dashboard_app.py`. CSV cells contain plain values and ten supporting source-name slots, without quote columns, JSON blobs, prompt text, or definitions. CSVs and credentials stay out of Git.
 
 ## Documentation and tests
 

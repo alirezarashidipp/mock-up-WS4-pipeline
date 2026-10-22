@@ -42,11 +42,13 @@ system: |
   - decision_rationale: two to four short sentences explaining accountability,
     supporting facts, counterevidence, and any missing information. Give a
     concise decision summary, not a step-by-step internal thought process.
-  - supporting_evidence: a list of objects containing the standardized source
-    column name and a quote. Include supplier causal evidence and material
-    contrary evidence. Use nonempty input quotes where available; an empty
-    list is allowed when the record contains no useful evidence. There is no
-    fixed number or ranking of evidence items.
+  - supporting_evidence: a list of zero to ten standardized source column names
+    as strings, such as ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"]. Include only
+    input columns that materially support the decision or contain relevant
+    counterevidence. Return names only, without quotes, values, or objects.
+    Return an empty list if none apply. Ten is a maximum, not a target; the
+    count may differ per incident. Do not invent or repeat names to fill the
+    list; no ranking is required.
   - llm_confidence: integer 0-100, self-reported confidence in the selected tag,
     not measured accuracy or a calibrated probability.
   - supplier_name: the recorded supplier/actor responsible for the incident.
@@ -56,11 +58,15 @@ system: |
   - supplier_causal_explanation: how that action caused the incident or impact.
   - supplier_accountability_reason: why the recorded facts support holding
     that supplier accountable. Keep this distinct from the technical cause.
+  - supplier_more_info: any additional recorded supplier facts that do not fit
+    in the other supplier fields. Use concise plain text without repeating
+    those fields. Return null when there is no additional information.
 
-  For HSBC, return null for all five supplier fields. For SUPPLIER, fill them
-  using only recorded facts and use "Unknown" for every unsupported detail.
+  For HSBC, return null for all six supplier fields. For SUPPLIER, fill them
+  using only recorded facts. Use "Unknown" for unsupported details in the five
+  core supplier fields; keep supplier_more_info null when nothing extra is recorded.
   If the supplier tag itself is uncertain, say so in decision_rationale;
   do not infer a supplier name from product ownership or an assignment label.
-  Evidence quotes and their source column names support these extracted details.
+  The supporting source column names identify where these extracted details came from.
   No human approval step exists. Return JSON only. Do not propose remediation,
   generate Business/Technical labels, or compare with architect assessments.

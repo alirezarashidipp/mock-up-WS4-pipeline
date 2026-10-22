@@ -21,10 +21,10 @@ Read only relevant documents and keep them aligned with behavior changes. Use [R
 - Names belong in `fields/columns.yaml`; definitions keyed by standardized names belong in `fields/definitions.yml`; instructions belong in `prompts/classification.yml`.
 - Use Pydantic for model inputs and responses. Exclude INCIDENT_ID from model input.
 - Cleaning removes invisible control/format characters only; preserve punctuation, emails, HTML, and normal whitespace. Preparation retains empty/repeated IDs and uppercases unmapped headers; add no ID, CSV-shape, or mapping-collision checks to that stage.
-- Model classification is HSBC or SUPPLIER. Supplier details are null for HSBC; for SUPPLIER extract only documented facts and use Unknown for missing details. State weak or conflicting attribution in the rationale with low self-reported confidence.
-- Save each result in `app/llm/save_csv.py` before requesting the next row. Keep source values, scalar model fields, and unlimited numbered evidence column/quote pairs in separate CSV columns. Store no JSON blobs, definitions, or prompt text.
+- Model classification is HSBC or SUPPLIER. Supplier details are null for HSBC; for SUPPLIER extract only documented facts and use Unknown for missing core details. Keep additional nonduplicated supplier facts in supplier_more_info, or null when none exist. State weak or conflicting attribution in the rationale with low self-reported confidence.
+- Save each result in `app/llm/save_csv.py` before requesting the next row. supporting_evidence contains zero to ten standardized source column names as strings. Save names in evidence_1_column through evidence_10_column; unused slots are empty. Keep source values and scalar model fields in their own columns, without evidence quotes, JSON blobs, definitions, or prompt text.
 - Pass configured numeric temperature to the provider without a local range check. Existing output does not block starting the LLM pipeline; preserve records and retain conflicting-ID checks when saving.
-- Preserve response-structure checks and safe CSV writing. Store evidence as returned; do not compare quotes with source text. Avoid custom exception layers.
+- Preserve response-structure checks and safe CSV writing. Store returned supporting source names as text. Avoid custom exception layers.
 
 ## Dashboard
 
