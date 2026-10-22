@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Final decisions | HSBC</title>
+  <title>Incident classification | HSBC</title>
   <link rel="stylesheet" href="/assets/style.css">
   <script src="/assets/dashboard/app.js" defer></script>
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/" aria-label="HSBC final decisions dashboard">
+    <a class="brand" href="/" aria-label="HSBC incident classification dashboard">
       <!-- Artwork from pictures/HSBC_logo_(2018) (1).svg. -->
       <svg class="brand-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 315.9 85" role="img" aria-labelledby="hsbc-logo-title">
 <title id="hsbc-logo-title">HSBC</title>
@@ -28,18 +28,17 @@
 <path d="M301.2,61c-11.5,0-16.6-7.3-16.6-18.2s5.7-18.8,17-18.8c7.1,0,14,3.2,14.2,11.2h-8c-0.4-3.6-2.8-5.4-6.2-5.4
 	c-7,0-9.1,7.5-9.1,13.2c0,5.7,2.1,12.3,8.8,12.3c3.5,0,6.1-1.9,6.6-5.5h8C315.1,58,308.6,61,301.2,61z"/>
 </svg>
-      <span class="brand-divider" aria-hidden="true"></span><span class="brand-caption">WS4 / FINAL DASHBOARD</span>
+      <span class="brand-divider" aria-hidden="true"></span><span class="brand-caption">WS4 / INCIDENT DASHBOARD</span>
     </a>
     <span class="mode" id="mode">Connecting…</span>
   </header>
 <main>
-  <nav class="page-nav" aria-label="Application"><a href="http://127.0.0.1:8765/">Review queue</a><a href="/" aria-current="page">Final decisions dashboard</a></nav>
-  <section class="page-heading"><div><p class="eyebrow">HUMAN DECISIONS / WS4</p><h1>Final decisions</h1><p class="subtitle">Final human decisions from FINAL.csv.</p></div><button id="reload" type="button" class="button">Refresh</button></section>
-  <p id="demo-note" class="demo-note" hidden>Demo: synthetic incidents and hand-authored LLM assessments. Saved human decisions populate this dashboard.</p>
+  <section class="page-heading"><div><p class="eyebrow">INCIDENT ACCOUNTABILITY / WS4</p><h1>Incident classification</h1><p class="subtitle">LLM tags, supplier details, and supporting evidence from LLM_OUTPUT.csv.</p></div><button id="reload" type="button" class="button">Refresh</button></section>
+  <p id="demo-note" class="demo-note" hidden>Demo: synthetic incidents and example model results.</p>
   <div id="message" class="message" role="status" aria-live="polite" hidden></div>
-  <section class="stats" aria-label="Final class counts"><div class="stat"><strong id="total-count">—</strong><span>Finalized incidents</span></div><div class="stat"><strong id="HSBC-count">—</strong><span>HSBC</span></div><div class="stat"><strong id="SUPPLIER-count">—</strong><span>SUPPLIER</span></div></section>
-  <section class="dashboard-card"><h2>Finalized incidents</h2><p id="dashboard-empty" class="field-note">FINAL.csv has no finalized decisions yet.</p><div class="table-scroll"><table id="final-table" hidden><caption class="field-note">Saved final decisions</caption><thead><tr><th scope="col">Incident</th><th scope="col">Summary</th><th scope="col">Final class</th><th scope="col">User reason</th></tr></thead><tbody id="final-rows"></tbody></table></div></section>
-  <footer><span>HSBC · Incident classification / WS4</span><span>Source: FINAL.csv</span></footer>
+  <section class="stats" aria-label="Classification counts"><div class="stat"><strong id="total-count">—</strong><span>Classified incidents</span></div><div class="stat"><strong id="HSBC-count">—</strong><span>HSBC</span></div><div class="stat"><strong id="SUPPLIER-count">—</strong><span>SUPPLIER</span></div><div class="stat"><strong id="failed-count">—</strong><span>Processing failures</span></div></section>
+  <section class="dashboard-card"><h2>Model results</h2><p id="dashboard-empty" class="field-note">LLM_OUTPUT.csv has no successful results yet.</p><div class="table-scroll"><table id="final-table" hidden><caption class="field-note">Saved LLM results. Open a record's details to inspect the explanation and source evidence. Confidence is model-reported, not measured accuracy.</caption><thead><tr><th scope="col">Incident</th><th scope="col">Summary</th><th scope="col">LLM tag</th><th scope="col">Supplier</th><th scope="col">Product / service</th><th scope="col">Confidence</th></tr></thead><tbody id="final-rows"></tbody></table></div></section>
+  <footer><span>HSBC · Incident classification / WS4</span><span>Source: LLM_OUTPUT.csv</span></footer>
 </main>
 </body>
 </html>

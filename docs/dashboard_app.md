@@ -3,22 +3,21 @@
 Run `python -m app.ui.dashboard_app` from the project root. Open `http://127.0.0.1:8766/`.
 
 ```text
-data/run/FINAL.csv -> read -> count FINAL_CLASS -> display counts and table
+data/run/LLM_OUTPUT.csv -> read successful model results -> count tags -> display details
 ```
 
 ## Request flow
 
-1. `GET /` serves `frontend/dashboard/index.html`; `frontend/dashboard/app.js` requests `GET /api/dashboard` on load and when Refresh is clicked. Shared styling and logo artwork remain in `frontend/style.css` and `frontend/pictures/`.
-2. `dashboard_app.get_dashboard_data` reads `app.state.final_file`, initialized from `FINAL_FILE`, using `csv.DictReader` and `utf-8-sig`.
-3. For each row, read `INCIDENT_ID`, `FINAL_CLASS`, and `USER_REASON`; use `INCIDENT_SHORT_DESCRIPTION` as the optional summary.
-4. Count `total`, `HSBC`, and `SUPPLIER` using `FINAL_CLASS`, the user's final decision.
-5. Return `{records, counts, demo}`. Each record contains `{incident_id, summary, final_class, user_reason}`. The UI renders the three counts and four-column table using text values.
+1. `GET /` serves `frontend/dashboard/index.html`; `frontend/dashboard/app.js` requests `GET /api/dashboard` on load and Refresh.
+2. `get_dashboard_data` reads `app.state.results_file`, initialized from `RESULTS_FILE`, using UTF-8 CSV input.
+3. Count successful HSBC and SUPPLIER rows; count failed processing rows separately. Return successful results as dashboard records.
+4. Show incident ID, summary, model tag, supplier name, product/service, and confidence. Collapsible details expose cause, rationale, supporting evidence/source-column names, and supplier-specific fields for SUPPLIER.
+5. Render CSV values as text. Share `frontend/style.css` and logo artwork in `frontend/pictures/`.
 
 ## Boundaries
 
-- `FINAL.csv` is the only data input. The app imports no review or LLM modules and needs neither process running.
-- It reads no RAW, CLEAN, or LLM_OUTPUT files; it makes no model calls and writes no files.
-- It uses the rows already present in FINAL.csv; it does not revalidate model results, evidence, or review history.
-- Missing or empty FINAL.csv produces an empty dashboard. Invalid classes, missing required row fields, or read/encoding failures return an error with HTTP 400.
-- Refresh rereads the file. There is no automatic polling or notification from review.
-- Configure the input path through `FINAL_FILE` in `app/ui/dashboard_app.py`.
+- LLM_OUTPUT.csv is the only data input. The app imports no LLM or review modules, makes no model calls, and writes no files.
+- No human approval, correction, final-decision queue, or FINAL.csv input remains. Tags are model assessments, not human-approved outcomes.
+- A missing or empty input produces an empty dashboard. Invalid or older result schemas return an actionable error; never invent supplier details when loading older files.
+- Refresh rereads the file. There is no automatic polling or notification from the LLM pipeline.
+- Configure the input through `RESULTS_FILE` in `app/ui/dashboard_app.py`. The dashboard can run independently once the CSV exists.

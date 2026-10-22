@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from app.llm.prepare_fields import prepare_fields
 from app.llm.llm_connection import llm_connection
-from app.models import Classification
+from app.models import Classification, SUPPLIER_FIELDS
 from app.llm.save_csv import save_result
 
 
@@ -77,11 +77,10 @@ def classify_row(client: OpenAI, model: str, fields: list[dict], prompt: str) ->
     if choice.finish_reason != "stop" or choice.message.refusal or not choice.message.content:
         return None
     result = Classification.model_validate_json(choice.message.content)
-    if result.classification != "UNDECIDED" and not result.supporting_evidence:
-        return None
-    if result.classification == "UNDECIDED" and not (result.uncertainty_reason or "").strip():
-        return None
-    if result.classification != "UNDECIDED" and result.uncertainty_reason is not None:
-        return None
+    for name in SUPPLIER_FIELDS:
+        if result.classification == "HSBC":
+            setattr(result, name, None)
+        elif not (getattr(result, name) or "").strip():
+            setattr(result, name, "Unknown")
 
     return result

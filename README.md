@@ -1,94 +1,68 @@
 # HSBC Incident Classification Demo
 
-A small Python 3.11 mock-up with CSV storage, structured LLM responses, and two independent FastAPI screens.
+A small Python 3.11 mock-up with CSV storage, Pydantic responses, and a read-only HSBC dashboard.
 
 ```text
 RAW.csv -> Read -> Rename -> Clean -> CLEAN.csv
 CLEAN.csv + Definitions + Prompt -> LLM (one row per request) -> LLM_OUTPUT.csv
-LLM_OUTPUT.csv -> User review -> FINAL.csv
-FINAL.csv -> Independent dashboard
+LLM_OUTPUT.csv -> Dashboard
 ```
+
+The LLM tags each incident HSBC or SUPPLIER. For SUPPLIER it also extracts the supplier name, related product/service, action or failure, causal explanation, accountability reason, and evidence with source column names. Missing supplier facts are Unknown. The tag is a model assessment; weak evidence is stated in the rationale with low self-reported confidence.
 
 ## Setup
 
-Run every command from the project root in a terminal. Commands call the virtual environment's Python directly.
-
-Create the environment once (skip the first command if `.venv` already exists):
+Run from the project root. Create the environment once; skip the first command if `.venv` exists:
 
 ```powershell
 py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-- Place your UTF-8 source CSV at `data/mockup/RAW.csv`.
-- Create `.env` using [.env.example](.env.example) if it does not already exist. Keep credentials local.
-- Select `LLM_PROVIDER=openai` or `azure` and fill the corresponding settings. `LLM_TEMPERATURE` is optional; leave it blank for the model default.
-- Names: [fields/columns.yaml](fields/columns.yaml). Short definitions: [fields/definitions.yml](fields/definitions.yml). Instructions: [prompts/classification.yml](prompts/classification.yml).
+- Put a UTF-8 source CSV at `data/mockup/RAW.csv`.
+- Create `.env` using [.env.example](.env.example) if absent. Select `LLM_PROVIDER=openai` or `azure` and fill that provider's settings. `LLM_TEMPERATURE` is optional.
+- Configure [column names](fields/columns.yaml), [short definitions](fields/definitions.yml), and [classification instructions](prompts/classification.yml).
 
 ## Run in this order
 
-### 1. Prepare the source data
+1. Prepare data; wait for `data/run/CLEAN.csv`:
 
-```powershell
-.\.venv\Scripts\python.exe -m app.data_preparation.pipeline
-```
+   ```powershell
+   .\.venv\Scripts\python.exe -m app.data_preparation.pipeline
+   ```
 
-Reads `data/mockup/RAW.csv`, renames columns, cleans values, and saves `data/run/CLEAN.csv`. Wait for completion before step 2.
+2. Classify rows; each response is saved immediately to `data/run/LLM_OUTPUT.csv`:
 
-### 2. Send each cleaned row to the LLM
+   ```powershell
+   .\.venv\Scripts\python.exe -m app.llm.pipeline
+   ```
 
-```powershell
-.\.venv\Scripts\python.exe -m app.llm.pipeline
-```
+3. Start the dashboard and open [http://127.0.0.1:8766/](http://127.0.0.1:8766/):
 
-Reads `CLEAN.csv`, sends one row per request with definitions and prompt, and saves inputs and responses to `data/run/LLM_OUTPUT.csv`. Wait for completion before step 3.
+   ```powershell
+   .\.venv\Scripts\python.exe -m app.ui.dashboard_app
+   ```
 
-`app/llm/save_csv.py` saves each result immediately. CSV cells contain plain source values, model fields and separate evidence column/quote pairs, without JSON blobs or prompt text. Definitions stay in `fields/definitions.yml`; review reads them from that file.
+The dashboard reads LLM_OUTPUT.csv only. Click Refresh to reread results; stop with Ctrl+C. There is no human approval step or new FINAL.csv. Existing CSVs from earlier versions remain untouched.
 
-### 3. Start the review frontend
+Preparation replaces CLEAN.csv on nonempty runs. LLM results append for new incident IDs; conflicting results for an existing ID are rejected. For an older output schema, configure a new output folder in `app/llm/pipeline.py` and update `RESULTS_FILE` in `app/ui/dashboard_app.py`. CSV cells contain plain values and numbered evidence pairs, without JSON blobs, prompt text, or definitions. CSVs and credentials stay out of Git.
 
-```powershell
-.\.venv\Scripts\python.exe -m app.ui.review_app
-```
-
-Open [Review UI](http://127.0.0.1:8765/). Choose the final class, enter a reason, and save. The first successful decision creates `data/run/FINAL.csv`. Keep this terminal open.
-
-### 4. Start the dashboard in a second terminal
-
-```powershell
-.\.venv\Scripts\python.exe -m app.ui.dashboard_app
-```
-
-Open [Dashboard](http://127.0.0.1:8766/). It reads `FINAL.csv` only; click Refresh after saving reviews. It can run independently and shows an empty view until final decisions exist. Stop either UI with Ctrl+C in its terminal.
-
-All model outcomes (`HSBC`, `SUPPLIER`, `UNDECIDED`) await a user's final class and reason. FINAL.csv preserves the original result plus the user decision and UTC date. Neither UI calls the model; the dashboard needs no other process running.
-
-Frontend files are separate: `frontend/review/` and `frontend/dashboard/`. Both use the shared `frontend/style.css` and logo artwork in `frontend/pictures/`.
-
-Preparation replaces CLEAN.csv with the newly prepared data on each nonempty run. The LLM pipeline can start with existing output files and appends new incident IDs; conflicting results for an existing ID are still rejected when saving. Use a separate output folder for a fresh batch. CSV files and credentials are excluded from Git.
-
-## Stage documentation
+## Documentation and tests
 
 - [Data preparation](docs/data_preparation.md)
-- [LLM requests and output](docs/llm.md)
-- [Review and final decisions](docs/review_app.md)
-- [Independent dashboard](docs/dashboard_app.md)
-
-AI agents: follow [AGENTS.md](AGENTS.md) and read the relevant stage document before changing code.
-
-## Simple tests
+- [LLM classification and supplier extraction](docs/llm.md)
+- [Dashboard](docs/dashboard_app.md)
+- AI agents: follow [AGENTS.md](AGENTS.md) before changing code.
 
 ```powershell
 .\.venv\Scripts\python.exe -B -m unittest discover -s tests -p test_frontend.py -v
 .\.venv\Scripts\python.exe -B -m unittest discover -s tests -p test_python.py -v
 ```
 
-Frontend tests check page controls and asset paths offline; they do not run a browser. Python tests use temporary CSVs and simulated LLM responses. No API key, network connection, or extra test dependency is required.
-
-To check the real LLM connection configured in `.env`, run this separately:
+These tests run offline with temporary CSVs and simulated LLM replies. Frontend checks cover assets and controls, not browser interaction. To make a real request using `.env`, run the separate connection check:
 
 ```powershell
 .\.venv\Scripts\python.exe -B -m unittest discover -s tests -p check_llm_connection.py -v
 ```
 
-It asks `What is capital of India?`, prints the answer, and checks that the response is nonempty. It makes a live API request using the selected provider and may incur usage charges. Ordinary test discovery (`test*.py`) skips this live check.
+It asks `What is capital of India?` and checks for a nonempty reply. Ordinary test discovery skips this live API call.

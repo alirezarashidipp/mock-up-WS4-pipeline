@@ -1,43 +1,31 @@
-# LLM request flow
+# LLM classification and supplier extraction
 
 Entry point: `python -m app.llm.pipeline` from the project root.
 
 ```text
-CLEAN.csv -> one row per request -> validate response -> save LLM_OUTPUT.csv
+CLEAN.csv -> one row per request -> validate response -> save LLM_OUTPUT.csv -> dashboard
 ```
 
 ## Per request
 
-1. Take the next row from `data/run/CLEAN.csv`, in file order.
-2. Keep `INCIDENT_ID` locally to associate the result with its source row.
-3. `app/llm/prepare_fields.py` builds a JSON array for the other columns: `{name, description, value}`. Resolve each description by standardized column name from `fields/definitions.yml`.
-4. Send two messages: `system` = the `system` value from `prompts/classification.yml`; `user` = the JSON array for this row. Repeat the prompt and definitions in every request. Requests contain no earlier rows or conversation history.
-5. Request a structured JSON response using the `Classification` schema in `app/models.py`:
-   - `classification`: `HSBC`, `SUPPLIER`, or `UNDECIDED`.
-   - `key_root_cause`: one sentence, or `null` if unknown.
-   - `decision_rationale`: concise evidence-based explanation.
-   - `supporting_evidence`: a list of `{column, quote}` objects, without a count limit.
-   - `llm_confidence`: integer 0-100; model-reported confidence, not measured accuracy.
-   - `uncertainty_reason`: required nonblank text for `UNDECIDED`; `null` otherwise.
-6. Validate the response structure with Pydantic and check classification/uncertainty consistency. `HSBC` and `SUPPLIER` require supporting evidence. Store evidence as returned; do not compare quotes with source text.
-7. Call `app/llm/save_csv.py:save_result` immediately after validation, before requesting the next row. Save the source values, response fields, and processing/review metadata to `data/run/LLM_OUTPUT.csv`.
+1. Read the next row from `data/run/CLEAN.csv`; retain INCIDENT_ID locally.
+2. `app/llm/prepare_fields.py` builds `{name, description, value}` objects for non-ID columns, using `fields/definitions.yml`.
+3. Send the `system` value from `prompts/classification.yml` plus that row's fields. Repeat the prompt and definitions on every independent request.
+4. Parse the response with the Pydantic `Classification` model:
+   - `classification`: HSBC or SUPPLIER, representing causal accountability rather than infrastructure ownership.
+   - `key_root_cause`, `decision_rationale`, `llm_confidence`: documented cause, concise attribution explanation, and self-reported confidence from 0 to 100.
+   - `supplier_name`, `supplier_product_or_service`, `supplier_action_or_failure`, `supplier_causal_explanation`, `supplier_accountability_reason`: null for HSBC; documented details or Unknown for SUPPLIER.
+   - `supporting_evidence`: unlimited `{column, quote}` objects. These carry supporting text and source column names, including supplier signals.
+5. Validate response structure. Normalize supplier fields to null for HSBC and replace blank/missing supplier facts with Unknown for SUPPLIER. Store evidence as returned; do not compare quotes against source values. An empty evidence list is allowed when nothing useful is recorded. Weak, missing, or conflicting attribution belongs in the rationale with low confidence; confidence is not measured accuracy. Absence of supplier evidence alone does not establish HSBC responsibility.
+6. Call `app/llm/save_csv.py:save_result` before requesting the next row. Save source values, scalar response fields, `processing_status`, and `error` to LLM_OUTPUT.csv. There is no human review status or approval step.
 
-## CSV columns
+## Storage and failures
 
-- Each source value and scalar response field has its own column.
-- Evidence uses numbered pairs: `evidence_1_column`, `evidence_1_quote`, and so on. Start with five empty pairs for a stable base header and add further pairs when returned. The writer expands existing headers and fills unused cells without dropping earlier evidence.
-- Keep definitions in `fields/definitions.yml` and the prompt in `prompts/classification.yml`. Send both to the model on every request; store neither in the output CSV.
-- Store no JSON blobs, arrays, or dictionaries in CSV cells. JSON is used only for API requests/responses in memory. Review reconstructs input fields from saved values plus the current definitions YAML, and evidence from the separate columns.
-- Older outputs containing `llm_input` or JSON evidence are left unchanged; generate a new batch for review with this schema.
-
-## Batch behavior
-
-- Processing is sequential: three rows produce three separate requests when all succeed.
-- Definitions and prompt are loaded once per batch; connection settings come from `.env` through `app/llm/llm_connection.py`.
-- Every non-ID input column needs a definition. Existing `LLM_OUTPUT.csv` or `FINAL.csv` does not block starting the LLM pipeline. New incident IDs append to the existing output; a conflicting result for an existing ID still fails at CSV saving. Earlier results and final decisions are preserved.
-- A nonblank `LLM_TEMPERATURE` is converted to a number and passed to the provider without a local range check. The provider decides whether it supports the value.
-- Successful results, including `UNDECIDED`, receive `PENDING_REVIEW`. Human decisions are handled by the separate review app.
-- API/validation errors or invalid responses stop the batch after attempting to save the failed row; earlier saved results remain. A save failure also stops processing.
-- The shared CSV writer still requires nonempty IDs and rejects conflicting records with the same ID. Relaxed ID handling in data preparation does not extend to this stage.
+- Each source value and scalar result has its own CSV column. Evidence uses numbered `evidence_N_column`/`evidence_N_quote` pairs; headers expand without dropping earlier evidence.
+- Keep prompt and definitions in YAML. Store no JSON blobs, definition columns, or prompt text in CSV; arrays are reconstructed only for display/API responses.
+- Process sequentially. Successful rows have `processing_status=success`; failed responses are saved as failed where possible and stop the batch, preserving earlier results.
+- Every non-ID column needs a definition. Nonblank temperature is converted to a number and passed to the provider without a local range check. Connection settings use `.env` via `app/llm/llm_connection.py`.
+- Existing output files do not block starting requests. The shared CSV writer still requires nonempty IDs, compatible source/result columns, and no conflicting result for an existing ID.
+- Older outputs with human-review fields, UNDECIDED tags, or the previous model schema are not silently migrated. Use a separate output folder for the new schema; update the dashboard input path accordingly. Existing CSVs, including earlier FINAL.csv files, remain untouched.
 
 Implementation: `app/llm/pipeline.py` -> `app/llm/classification.py` -> `app/llm/save_csv.py`.
