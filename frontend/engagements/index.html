@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Engagements | HSBC</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <script src="/assets/engagements/app.js" defer></script>
+</head>
+<body class="engagement-app">
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="All engagements">
+      <img class="brand-logo" src="/assets/pictures/HSBC_logo_%282018%29%20%281%29.svg" alt="HSBC" width="138" height="37">
+      <span class="brand-divider" aria-hidden="true"></span>
+      <span class="brand-caption">WS4 / ENGAGEMENTS</span>
+    </a>
+    <span id="mode" class="mode">Loading…</span>
+  </header>
+  <main>
+    <nav id="breadcrumbs" class="eng-breadcrumbs" aria-label="Breadcrumb"></nav>
+    <section class="page-heading">
+      <div><p id="eyebrow" class="eyebrow">SUPPLIER ENGAGEMENTS / WS4</p><h1 id="page-title" tabindex="-1">Engagements</h1><p id="subtitle" class="subtitle">Explore companies, engagements, and their linked incidents.</p></div>
+      <button id="reload" type="button" class="button">Refresh</button>
+    </section>
+    <p id="demo-note" class="demo-note" hidden>Demo: synthetic engagements, incidents, and model results.</p>
+    <div id="message" class="message" role="status" aria-live="polite" hidden></div>
+    <section id="counts" class="stats" aria-label="Linked data counts">
+      <div class="stat"><strong id="engagements-count">—</strong><span>Engagements</span></div>
+      <div class="stat"><strong id="companies-count">—</strong><span>Companies</span></div>
+      <div class="stat"><strong id="linked_incidents-count">—</strong><span>Linked incidents</span></div>
+      <div class="stat"><strong id="unlinked_incidents-count">—</strong><span>Without an engagement</span></div>
+    </section>
+    <div id="search-panel" class="eng-search">
+      <label for="search">Find an engagement or company</label>
+      <input id="search" type="search" placeholder="Name, company, or engagement ID" autocomplete="off">
+    </div>
+    <section id="view" aria-labelledby="page-title"></section>
+    <footer><span>HSBC · Engagement explorer / WS4</span><span>Source: INC_LINKED.csv</span></footer>
+  </main>
+</body>
+</html>

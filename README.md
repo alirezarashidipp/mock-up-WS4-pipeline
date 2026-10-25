@@ -1,12 +1,13 @@
 # HSBC Incident Classification Demo
 
-A small Python 3.11 mock-up with CSV storage, Pydantic responses, and a read-only HSBC dashboard.
+A small Python 3.11 mock-up with CSV storage, Pydantic responses, and two independent read-only HSBC dashboards.
 
 ```text
 RAW.csv -> Read -> Rename -> Clean -> CLEAN.csv
 CLEAN.csv + Definitions + Prompt -> LLM (one row per request) -> LLM_OUTPUT.csv
-LLM_OUTPUT.csv -> Dashboard
+LLM_OUTPUT.csv -> Classification dashboard
 LLM_OUTPUT.csv + ENG_ALL.csv -> Candidate search -> LLM linking -> INC_LINKED.csv
+INC_LINKED.csv -> Engagement dashboard -> Linked incidents -> Incident details
 ```
 
 The LLM tags each incident HSBC or SUPPLIER. For SUPPLIER it also extracts the supplier name, related product/service, action or failure, causal explanation, accountability reason, and supporting source column names without quotes. Extra recorded supplier facts go in `supplier_more_info`, left empty when none exist. Missing core supplier facts are Unknown. Each result needs one to ten supporting names, stored in one `supporting_evidence` CSV cell separated by commas. The dashboard keeps decision and supplier fields visible, with sources and processing status in a dropdown. The tag is a model assessment; weak evidence is stated in the rationale with low self-reported confidence.
@@ -52,7 +53,15 @@ After classification, optionally link incidents to engagements. Put the UTF-8 en
 .\.venv\Scripts\python.exe -m app.linking.pipeline
 ```
 
-It writes `data/run/INC_LINKED.csv`: original incident columns, selected engagement columns prefixed with `ENG_`, and the link decision. It uses [linking instructions](prompts/linking.yml) and the existing `.env` connection. Ambiguous or missing matches stay undecided. The dashboard continues to read LLM_OUTPUT.csv.
+It writes `data/run/INC_LINKED.csv`: original incident columns, selected engagement columns prefixed with `ENG_`, and the link decision. It uses [linking instructions](prompts/linking.yml) and the existing `.env` connection. Ambiguous or missing matches stay undecided.
+
+To browse that output, start the separate engagement dashboard and open [http://127.0.0.1:8767/](http://127.0.0.1:8767/):
+
+```powershell
+.\.venv\Scripts\python.exe -m app.ui.engagement_dashboard
+```
+
+It reads only `data/run/INC_LINKED.csv`. Select an engagement to see its linked incidents, then select an incident for details. Refresh rereads the CSV. The classification dashboard on port 8766 is independent and does not need to be running.
 
 Preparation replaces CLEAN.csv on nonempty runs. LLM results append for new incident IDs; conflicting results for an existing ID are rejected. For an older output schema, configure a new output folder in `app/llm/pipeline.py` and update `RESULTS_FILE` in `app/ui/dashboard_app.py`. CSV cells contain plain values, without evidence quote columns, JSON blobs, prompt text, or definitions. CSVs and credentials stay out of Git.
 
@@ -61,7 +70,8 @@ Preparation replaces CLEAN.csv on nonempty runs. LLM results append for new inci
 - [Data preparation](docs/data_preparation.md)
 - [LLM classification and supplier extraction](docs/llm.md)
 - [Incident-to-engagement linking](docs/linking.md)
-- [Dashboard](docs/dashboard_app.md)
+- [Classification dashboard](docs/dashboard_app.md)
+- [Engagement dashboard](docs/engagement_dashboard.md)
 - AI agents: follow [AGENTS.md](AGENTS.md) before changing code.
 
 ```powershell

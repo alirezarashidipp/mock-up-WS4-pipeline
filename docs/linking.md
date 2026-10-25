@@ -32,4 +32,4 @@ data/run/LLM_OUTPUT.csv + data/mockup/ENG_ALL.csv
 
 Provider/invalid-response failures are saved where possible, then stop the batch; earlier rows remain saved. The shared writer retains schema and conflicting-ID checks. Use a separate output file for changed decisions rather than overwriting saved results.
 
-The dashboard still reads only LLM_OUTPUT.csv. Linking is an independent command; INC_LINKED.csv is not displayed there. Candidate retrieval is a simple lexical demo and does not guarantee all relevant engagements are found. Offline simulated checks do not establish live matching accuracy.
+The classification dashboard reads only LLM_OUTPUT.csv. The separate [engagement dashboard](engagement_dashboard.md) reads INC_LINKED.csv and groups linked incidents under engagements. Candidate retrieval is a simple lexical demo and does not guarantee all relevant engagements are found. Offline simulated checks do not establish live matching accuracy.

@@ -12,7 +12,8 @@ Before explaining or changing a stage, read its document and inspect the current
 - Data preparation, renaming, or cleaning: [docs/data_preparation.md](docs/data_preparation.md).
 - LLM requests, supplier extraction, response schema, or CSV saving: [docs/llm.md](docs/llm.md).
 - Engagement candidate search, linking requests, or INC_LINKED.csv: [docs/linking.md](docs/linking.md).
-- Dashboard input, counts, or display: [docs/dashboard_app.md](docs/dashboard_app.md).
+- Classification dashboard input, counts, or display: [docs/dashboard_app.md](docs/dashboard_app.md).
+- Engagement dashboard grouping, navigation, or details: [docs/engagement_dashboard.md](docs/engagement_dashboard.md).
 
 Read only relevant documents and keep them aligned with behavior changes. Use [README.md](README.md) for setup and run commands.
 
@@ -26,11 +27,12 @@ Read only relevant documents and keep them aligned with behavior changes. Use [R
 - Save each result in `app/llm/save_csv.py` before requesting the next row. supporting_evidence contains one to ten standardized source column names as strings. Join the names with comma and space in one supporting_evidence CSV cell. Keep source values and scalar model fields in their own columns, without evidence quotes, JSON blobs, definitions, or prompt text.
 - Pass configured numeric temperature to the provider without a local range check. Existing output does not block starting the LLM pipeline; preserve records and retain conflicting-ID checks when saving.
 - Preserve response-structure checks and safe CSV writing. Store returned supporting source names as text. Avoid custom exception layers.
-- Keep engagement linking independent in `app/linking/`: preserve LLM_OUTPUT rows, select only a supplied ENG_ALL candidate or leave the link undecided, and save INC_LINKED.csv. Reuse the existing LLM connection; keep the dashboard on LLM_OUTPUT.csv.
+- Keep engagement linking independent in `app/linking/`: preserve LLM_OUTPUT rows, select only a supplied ENG_ALL candidate or leave the link undecided, and save INC_LINKED.csv. Reuse the existing LLM connection; keep the classification dashboard on LLM_OUTPUT.csv.
 
-## Dashboard
+## Dashboards
 
 - Human review is removed. There is no approval queue, review API, or new FINAL.csv output. Preserve existing CSV files from earlier versions.
 - Keep the minimal English HSBC frontend in `frontend/dashboard/`, with styling in `frontend/style.css` and logo artwork in `frontend/pictures/`.
 - Run `app/ui/dashboard_app.py` independently on port 8766. Its only data input is LLM_OUTPUT.csv; it imports no LLM modules and makes no model calls or file writes.
 - Count successful model classifications, and report failed rows separately. Keep classification, rationale, confidence, and all six supplier fields visible on SUPPLIER cards. Keep evidence names, processing_status, and root cause in a closed dropdown; saved input fields have a separate dropdown. Render CSV values as text.
+- Keep `app/ui/engagement_dashboard.py` independent on port 8767, reading only INC_LINKED.csv. Use `frontend/engagements/` to show engagements and companies, then their linked incidents, then incident details. Group MATCHED rows by engagement ID, not company name; count other rows separately. Make no LLM calls or file writes and render CSV values as text.
