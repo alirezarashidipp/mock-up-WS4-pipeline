@@ -97,15 +97,14 @@ class PythonTests(unittest.TestCase):
                 self.assertEqual(saved[0][name], "")
                 self.assertTrue(saved[1][name])
             self.assertEqual(saved[1]["supplier_name"], "Unknown")
-            self.assertEqual(saved[0]["evidence_3_column"], "")
-            self.assertTrue(saved[1]["evidence_8_column"])
-            self.assertEqual(saved[1]["evidence_9_column"], "")
-            self.assertEqual(saved[1]["evidence_10_column"], "")
-            self.assertNotIn("evidence_11_column", saved[1])
+            self.assertEqual(saved[0]["supporting_evidence"], "INCIDENT_DESCRIPTION, ROOT_CAUSE_NOTES")
+            expected_names = json.loads(responses[1].choices[0].message.content)["supporting_evidence"]
+            self.assertEqual(saved[1]["supporting_evidence"], ", ".join(expected_names))
+            self.assertFalse(any(name.startswith("evidence_") for name in saved[1]))
             self.assertFalse(any(name.endswith("_quote") for name in saved[1]))
             self.assertEqual(saved[1]["supplier_more_info"], "The synthetic supplier recorded a regional maintenance window.")
             for row in saved:
-                self.assertTrue(all(name not in row for name in ("llm_input", "llm_prompt", "supporting_evidence", "review_status")))
+                self.assertTrue(all(name not in row for name in ("llm_input", "llm_prompt", "review_status")))
                 self.assertFalse(any(name.startswith("definition_") for name in row))
             before = output.read_bytes()
             dashboard = get_dashboard_data(output)
@@ -113,7 +112,6 @@ class PythonTests(unittest.TestCase):
             self.assertEqual(dashboard["records"][1]["supplier_name"], "Unknown")
             self.assertEqual(dashboard["records"][1]["processing_status"], "success")
             self.assertEqual(dashboard["records"][0]["supporting_evidence"], ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"])
-            expected_names = json.loads(responses[1].choices[0].message.content)["supporting_evidence"]
             self.assertEqual(dashboard["records"][1]["supporting_evidence"], expected_names)
             self.assertEqual(len(expected_names), 8)
             self.assertEqual(dashboard["records"][1]["supplier_more_info"], saved[1]["supplier_more_info"])
@@ -122,10 +120,14 @@ class PythonTests(unittest.TestCase):
             for row in saved:
                 for name in SUPPLIER_FIELDS:
                     row.pop(name)
+                names = row.pop("supporting_evidence").split(", ")
+                for number in range(1, 11):
+                    row[f"evidence_{number}_column"] = names[number - 1] if number <= len(names) else ""
             write_records(output, saved)
             older_dashboard = get_dashboard_data(output)
             self.assertEqual(older_dashboard["counts"], dashboard["counts"])
             self.assertEqual(older_dashboard["records"][1]["supplier_name"], "")
+            self.assertEqual(older_dashboard["records"][1]["supporting_evidence"], expected_names)
 
     def test_failed_request_is_saved_and_excluded_from_counts(self):
         rows = [{"INCIDENT_ID": "001", "INCIDENT_DESCRIPTION": "Synthetic cause."}, {"INCIDENT_ID": "002", "INCIDENT_DESCRIPTION": "Synthetic failed request."}]
@@ -138,6 +140,7 @@ class PythonTests(unittest.TestCase):
             saved, _ = read_records(output)
             self.assertEqual([row["processing_status"] for row in saved], ["success", "failed"])
             self.assertEqual(saved[1]["error"], "OpenAIError")
+            self.assertEqual(saved[1]["supporting_evidence"], "")
             self.assertEqual(get_dashboard_data(output)["counts"], {"total": 1, "HSBC": 1, "SUPPLIER": 0, "failed": 1})
             self.assertFalse((Path(folder) / "FINAL.csv").exists())
 

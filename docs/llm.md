@@ -22,11 +22,11 @@ CLEAN.csv -> one row per request -> validate response -> save LLM_OUTPUT.csv -> 
 
 ## Storage and failures
 
-- Each source value and scalar result has its own CSV column. Save supporting source names in `evidence_1_column` through `evidence_10_column`; unused slots remain empty. There are no evidence quote columns.
+- Each source value and scalar result has its own CSV column. Join supporting source names with comma and space in one `supporting_evidence` cell, for example `INCIDENT_DESCRIPTION, ROOT_CAUSE_NOTES`. The CSV writer quotes that cell automatically. There are no numbered evidence or evidence quote columns in new outputs.
 - Keep prompt and definitions in YAML. Store no JSON blobs, definition columns, or prompt text in CSV; arrays are reconstructed only for display/API responses.
 - Process sequentially. Successful rows have `processing_status=success`; failed responses are saved as failed where possible and stop the batch, preserving earlier results.
 - Every non-ID column needs a definition. Nonblank temperature is converted to a number and passed to the provider without a local range check. Connection settings use `.env` via `app/llm/llm_connection.py`.
 - Existing output files do not block starting requests. The shared CSV writer still requires nonempty IDs, compatible source/result columns, and no conflicting result for an existing ID.
-- Older outputs with human-review fields, UNDECIDED tags, or the previous model schema are not silently migrated. Use a separate output folder for the new schema; update the dashboard input path accordingly. Existing CSVs, including earlier FINAL.csv files, remain untouched.
+- Older outputs with numbered evidence columns, human-review fields, UNDECIDED tags, or the previous model schema are not silently migrated. Use a separate output folder for the new schema; update the dashboard input path accordingly. Existing CSVs, including earlier FINAL.csv files, remain untouched.
 
 Implementation: `app/llm/pipeline.py` -> `app/llm/classification.py` -> `app/llm/save_csv.py`.

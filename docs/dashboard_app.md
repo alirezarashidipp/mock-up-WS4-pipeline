@@ -12,7 +12,7 @@ data/run/LLM_OUTPUT.csv -> read successful model results -> count tags -> displa
 2. `get_dashboard_data` reads `app.state.results_file`, initialized from `RESULTS_FILE`, using UTF-8 CSV input.
 3. Count successful HSBC and SUPPLIER rows; count failed processing rows separately. Return successful results as dashboard records.
 4. Render each incident as a card. Keep classification, decision_rationale, and llm_confidence visible. For SUPPLIER also keep all six supplier fields visible, including supplier_more_info with an empty-state message when no extra facts exist.
-5. Keep source-column names, processing_status, and key_root_cause in the closed-by-default Evidence and processing details dropdown. Show only nonempty evidence slots and their actual count, without quotes. The API reconstructs supporting_evidence from evidence_N_column cells. Keep saved input values in a separate Source fields dropdown.
+5. Keep source-column names, processing_status, and key_root_cause in the closed-by-default Evidence and processing details dropdown. Split the `supporting_evidence` CSV cell on commas, trim spaces, and return the nonempty names as a list with their actual count. Older files with `evidence_N_column` cells remain readable without rewriting them. Keep saved input values in a separate Source fields dropdown.
 6. Render CSV values as text. Share `frontend/style.css` and logo artwork in `frontend/pictures/`.
 
 ## Boundaries

@@ -11,6 +11,7 @@ Before explaining or changing a stage, read its document and inspect the current
 
 - Data preparation, renaming, or cleaning: [docs/data_preparation.md](docs/data_preparation.md).
 - LLM requests, supplier extraction, response schema, or CSV saving: [docs/llm.md](docs/llm.md).
+- Engagement candidate search, linking requests, or INC_LINKED.csv: [docs/linking.md](docs/linking.md).
 - Dashboard input, counts, or display: [docs/dashboard_app.md](docs/dashboard_app.md).
 
 Read only relevant documents and keep them aligned with behavior changes. Use [README.md](README.md) for setup and run commands.
@@ -22,9 +23,10 @@ Read only relevant documents and keep them aligned with behavior changes. Use [R
 - Use Pydantic for model inputs and responses. Exclude INCIDENT_ID from model input.
 - Cleaning removes invisible control/format characters only; preserve punctuation, emails, HTML, and normal whitespace. Preparation retains empty/repeated IDs and uppercases unmapped headers; add no ID, CSV-shape, or mapping-collision checks to that stage.
 - Model classification is HSBC or SUPPLIER. Supplier details are null for HSBC; for SUPPLIER extract only documented facts and use Unknown for missing core details. Keep additional nonduplicated supplier facts in supplier_more_info, or null when none exist. State weak or conflicting attribution in the rationale with low self-reported confidence.
-- Save each result in `app/llm/save_csv.py` before requesting the next row. supporting_evidence contains one to ten standardized source column names as strings. Save names in evidence_1_column through evidence_10_column; unused slots are empty. Keep source values and scalar model fields in their own columns, without evidence quotes, JSON blobs, definitions, or prompt text.
+- Save each result in `app/llm/save_csv.py` before requesting the next row. supporting_evidence contains one to ten standardized source column names as strings. Join the names with comma and space in one supporting_evidence CSV cell. Keep source values and scalar model fields in their own columns, without evidence quotes, JSON blobs, definitions, or prompt text.
 - Pass configured numeric temperature to the provider without a local range check. Existing output does not block starting the LLM pipeline; preserve records and retain conflicting-ID checks when saving.
 - Preserve response-structure checks and safe CSV writing. Store returned supporting source names as text. Avoid custom exception layers.
+- Keep engagement linking independent in `app/linking/`: preserve LLM_OUTPUT rows, select only a supplied ENG_ALL candidate or leave the link undecided, and save INC_LINKED.csv. Reuse the existing LLM connection; keep the dashboard on LLM_OUTPUT.csv.
 
 ## Dashboard
 

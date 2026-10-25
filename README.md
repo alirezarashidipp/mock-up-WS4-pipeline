@@ -6,9 +6,10 @@ A small Python 3.11 mock-up with CSV storage, Pydantic responses, and a read-onl
 RAW.csv -> Read -> Rename -> Clean -> CLEAN.csv
 CLEAN.csv + Definitions + Prompt -> LLM (one row per request) -> LLM_OUTPUT.csv
 LLM_OUTPUT.csv -> Dashboard
+LLM_OUTPUT.csv + ENG_ALL.csv -> Candidate search -> LLM linking -> INC_LINKED.csv
 ```
 
-The LLM tags each incident HSBC or SUPPLIER. For SUPPLIER it also extracts the supplier name, related product/service, action or failure, causal explanation, accountability reason, and supporting source column names without quotes. Extra recorded supplier facts go in `supplier_more_info`, left empty when none exist. Missing core supplier facts are Unknown. Each result needs one to ten supporting names; unused CSV slots stay empty. The dashboard keeps decision and supplier fields visible, with sources and processing status in a dropdown. The tag is a model assessment; weak evidence is stated in the rationale with low self-reported confidence.
+The LLM tags each incident HSBC or SUPPLIER. For SUPPLIER it also extracts the supplier name, related product/service, action or failure, causal explanation, accountability reason, and supporting source column names without quotes. Extra recorded supplier facts go in `supplier_more_info`, left empty when none exist. Missing core supplier facts are Unknown. Each result needs one to ten supporting names, stored in one `supporting_evidence` CSV cell separated by commas. The dashboard keeps decision and supplier fields visible, with sources and processing status in a dropdown. The tag is a model assessment; weak evidence is stated in the rationale with low self-reported confidence.
 
 ## Setup
 
@@ -45,12 +46,21 @@ py -3.11 -m venv .venv
 
 The dashboard reads LLM_OUTPUT.csv only. Click Refresh to reread results; stop with Ctrl+C. There is no human approval step or new FINAL.csv. Existing CSVs from earlier versions remain untouched.
 
-Preparation replaces CLEAN.csv on nonempty runs. LLM results append for new incident IDs; conflicting results for an existing ID are rejected. For an older output schema, configure a new output folder in `app/llm/pipeline.py` and update `RESULTS_FILE` in `app/ui/dashboard_app.py`. CSV cells contain plain values and ten supporting source-name slots, without quote columns, JSON blobs, prompt text, or definitions. CSVs and credentials stay out of Git.
+After classification, optionally link incidents to engagements. Put the UTF-8 engagement file at `data/mockup/ENG_ALL.csv`, then run this separate pipeline:
+
+```powershell
+.\.venv\Scripts\python.exe -m app.linking.pipeline
+```
+
+It writes `data/run/INC_LINKED.csv`: original incident columns, selected engagement columns prefixed with `ENG_`, and the link decision. It uses [linking instructions](prompts/linking.yml) and the existing `.env` connection. Ambiguous or missing matches stay undecided. The dashboard continues to read LLM_OUTPUT.csv.
+
+Preparation replaces CLEAN.csv on nonempty runs. LLM results append for new incident IDs; conflicting results for an existing ID are rejected. For an older output schema, configure a new output folder in `app/llm/pipeline.py` and update `RESULTS_FILE` in `app/ui/dashboard_app.py`. CSV cells contain plain values, without evidence quote columns, JSON blobs, prompt text, or definitions. CSVs and credentials stay out of Git.
 
 ## Documentation and tests
 
 - [Data preparation](docs/data_preparation.md)
 - [LLM classification and supplier extraction](docs/llm.md)
+- [Incident-to-engagement linking](docs/linking.md)
 - [Dashboard](docs/dashboard_app.md)
 - AI agents: follow [AGENTS.md](AGENTS.md) before changing code.
 

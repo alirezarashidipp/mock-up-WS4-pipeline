@@ -43,9 +43,14 @@ def get_dashboard_data(path):
                          "supplier_product_or_service", "supplier_action_or_failure",
                          "supplier_causal_explanation", "supplier_accountability_reason", "supplier_more_info"):
                 record[name] = row.get(name, "")
-            for name, value in row.items():
-                if name.startswith("evidence_") and name.endswith("_column") and value:
-                    record["supporting_evidence"].append(value)
+            if "supporting_evidence" in row:
+                for name in row["supporting_evidence"].split(","):
+                    if name.strip():
+                        record["supporting_evidence"].append(name.strip())
+            else:
+                for name, value in row.items():
+                    if name.startswith("evidence_") and name.endswith("_column") and value:
+                        record["supporting_evidence"].append(value)
             records.append(record)
             counts[classification] += 1
         counts["total"] = len(records)
