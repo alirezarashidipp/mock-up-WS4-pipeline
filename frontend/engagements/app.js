@@ -1,5 +1,11 @@
 const $ = id => document.getElementById(id);
 let dashboard = null;
+let activeView = "engagements";
+const groupLabels = {
+  hsbc: "HSBC · No link required",
+  supplier: "Supplier · No confirmed match",
+  other: "Failed / skipped / other",
+};
 
 function textElement(tag, text, className = "") {
   const element = document.createElement(tag);
@@ -11,6 +17,12 @@ function textElement(tag, text, className = "") {
 function route(engagementId, incidentId) {
   const parameters = new URLSearchParams();
   parameters.set("engagement", engagementId);
+  if (incidentId !== undefined) parameters.set("incident", incidentId);
+  return "#" + parameters.toString();
+}
+
+function unlinkedRoute(group = "all", incidentId) {
+  const parameters = new URLSearchParams({view: "unlinked", group});
   if (incidentId !== undefined) parameters.set("incident", incidentId);
   return "#" + parameters.toString();
 }
@@ -83,13 +95,51 @@ function showEngagement(engagement) {
   $("view").append(fields);
 }
 
-function showIncident(engagement, incident) {
-  $("eyebrow").textContent = engagement.company || "Unknown company";
+function showUnlinked(group) {
+  $("page-title").textContent = "Unlinked incidents";
+  $("subtitle").textContent = "HSBC incidents need no engagement link. Supplier incidents here have no confirmed match; failed or skipped processing is listed separately.";
+  const query = $("search").value.trim().toLowerCase();
+  const list = textElement("div", "", "eng-incident-list");
+  let total = 0;
+  for (const [category, incidents] of Object.entries(dashboard.unlinked_groups)) {
+    if (group !== "all" && category !== group) continue;
+    total += incidents.length;
+    for (const incident of incidents) {
+      const searchable = [incident.INCIDENT_ID, incident.INCIDENT_SHORT_DESCRIPTION, incident.supplier_name, incident.link_reason, incident.classification, incident.link_status].join(" ").toLowerCase();
+      if (!searchable.includes(query)) continue;
+      const link = navigationLink("", unlinkedRoute(category, incident.INCIDENT_ID));
+      link.className = "eng-incident-link";
+      link.append(textElement("p", groupLabels[category], "eng-company"));
+      link.append(textElement("p", incident.INCIDENT_ID || "Incident ID not recorded", "eng-identifier"));
+      link.append(textElement("h2", incident.INCIDENT_SHORT_DESCRIPTION || "Incident details"));
+      if (incident.classification === "SUPPLIER") link.append(textElement("p", "Supplier: " + (incident.supplier_name || "Unknown"), "eng-preview"));
+      link.append(textElement("p", incident.link_reason || "No link explanation recorded.", "eng-preview"));
+      link.append(textElement("span", "Link status: " + incident.link_status, "eng-count"));
+      list.append(link);
+    }
+  }
+  if (!list.children.length) {
+    $("view").append(textElement("p", total ? "No incidents match your search." : "No unlinked incidents in this group.", "eng-empty"));
+    return;
+  }
+  $("view").append(textElement("p", "Showing " + list.children.length + " of " + total + " incidents", "field-note"), list);
+}
+
+function showIncident(engagement, incident, group) {
+  $("eyebrow").textContent = engagement ? engagement.company || "Unknown company" : groupLabels[group];
   $("page-title").textContent = incident.INCIDENT_ID;
   $("subtitle").textContent = incident.INCIDENT_SHORT_DESCRIPTION || "Incident details";
   const card = textElement("article", "", "incident-card");
-  addField(card, "Linked engagement", (engagement.name || engagement.engagement_id) + " · " + engagement.engagement_id);
-  addField(card, "Why this engagement was selected", incident.link_reason);
+  if (engagement) {
+    addField(card, "Linked engagement", (engagement.name || engagement.engagement_id) + " · " + engagement.engagement_id);
+    addField(card, "Why this engagement was selected", incident.link_reason);
+  } else {
+    addField(card, "Engagement link", groupLabels[group]);
+    addField(card, "Link status", incident.link_status);
+    addField(card, "Why this incident is not linked", incident.link_reason);
+    if (incident.link_error) addField(card, "Link processing error", incident.link_error);
+    if (incident.error) addField(card, "Classification processing error", incident.error);
+  }
   const decisions = textElement("div", "", "eng-decision-grid");
   addField(decisions, "Classification", incident.classification);
   addField(decisions, "Classification confidence", confidence(incident.llm_confidence));
@@ -98,13 +148,15 @@ function showIncident(engagement, incident) {
   addField(card, "Incident description", incident.INCIDENT_DESCRIPTION);
   addField(card, "Key root cause", incident.key_root_cause);
   addField(card, "Classification rationale", incident.decision_rationale);
-  const supplier = textElement("div", "", "supplier-grid");
-  for (const [label, name] of [
-    ["Supplier", "supplier_name"], ["Product or service", "supplier_product_or_service"],
-    ["Supplier action or failure", "supplier_action_or_failure"], ["Causal explanation", "supplier_causal_explanation"],
-    ["Accountability reason", "supplier_accountability_reason"], ["Additional supplier information", "supplier_more_info"]
-  ]) addField(supplier, label, incident[name]);
-  card.append(supplier);
+  if (incident.classification === "SUPPLIER") {
+    const supplier = textElement("div", "", "supplier-grid");
+    for (const [label, name] of [
+      ["Supplier", "supplier_name"], ["Product or service", "supplier_product_or_service"],
+      ["Supplier action or failure", "supplier_action_or_failure"], ["Causal explanation", "supplier_causal_explanation"],
+      ["Accountability reason", "supplier_accountability_reason"], ["Additional supplier information", "supplier_more_info"]
+    ]) addField(supplier, label, incident[name]);
+    card.append(supplier);
+  }
   const incidentFields = {}, engagementFields = {}, linkFields = {};
   for (const [name, value] of Object.entries(incident)) {
     if (name.startsWith("ENG_")) engagementFields[name.slice(4)] = value;
@@ -113,7 +165,7 @@ function showIncident(engagement, incident) {
   }
   addDisclosure(card, "Link evidence and processing details", linkFields);
   addDisclosure(card, "All incident fields", incidentFields);
-  addDisclosure(card, "All engagement fields", engagementFields);
+  if (engagement || Object.values(engagementFields).some(value => value)) addDisclosure(card, "All engagement fields", engagementFields);
   $("view").append(card);
 }
 
@@ -124,10 +176,35 @@ function render(focus = false) {
   const parameters = new URLSearchParams(location.hash.slice(1));
   const engagementId = parameters.get("engagement");
   const incidentId = parameters.get("incident");
-  $("search-panel").hidden = engagementId !== null;
-  $("counts").hidden = engagementId !== null;
-  $("eyebrow").textContent = "SUPPLIER ENGAGEMENTS / WS4";
-  if (engagementId === null && incidentId === null) {
+  const view = parameters.get("view") === "unlinked" ? "unlinked" : "engagements";
+  const group = parameters.get("group") || "all";
+  const isDetail = engagementId !== null || incidentId !== null;
+  if (activeView !== view) $("search").value = "";
+  activeView = view;
+  for (const name of ["engagements", "unlinked"]) {
+    if (name === view) $(name + "-tab").setAttribute("aria-current", "page");
+    else $(name + "-tab").removeAttribute("aria-current");
+  }
+  $("search-panel").hidden = isDetail;
+  $("unlinked-filter-panel").hidden = view !== "unlinked" || isDetail;
+  $("counts").hidden = isDetail;
+  $("search-label").textContent = view === "unlinked" ? "Find an unlinked incident" : "Find an engagement or company";
+  $("search").placeholder = view === "unlinked" ? "Incident ID, description, supplier, or link reason" : "Name, company, or engagement ID";
+  $("eyebrow").textContent = view === "unlinked" ? "UNLINKED INCIDENTS / WS4" : "SUPPLIER ENGAGEMENTS / WS4";
+  if (view === "unlinked") {
+    $("unlinked-filter").value = group;
+    const incidents = Object.hasOwn(groupLabels, group) ? dashboard.unlinked_groups[group] : null;
+    const incident = incidents?.find(item => item.INCIDENT_ID === incidentId);
+    if (incidentId !== null) $("breadcrumbs").append(navigationLink("Unlinked incidents", unlinkedRoute(group)));
+    if ((group !== "all" && !incidents) || (incidentId !== null && !incident)) {
+      $("page-title").textContent = "Record not found";
+      $("subtitle").textContent = "This record is not in the current CSV. Return to unlinked incidents.";
+    } else if (incidentId !== null) {
+      showIncident(null, incident, group);
+    } else {
+      showUnlinked(group);
+    }
+  } else if (engagementId === null && incidentId === null) {
     showEngagements();
   } else {
     $("breadcrumbs").append(navigationLink("All engagements", "#"));
@@ -165,6 +242,12 @@ async function loadDashboard() {
     if (!response.ok) throw new Error(data.error || "Could not read linked incidents.");
     dashboard = data;
     for (const [name, count] of Object.entries(data.counts)) $(name + "-count").textContent = count;
+    $("other-count-panel").hidden = data.counts.other_unlinked_incidents === 0;
+    for (const option of $("unlinked-filter").options) {
+      const total = option.value === "all" ? data.counts.unlinked_incidents : data.unlinked_groups[option.value].length;
+      const label = option.value === "all" ? "All unlinked incidents" : groupLabels[option.value];
+      option.textContent = label + " (" + total + ")";
+    }
     $("demo-note").hidden = !data.demo;
     $("mode").textContent = data.demo ? "Demo · synthetic data" : "Linked incidents";
     render();
@@ -187,5 +270,6 @@ async function loadDashboard() {
 
 $("reload").addEventListener("click", loadDashboard);
 $("search").addEventListener("input", () => render());
+$("unlinked-filter").addEventListener("change", () => { location.hash = unlinkedRoute($("unlinked-filter").value); });
 window.addEventListener("hashchange", () => render(true));
 loadDashboard();

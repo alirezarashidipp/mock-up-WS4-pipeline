@@ -24,15 +24,32 @@
     </section>
     <p id="demo-note" class="demo-note" hidden>Demo: synthetic engagements, incidents, and model results.</p>
     <div id="message" class="message" role="status" aria-live="polite" hidden></div>
-    <section id="counts" class="stats" aria-label="Linked data counts">
+    <nav class="eng-tabs" aria-label="Dashboard views">
+      <a id="engagements-tab" href="#" aria-current="page">Engagements</a>
+      <a id="unlinked-tab" href="#view=unlinked">Unlinked incidents <span id="unlinked_incidents-count">—</span></a>
+    </nav>
+    <section id="counts" class="stats" aria-label="Incident and engagement counts">
       <div class="stat"><strong id="engagements-count">—</strong><span>Engagements</span></div>
       <div class="stat"><strong id="companies-count">—</strong><span>Companies</span></div>
       <div class="stat"><strong id="linked_incidents-count">—</strong><span>Linked incidents</span></div>
-      <div class="stat"><strong id="unlinked_incidents-count">—</strong><span>Without an engagement</span></div>
+      <div class="stat"><strong id="hsbc_incidents-count">—</strong><span>HSBC · No link required</span></div>
+      <div class="stat"><strong id="supplier_unlinked_incidents-count">—</strong><span>Supplier · Not linked</span></div>
+      <div id="other-count-panel" class="stat" hidden><strong id="other_unlinked_incidents-count">—</strong><span>Failed / skipped / other</span></div>
     </section>
-    <div id="search-panel" class="eng-search">
-      <label for="search">Find an engagement or company</label>
-      <input id="search" type="search" placeholder="Name, company, or engagement ID" autocomplete="off">
+    <div class="eng-filters">
+      <div id="search-panel" class="eng-search">
+        <label id="search-label" for="search">Find an engagement or company</label>
+        <input id="search" type="search" placeholder="Name, company, or engagement ID" autocomplete="off">
+      </div>
+      <div id="unlinked-filter-panel" class="eng-search" hidden>
+        <label for="unlinked-filter">Incident group</label>
+        <select id="unlinked-filter">
+          <option value="all">All unlinked incidents</option>
+          <option value="hsbc">HSBC · No link required</option>
+          <option value="supplier">Supplier · No confirmed match</option>
+          <option value="other">Failed / skipped / other</option>
+        </select>
+      </div>
     </div>
     <section id="view" aria-labelledby="page-title"></section>
     <footer><span>HSBC · Engagement explorer / WS4</span><span>Source: INC_LINKED.csv</span></footer>

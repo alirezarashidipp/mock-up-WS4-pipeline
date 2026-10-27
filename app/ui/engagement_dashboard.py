@@ -25,6 +25,7 @@ def get_engagement_data(path):
                     return {"error": "INC_LINKED.csv is missing incident or engagement link columns."}
                 rows = list(reader)
         groups = {}
+        unlinked_groups = {"hsbc": [], "supplier": [], "other": []}
         companies = set()
         counts = {"engagements": 0, "companies": 0, "linked_incidents": 0, "unlinked_incidents": 0}
         for row in rows:
@@ -33,6 +34,12 @@ def get_engagement_data(path):
             row = {name: value or "" for name, value in row.items()}
             status = row["link_status"]
             if status in ("UNDECIDED", "NOT_APPLICABLE", "SKIPPED", "FAILED"):
+                if status == "NOT_APPLICABLE" and row.get("classification") == "HSBC":
+                    unlinked_groups["hsbc"].append(row)
+                elif status == "UNDECIDED" and row.get("classification") == "SUPPLIER":
+                    unlinked_groups["supplier"].append(row)
+                else:
+                    unlinked_groups["other"].append(row)
                 counts["unlinked_incidents"] += 1
                 continue
             if status != "MATCHED":
@@ -57,7 +64,10 @@ def get_engagement_data(path):
         engagements = sorted(groups.values(), key=lambda group: (group["company"].casefold(), group["name"].casefold()))
         counts["engagements"] = len(engagements)
         counts["companies"] = len(companies)
-        return {"engagements": engagements, "counts": counts}
+        counts["hsbc_incidents"] = len(unlinked_groups["hsbc"])
+        counts["supplier_unlinked_incidents"] = len(unlinked_groups["supplier"])
+        counts["other_unlinked_incidents"] = len(unlinked_groups["other"])
+        return {"engagements": engagements, "unlinked_groups": unlinked_groups, "counts": counts}
     except (OSError, UnicodeError, csv.Error, KeyError, TypeError):
         return {"error": "Could not read INC_LINKED.csv. Check its columns and UTF-8 encoding."}
 
