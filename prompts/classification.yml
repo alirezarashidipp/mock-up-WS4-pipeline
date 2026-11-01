@@ -13,6 +13,12 @@ system: |
   These are model assessments of causal accountability, not infrastructure
   ownership. Whoever restored service did not necessarily cause the incident.
 
+  Input fields are presented as narrative, recorded causes, closure/resolution,
+  investigation history, supplier/product context, then remaining metadata.
+  Each field includes its name, description, and original value. Field order
+  and names do not establish authority. Consider recorded timing, confirmation,
+  and counterevidence across all fields, including later work notes.
+
   Base attribution primarily on INCIDENT_DESCRIPTION, IT_PROBLEM_DESCRIPTION,
   IT_INCIDENT_CAUSE_DETAILS, ROOT_CAUSE_NOTES, PROBLEM_CLOSE_NOTES,
   IT_PROBLEM_CLOSE_NOTES, and incident/problem resolution fields. Use work
@@ -32,16 +38,13 @@ system: |
     recorded responsible party when assigning the binary label.
   - With incomplete, contradictory, or shared evidence, still choose the
     better-supported of the two labels for this demo. Explain the attribution
-    limits in decision_rationale and use low confidence. If neither party is
+    limits in decision_rationale and score the evidence using the rubric below.
+    If neither party is
     established, explicitly say the selected tag is uncertain and unsupported
     by a confirmed RCA. Do not present the tag as proven accountability.
 
-  Return exactly the fields in the response schema:
-  - classification: HSBC or SUPPLIER.
+  Return exactly the fields in the response schema, in this order:
   - key_root_cause: one sentence describing the recorded cause; null if unknown.
-  - decision_rationale: two to four short sentences explaining accountability,
-    supporting facts, counterevidence, and any missing information. Give a
-    concise decision summary, not a step-by-step internal thought process.
   - supporting_evidence: a list of one to ten standardized source column names
     as strings, such as ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"]. Include only
     input columns that materially informed the decision, its limitations, or
@@ -49,8 +52,12 @@ system: |
     objects. At least one source name is required; ten is a maximum, not a
     target. The count may differ per incident. Use only existing input columns
     and do not invent or repeat names to fill the list; no ranking is required.
-  - llm_confidence: integer 0-100, self-reported confidence in the selected tag,
-    not measured accuracy or a calibrated probability.
+  - decision_rationale: two to four short sentences explaining accountability,
+    supporting facts, counterevidence, and any missing information. Give a
+    concise decision summary, not a step-by-step internal thought process.
+  - classification: HSBC or SUPPLIER.
+  - attribution_evidence_strength: integer 0-4 using the rubric below. Assess
+    only the recorded evidence for the selected HSBC/SUPPLIER attribution.
   - supplier_name: the recorded supplier/actor responsible for the incident.
   - supplier_product_or_service: the recorded related product, service, or
     infrastructure. Extract its name; do not predict a product or its owner.
@@ -61,6 +68,24 @@ system: |
   - supplier_more_info: any additional recorded supplier facts that do not fit
     in the other supplier fields. Use concise plain text without repeating
     those fields. Return null when there is no additional information.
+
+  Attribution evidence strength rubric:
+  - 0 (UNSUPPORTED): No recorded causal evidence distinguishes HSBC from
+    Supplier. The required binary tag is tentative and unsupported.
+  - 1 (WEAK): Only indirect references or unconfirmed suspicion support the
+    tag; key causal facts are absent.
+  - 2 (MODERATE): Some relevant causal evidence exists, but a material
+    contradiction or missing causal link remains.
+  - 3 (STRONG): Concrete recorded facts support the responsible party and
+    mechanism; remaining gaps do not substantially challenge the tag.
+  - 4 (VERY_STRONG): A clear documented causal finding has supporting details,
+    with no unresolved material counterevidence in the supplied record.
+  This score is not a probability, measured accuracy, supplier-name certainty,
+  or engagement-link confidence. Zero does not mean the tag is false; four
+  does not mean it is certainly true. Repeated copies of a statement are not
+  independent evidence. An unnamed supplier can still have strong Supplier
+  attribution when the causal facts support it. Return the integer only;
+  display labels are derived by the application.
 
   For HSBC, return null for all six supplier fields. For SUPPLIER, fill them
   using only recorded facts. Use "Unknown" for unsupported details in the five

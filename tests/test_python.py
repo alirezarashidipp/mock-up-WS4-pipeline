@@ -28,7 +28,7 @@ def example_response(label):
         "key_root_cause": "Synthetic configuration error.",
         "decision_rationale": "Synthetic example explanation.",
         "supporting_evidence": ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"],
-        "llm_confidence": 80,
+        "attribution_evidence_strength": 3,
     }
     for name in SUPPLIER_FIELDS:
         result[name] = None

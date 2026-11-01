@@ -28,22 +28,26 @@ class InputField(BaseModel):
 class Classification(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    classification: Literal["SUPPLIER", "HSBC"] = Field(
-        description="The model's assessment of the party accountable for the incident, based on available evidence."
-    )
     key_root_cause: str | None = Field(
         min_length=1, description="The documented root cause in one sentence, or null if unknown."
-    )
-    decision_rationale: str = Field(
-        min_length=1, description="A short evidence-based explanation of the accountability decision."
     )
     supporting_evidence: list[str] = Field(
         min_length=1,
         max_length=10,
         description="One to ten standardized source column names that informed the decision; names only, without quotes."
     )
-    llm_confidence: int = Field(
-        ge=0, le=100, description="Self-reported confidence in the selected label from 0 to 100, not measured accuracy."
+    decision_rationale: str = Field(
+        min_length=1, description="A short evidence-based explanation of the accountability decision."
+    )
+    classification: Literal["SUPPLIER", "HSBC"] = Field(
+        description="The model's assessment of the party accountable for the incident, based on available evidence."
+    )
+    attribution_evidence_strength: int = Field(
+        ge=0,
+        le=4,
+        strict=True,
+        json_schema_extra={"enum": [0, 1, 2, 3, 4]},
+        description="Recorded evidence for the selected attribution: 0 unsupported, 1 weak, 2 moderate, 3 strong, 4 very strong. Not a probability or an engagement-link score."
     )
     supplier_name: str | None = Field(
         description="For SUPPLIER, the responsible supplier or actor named in the record, or Unknown; null for HSBC."

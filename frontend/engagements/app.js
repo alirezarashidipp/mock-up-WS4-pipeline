@@ -52,6 +52,14 @@ function confidence(value) {
   return value === "" || value == null ? "Not recorded" : value + "/100";
 }
 
+function evidenceStrength(value) {
+  if (value == null || String(value).trim() === "") return "Not recorded";
+  const score = String(value).trim();
+  if (!/^[0-4]$/.test(score)) return "Invalid score";
+  const labels = ["Unsupported", "Weak", "Moderate", "Strong", "Very strong"];
+  return score + "/4 · " + labels[Number(score)];
+}
+
 function showEngagements() {
   $("page-title").textContent = "Engagements";
   $("subtitle").textContent = "Choose an engagement to explore its linked incidents.";
@@ -142,9 +150,17 @@ function showIncident(engagement, incident, group) {
   }
   const decisions = textElement("div", "", "eng-decision-grid");
   addField(decisions, "Classification", incident.classification);
-  addField(decisions, "Classification confidence", confidence(incident.llm_confidence));
+  addField(decisions, "Attribution evidence strength", evidenceStrength(incident.attribution_evidence_strength));
   addField(decisions, "Link confidence", confidence(incident.link_confidence));
-  card.append(decisions, textElement("p", "Confidence values are model-reported, not measured accuracy.", "field-note"));
+  card.append(decisions, textElement("p", "Evidence strength rates the recorded support for HSBC or SUPPLIER accountability, not the probability that the decision is correct. Link confidence is a separate model-reported score, not measured accuracy.", "field-note"));
+  addDisclosure(card, "Evidence strength scale · 0 to 4", {
+    "0 · Unsupported": "No recorded causal evidence distinguishes HSBC from Supplier. The selected tag is tentative.",
+    "1 · Weak": "Only indirect references or unconfirmed suspicion support the tag; key causal facts are missing.",
+    "2 · Moderate": "Some causal evidence exists, but a material contradiction or missing causal link remains.",
+    "3 · Strong": "Concrete facts support the responsible party and causal mechanism; remaining gaps do not substantially challenge the tag.",
+    "4 · Very strong": "A clear documented causal finding has supporting details and no unresolved material counterevidence in the supplied record.",
+    "Reading the score": "A score of 4 does not mean 100% accuracy. Repeated copies of one statement are not independent evidence. This score does not rate supplier-name extraction or engagement matching. Older results without this score show Not recorded.",
+  });
   addField(card, "Incident description", incident.INCIDENT_DESCRIPTION);
   addField(card, "Key root cause", incident.key_root_cause);
   addField(card, "Classification rationale", incident.decision_rationale);

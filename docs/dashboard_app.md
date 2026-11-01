@@ -11,7 +11,7 @@ data/run/LLM_OUTPUT.csv -> read successful model results -> count tags -> displa
 1. `GET /` serves `frontend/dashboard/index.html`; `frontend/dashboard/app.js` requests `GET /api/dashboard` on load and Refresh.
 2. `get_dashboard_data` reads `app.state.results_file`, initialized from `RESULTS_FILE`, using UTF-8 CSV input.
 3. Count successful HSBC and SUPPLIER rows; count failed processing rows separately. Return successful results as dashboard records.
-4. Render each incident as a card. Keep classification, decision_rationale, and llm_confidence visible. For SUPPLIER also keep all six supplier fields visible, including supplier_more_info with an empty-state message when no extra facts exist.
+4. Render each incident as a card. Keep classification, decision_rationale, and attribution_evidence_strength visible. Display the score as 0-4 with its label: Unsupported, Weak, Moderate, Strong, or Very strong. The expandable scale explains all five levels. This rates recorded support for the selected HSBC/SUPPLIER attribution, not a probability of correctness, supplier-name extraction, or engagement matching. For SUPPLIER also keep all six supplier fields visible, including supplier_more_info with an empty-state message when no extra facts exist.
 5. Keep source-column names, processing_status, and key_root_cause in the closed-by-default Evidence and processing details dropdown. Split the `supporting_evidence` CSV cell on commas, trim spaces, and return the nonempty names as a list with their actual count. Older files with `evidence_N_column` cells remain readable without rewriting them. Keep saved input values in a separate Source fields dropdown.
 6. Render CSV values as text. Share `frontend/style.css` and logo artwork in `frontend/pictures/`.
 
@@ -20,5 +20,6 @@ data/run/LLM_OUTPUT.csv -> read successful model results -> count tags -> displa
 - LLM_OUTPUT.csv is the only data input. The app imports no LLM or review modules, makes no model calls, and writes no files.
 - No human approval, correction, final-decision queue, or FINAL.csv input remains. Tags are model assessments, not human-approved outcomes.
 - A missing or empty input produces an empty dashboard. Older HSBC/SUPPLIER rows can lack supplier details; display unrecorded details as Unknown without changing the CSV or inventing facts. Invalid processing statuses or other classification labels return an error. REVIEW_STATUS is not used.
+- Older results without `attribution_evidence_strength` show Not recorded. Never convert legacy `llm_confidence` percentages into evidence-strength scores. Unexpected nonblank scores display Invalid score. The [classification document](llm.md) defines the new response schema and rubric.
 - Refresh rereads the file. There is no automatic polling or notification from the LLM pipeline.
 - Configure the input through `RESULTS_FILE` in `app/ui/dashboard_app.py`. The dashboard can run independently once the CSV exists.

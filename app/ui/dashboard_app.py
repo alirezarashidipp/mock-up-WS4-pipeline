@@ -39,7 +39,7 @@ def get_dashboard_data(path):
                 "input": {name: value for name, value in row.items() if name.isupper()},
                 "supporting_evidence": [],
             }
-            for name in ("key_root_cause", "decision_rationale", "llm_confidence", "supplier_name",
+            for name in ("key_root_cause", "decision_rationale", "attribution_evidence_strength", "supplier_name",
                          "supplier_product_or_service", "supplier_action_or_failure",
                          "supplier_causal_explanation", "supplier_accountability_reason", "supplier_more_info"):
                 record[name] = row.get(name, "")

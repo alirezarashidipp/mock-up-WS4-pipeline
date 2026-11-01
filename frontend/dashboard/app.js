@@ -11,6 +11,14 @@ function addField(container, label, value) {
   container.append(section);
 }
 
+function evidenceStrength(value) {
+  if (value == null || String(value).trim() === "") return "Not recorded";
+  const score = String(value).trim();
+  if (!/^[0-4]$/.test(score)) return "Invalid score";
+  const labels = ["Unsupported", "Weak", "Moderate", "Strong", "Very strong"];
+  return score + "/4 · " + labels[Number(score)];
+}
+
 function recordCard(row) {
   const card = document.createElement("article");
   card.className = "incident-card";
@@ -28,7 +36,7 @@ function recordCard(row) {
   const decision = document.createElement("div");
   decision.className = "incident-decision";
   addField(decision, "Classification", row.classification);
-  addField(decision, "LLM confidence", row.llm_confidence + "/100");
+  addField(decision, "Attribution evidence strength", evidenceStrength(row.attribution_evidence_strength));
   card.append(decision);
   addField(card, "Decision rationale", row.decision_rationale);
   if (row.classification === "SUPPLIER") {

@@ -9,10 +9,10 @@ data/run/LLM_OUTPUT.csv + data/mockup/ENG_ALL.csv
 
 ## Per incident
 
-1. Keep the complete LLM_OUTPUT row. Only successful SUPPLIER classifications enter matching.
+1. Keep the complete LLM_OUTPUT row, including `attribution_evidence_strength` in new classifications. Only successful SUPPLIER classifications enter matching.
 2. Compare `supplier_name` with `THIRD_PARTY_NAME` and `THIRD_PARTY_NORMALISED_NAME`. Python normalizes case/punctuation and uses whole-word or fuzzy matching at 0.8. Keep every matching engagement row; name similarity retrieves candidates, not a confirmed link. Blank/Unknown names produce no candidates. Lexical matching can miss aliases such as EY versus Ernst & Young.
 3. Send the incident fields, prior model results, all candidate rows, and `prompts/linking.yml` to the LLM. Keep INCIDENT_ID local. Prior model results are context, not proof. Reuse `app/llm/llm_connection.py` and its OpenAI/Azure settings.
-4. The model chooses one candidate ENGAGEMENT_ID or null when evidence is insufficient or ambiguous. Return a short reason, self-reported confidence from 0 to 100, and separate incident/engagement source-column name lists, without quotes.
+4. The model chooses one candidate ENGAGEMENT_ID or null when evidence is insufficient or ambiguous. Return a short reason, self-reported confidence from 0 to 100, and separate incident/engagement source-column name lists, without quotes. This `link_confidence` concerns the engagement match; it is separate from the classification's 0-4 attribution evidence strength. Strong Supplier attribution does not by itself establish an engagement match.
 5. Validate the response structure, selected ID against exactly one candidate, and source names against supplied headers. Copy the selected engagement's actual CSV values; do not generate its details with the model.
 6. Save that row before processing the next incident. Never modify either input CSV.
 
