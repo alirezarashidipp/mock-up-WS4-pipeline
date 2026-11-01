@@ -19,7 +19,7 @@ class FrontendTests(unittest.TestCase):
         for url in urls:
             _, file_info = assets.lookup_path(url)
             self.assertIsNotNone(file_info, f"Missing asset: {url}")
-        for control in ("total-count", "HSBC-count", "SUPPLIER-count", "incident-list", "reload"):
+        for control in ("total-count", "HSBC-count", "SUPPLIER-count", "UNCERTAIN-count", "failed-count", "incident-list", "reload"):
             self.assertIn(f'id="{control}"', html)
 
     def test_dashboard_controls_match_script(self):
@@ -31,6 +31,7 @@ class FrontendTests(unittest.TestCase):
         self.assertFalse(script_ids - html_ids, f"Missing controls: {script_ids - html_ids}")
         self.assertIn("/api/dashboard", script)
         self.assertIn("row.supplier_more_info", script)
+        self.assertIn("row.evidence_column", script)
         self.assertIn("text.textContent = columnName", script)
         self.assertNotIn("item.quote", script)
         self.assertNotIn("/api/review", script)

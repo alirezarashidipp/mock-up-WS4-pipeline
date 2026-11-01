@@ -27,11 +27,15 @@ def example_response(label):
         "classification": label,
         "key_root_cause": "Synthetic configuration error.",
         "decision_rationale": "Synthetic example explanation.",
-        "supporting_evidence": ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"],
+        "evidence_column": ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"],
         "attribution_evidence_strength": 3,
     }
     for name in SUPPLIER_FIELDS:
         result[name] = None
+    if label == "UNCERTAIN":
+        result["key_root_cause"] = None
+        result["decision_rationale"] = "Synthetic record lacks evidence to attribute responsibility."
+        result["attribution_evidence_strength"] = 0
     if label == "SUPPLIER":
         result.update(
             supplier_name="Unknown",
@@ -41,7 +45,7 @@ def example_response(label):
             supplier_accountability_reason="The recorded supplier change caused the failure.",
             supplier_more_info="The synthetic supplier recorded a regional maintenance window.",
         )
-        result["supporting_evidence"].extend([
+        result["evidence_column"].extend([
             "PROBLEM_CLOSE_NOTES", "IT_PROBLEM_DESCRIPTION", "INCIDENT_RESOLUTION_NOTES",
             "INCIDENT_WORK_NOTES", "PROBLEM_WORK_NOTES", "MAJOR_INCIDENT_FINDINGS",
         ])
@@ -66,9 +70,13 @@ class PythonTests(unittest.TestCase):
             self.assertEqual(raw.read_text(encoding="utf-8"), source)
 
     def test_llm_saves_each_response_and_dashboard_reads_it(self):
-        rows = [{"INCIDENT_ID": "001", "INCIDENT_DESCRIPTION": "Synthetic HSBC cause."}, {"INCIDENT_ID": "002", "INCIDENT_DESCRIPTION": "Synthetic supplier cause."}]
+        rows = [
+            {"INCIDENT_ID": "001", "INCIDENT_DESCRIPTION": "Synthetic HSBC cause."},
+            {"INCIDENT_ID": "002", "INCIDENT_DESCRIPTION": "Synthetic supplier cause."},
+            {"INCIDENT_ID": "003", "INCIDENT_DESCRIPTION": "Synthetic uncertain attribution."},
+        ]
         definitions = {"INCIDENT_DESCRIPTION": "A synthetic incident narrative."}
-        responses = [example_response("HSBC"), example_response("SUPPLIER")]
+        responses = [example_response("HSBC"), example_response("SUPPLIER"), example_response("UNCERTAIN")]
         client = Mock()
         with TemporaryDirectory(dir=ROOT) as folder:
             output = Path(folder) / "LLM_OUTPUT.csv"
@@ -83,7 +91,7 @@ class PythonTests(unittest.TestCase):
             client.chat.completions.create.side_effect = respond
             with patch.object(classification, "llm_connection", return_value=nullcontext((client, "example-model"))), patch.dict(os.environ, {"LLM_TEMPERATURE": "3"}):
                 self.assertEqual(classification.classify_rows(rows, definitions, output), 0)
-            self.assertEqual(client.chat.completions.create.call_count, 2)
+            self.assertEqual(client.chat.completions.create.call_count, 3)
             for index, call in enumerate(client.chat.completions.create.call_args_list):
                 messages = call.kwargs["messages"]
                 fields = json.loads(messages[1]["content"])
@@ -92,15 +100,18 @@ class PythonTests(unittest.TestCase):
                 self.assertEqual(call.kwargs["temperature"], 3.0)
             saved, error = read_records(output)
             self.assertEqual(error, "")
-            self.assertEqual([row["classification"] for row in saved], ["HSBC", "SUPPLIER"])
+            self.assertEqual([row["classification"] for row in saved], ["HSBC", "SUPPLIER", "UNCERTAIN"])
+            self.assertEqual(saved[2]["processing_status"], "success")
+            self.assertEqual(saved[2]["attribution_evidence_strength"], "0")
             for name in SUPPLIER_FIELDS:
                 self.assertEqual(saved[0][name], "")
                 self.assertTrue(saved[1][name])
+                self.assertEqual(saved[2][name], "")
             self.assertEqual(saved[1]["supplier_name"], "Unknown")
-            self.assertEqual(saved[0]["supporting_evidence"], "INCIDENT_DESCRIPTION, ROOT_CAUSE_NOTES")
-            expected_names = json.loads(responses[1].choices[0].message.content)["supporting_evidence"]
-            self.assertEqual(saved[1]["supporting_evidence"], ", ".join(expected_names))
-            self.assertFalse(any(name.startswith("evidence_") for name in saved[1]))
+            self.assertEqual(saved[0]["evidence_column"], "INCIDENT_DESCRIPTION, ROOT_CAUSE_NOTES")
+            expected_names = json.loads(responses[1].choices[0].message.content)["evidence_column"]
+            self.assertEqual(saved[1]["evidence_column"], ", ".join(expected_names))
+            self.assertEqual([name for name in saved[1] if name.startswith("evidence_")], ["evidence_column"])
             self.assertFalse(any(name.endswith("_quote") for name in saved[1]))
             self.assertEqual(saved[1]["supplier_more_info"], "The synthetic supplier recorded a regional maintenance window.")
             for row in saved:
@@ -108,11 +119,11 @@ class PythonTests(unittest.TestCase):
                 self.assertFalse(any(name.startswith("definition_") for name in row))
             before = output.read_bytes()
             dashboard = get_dashboard_data(output)
-            self.assertEqual(dashboard["counts"], {"total": 2, "HSBC": 1, "SUPPLIER": 1, "failed": 0})
+            self.assertEqual(dashboard["counts"], {"total": 3, "HSBC": 1, "SUPPLIER": 1, "UNCERTAIN": 1, "failed": 0})
             self.assertEqual(dashboard["records"][1]["supplier_name"], "Unknown")
             self.assertEqual(dashboard["records"][1]["processing_status"], "success")
-            self.assertEqual(dashboard["records"][0]["supporting_evidence"], ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"])
-            self.assertEqual(dashboard["records"][1]["supporting_evidence"], expected_names)
+            self.assertEqual(dashboard["records"][0]["evidence_column"], ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"])
+            self.assertEqual(dashboard["records"][1]["evidence_column"], expected_names)
             self.assertEqual(len(expected_names), 8)
             self.assertEqual(dashboard["records"][1]["supplier_more_info"], saved[1]["supplier_more_info"])
             self.assertEqual(output.read_bytes(), before)
@@ -120,14 +131,14 @@ class PythonTests(unittest.TestCase):
             for row in saved:
                 for name in SUPPLIER_FIELDS:
                     row.pop(name)
-                names = row.pop("supporting_evidence").split(", ")
+                names = row.pop("evidence_column").split(", ")
                 for number in range(1, 11):
                     row[f"evidence_{number}_column"] = names[number - 1] if number <= len(names) else ""
             write_records(output, saved)
             older_dashboard = get_dashboard_data(output)
             self.assertEqual(older_dashboard["counts"], dashboard["counts"])
             self.assertEqual(older_dashboard["records"][1]["supplier_name"], "")
-            self.assertEqual(older_dashboard["records"][1]["supporting_evidence"], expected_names)
+            self.assertEqual(older_dashboard["records"][1]["evidence_column"], expected_names)
 
     def test_failed_request_is_saved_and_excluded_from_counts(self):
         rows = [{"INCIDENT_ID": "001", "INCIDENT_DESCRIPTION": "Synthetic cause."}, {"INCIDENT_ID": "002", "INCIDENT_DESCRIPTION": "Synthetic failed request."}]
@@ -140,17 +151,17 @@ class PythonTests(unittest.TestCase):
             saved, _ = read_records(output)
             self.assertEqual([row["processing_status"] for row in saved], ["success", "failed"])
             self.assertEqual(saved[1]["error"], "OpenAIError")
-            self.assertEqual(saved[1]["supporting_evidence"], "")
-            self.assertEqual(get_dashboard_data(output)["counts"], {"total": 1, "HSBC": 1, "SUPPLIER": 0, "failed": 1})
+            self.assertEqual(saved[1]["evidence_column"], "")
+            self.assertEqual(get_dashboard_data(output)["counts"], {"total": 1, "HSBC": 1, "SUPPLIER": 0, "UNCERTAIN": 0, "failed": 1})
             self.assertFalse((Path(folder) / "FINAL.csv").exists())
 
     def test_supplier_fields_follow_the_tag(self):
         labels = classification.classification_schema()["properties"]["classification"]["enum"]
-        self.assertEqual(set(labels), {"HSBC", "SUPPLIER"})
-        for label in ("HSBC", "SUPPLIER"):
+        self.assertEqual(set(labels), {"HSBC", "SUPPLIER", "UNCERTAIN"})
+        for label in ("HSBC", "SUPPLIER", "UNCERTAIN"):
             result = json.loads(example_response(label).choices[0].message.content)
             for name in SUPPLIER_FIELDS:
-                result[name] = "Unneeded supplier text" if label == "HSBC" else None
+                result[name] = "Unneeded supplier text" if label != "SUPPLIER" else None
             if label == "SUPPLIER":
                 result["supplier_name"] = "  "
             message = SimpleNamespace(content=json.dumps(result), refusal=None)
@@ -161,23 +172,23 @@ class PythonTests(unittest.TestCase):
                 classified = classification.classify_row(client, "example-model", fields, "Example prompt.")
             self.assertIsNotNone(classified)
             for name in SUPPLIER_FIELDS:
-                expected = None if label == "HSBC" or name == "supplier_more_info" else "Unknown"
+                expected = None if label != "SUPPLIER" or name == "supplier_more_info" else "Unknown"
                 self.assertEqual(getattr(classified, name), expected)
 
     def test_evidence_count_is_one_to_ten(self):
         result = json.loads(example_response("SUPPLIER").choices[0].message.content)
-        evidence = result["supporting_evidence"][0]
+        evidence = result["evidence_column"][0]
         for count in (1, 2, 8, 10):
             with self.subTest(count=count):
-                result["supporting_evidence"] = [evidence] * count
+                result["evidence_column"] = [evidence] * count
                 parsed = Classification.model_validate(result)
-                self.assertEqual(len(parsed.supporting_evidence), count)
+                self.assertEqual(len(parsed.evidence_column), count)
         for count in (0, 11):
             with self.subTest(count=count):
-                result["supporting_evidence"] = [evidence] * count
+                result["evidence_column"] = [evidence] * count
                 with self.assertRaises(ValidationError):
                     Classification.model_validate(result)
-        result["supporting_evidence"] = [{"column": "INCIDENT_DESCRIPTION", "quote": "Old format"}]
+        result["evidence_column"] = [{"column": "INCIDENT_DESCRIPTION", "quote": "Old format"}]
         with self.assertRaises(ValidationError):
             Classification.model_validate(result)
 

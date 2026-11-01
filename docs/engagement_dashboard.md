@@ -15,7 +15,7 @@ data/run/INC_LINKED.csv -> Engagements -> Linked incidents -> Incident details
 4. Split the unlinked total into three nonoverlapping groups:
    - HSBC: `classification=HSBC` and `link_status=NOT_APPLICABLE`. No supplier engagement link is required.
    - Supplier: `classification=SUPPLIER` and `link_status=UNDECIDED`. No confirmed match was found; the saved reason may describe missing candidates, missing supplier information, or ambiguity.
-   - Other: failed or skipped rows, plus remaining unlinked rows whose classification/status pair does not fit either group above. Keep these separate from successful HSBC and undecided Supplier rows.
+   - Other: successful UNCERTAIN classifications with `link_status=SKIPPED`, failed or other skipped rows, plus remaining unlinked rows whose classification/status pair does not fit either group above. UNCERTAIN is a valid classification; its linking is skipped because supplier accountability is not established. Keep these separate from successful HSBC and undecided Supplier rows.
 5. Selecting an engagement opens its linked incident list. Selecting a linked or unlinked incident opens its saved incident, supplier, and linking details, including the saved reason and processing status. Show classification `attribution_evidence_strength` as 0-4 with its label (Unsupported, Weak, Moderate, Strong, Very strong), plus an expandable explanation of the five levels. Keep `link_confidence` separate on its existing 0-100 scale. Linked incidents also show the selected engagement. Hash URLs retain navigation through refresh and browser Back.
 6. Render every CSV value as text. Reuse `frontend/style.css` and the existing logo artwork.
 
@@ -27,7 +27,8 @@ data/run/INC_LINKED.csv -> Engagements -> Linked incidents -> Incident details
 
 - INC_LINKED.csv is the only data input. Keep the full saved incident row available for details; do not query ENG_ALL.csv, LLM_OUTPUT.csv, or an LLM.
 - The app writes no files and provides no review or editing actions. Linking confidence is model-reported, not measured accuracy.
-- Attribution evidence strength rates recorded support for the selected HSBC/SUPPLIER classification, not probability of correctness or supplier-name extraction. It is separate from engagement matching. A score of 4 is not 100% accuracy; repeated copies of one statement are not independent evidence.
+- Attribution evidence strength rates recorded support for assigning responsibility to HSBC or Supplier, not probability of correctness or supplier-name extraction. For UNCERTAIN, scores 0-2 describe the limited attribution evidence, not confidence in uncertainty. It is separate from engagement matching. A score of 4 is not 100% accuracy; repeated copies of one statement are not independent evidence.
+- The single classification `evidence_column` cell is preserved and visible in All incident fields. It contains comma-separated source column names; the dashboard does not generate extra evidence columns.
 - Old rows without `attribution_evidence_strength` show Not recorded; legacy `llm_confidence` is never converted. Unexpected nonblank scores display Invalid score. All saved row values remain available in the incident details dropdown without rewriting the CSV.
 - A missing or empty file produces an empty view. Refresh rereads the CSV; there is no polling or pipeline dependency at runtime.
 - The classification dashboard on port 8766 remains separate. This dashboard does not require it to be running.

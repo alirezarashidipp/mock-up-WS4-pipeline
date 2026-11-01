@@ -55,7 +55,7 @@ function recordCard(row) {
 
   const details = document.createElement("details");
   const summary = document.createElement("summary");
-  summary.textContent = "Evidence and processing details · " + row.supporting_evidence.length + " source columns";
+  summary.textContent = "Evidence and processing details · " + row.evidence_column.length + " source columns";
   details.append(summary);
   const content = document.createElement("div");
   content.className = "incident-secondary";
@@ -63,14 +63,14 @@ function recordCard(row) {
   addField(content, "Key root cause", row.key_root_cause);
   const evidence = document.createElement("section");
   const heading = document.createElement("h3");
-  heading.textContent = "Source columns supporting the decision";
+  heading.textContent = "Source columns informing the decision";
   evidence.append(heading);
-  if (!row.supporting_evidence.length) {
+  if (!row.evidence_column.length) {
     const empty = document.createElement("p");
     empty.textContent = "No supporting source columns returned.";
     evidence.append(empty);
   }
-  for (const columnName of row.supporting_evidence) {
+  for (const columnName of row.evidence_column) {
     const text = document.createElement("p");
     text.textContent = columnName;
     text.className = "record-text";
@@ -100,7 +100,7 @@ async function loadDashboard() {
     if (!response.ok) throw new Error(data.error || "Could not load model results.");
     $("mode").textContent = data.demo ? "Demo · synthetic data" : "LLM results";
     $("demo-note").hidden = !data.demo;
-    for (const key of ["total", "HSBC", "SUPPLIER", "failed"]) {
+    for (const key of ["total", "HSBC", "SUPPLIER", "UNCERTAIN", "failed"]) {
       $(key + "-count").textContent = data.counts[key];
     }
     $("incident-list").replaceChildren();

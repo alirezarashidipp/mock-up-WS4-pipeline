@@ -13,6 +13,23 @@ app.state.results_file = RESULTS_FILE
 app.state.demo = False
 
 
+def read_evidence_columns(row):
+    names = []
+    for column in ("evidence_column", "supporting_evidence"):
+        if column in row:
+            for value in (row[column] or "").split(","):
+                name = value.strip()
+                if name:
+                    names.append(name)
+            return names
+
+    # Read older numbered columns without rewriting the saved file.
+    for column, value in row.items():
+        if column.startswith("evidence_") and column.endswith("_column") and value:
+            names.append(value)
+    return names
+
+
 def get_dashboard_data(path):
     rows = []
     try:
@@ -20,7 +37,7 @@ def get_dashboard_data(path):
             with path.open(encoding="utf-8-sig", newline="") as file:
                 rows = list(csv.DictReader(file))
 
-        counts = {"total": 0, "HSBC": 0, "SUPPLIER": 0, "failed": 0}
+        counts = {"total": 0, "HSBC": 0, "SUPPLIER": 0, "UNCERTAIN": 0, "failed": 0}
         records = []
         for row in rows:
             if row["processing_status"] == "failed":
@@ -29,28 +46,20 @@ def get_dashboard_data(path):
             if row["processing_status"] != "success":
                 return {"error": "LLM_OUTPUT.csv contains an invalid processing status."}
             classification = row["classification"]
-            if classification not in ("HSBC", "SUPPLIER"):
-                return {"error": "Classification must be HSBC or SUPPLIER. Generate new binary results."}
+            if classification not in ("HSBC", "SUPPLIER", "UNCERTAIN"):
+                return {"error": "Classification must be HSBC, SUPPLIER, or UNCERTAIN."}
             record = {
                 "incident_id": row["INCIDENT_ID"],
                 "summary": row.get("INCIDENT_SHORT_DESCRIPTION", ""),
                 "classification": classification,
                 "processing_status": row["processing_status"],
                 "input": {name: value for name, value in row.items() if name.isupper()},
-                "supporting_evidence": [],
+                "evidence_column": read_evidence_columns(row),
             }
             for name in ("key_root_cause", "decision_rationale", "attribution_evidence_strength", "supplier_name",
                          "supplier_product_or_service", "supplier_action_or_failure",
                          "supplier_causal_explanation", "supplier_accountability_reason", "supplier_more_info"):
                 record[name] = row.get(name, "")
-            if "supporting_evidence" in row:
-                for name in row["supporting_evidence"].split(","):
-                    if name.strip():
-                        record["supporting_evidence"].append(name.strip())
-            else:
-                for name, value in row.items():
-                    if name.startswith("evidence_") and name.endswith("_column") and value:
-                        record["supporting_evidence"].append(value)
             records.append(record)
             counts[classification] += 1
         counts["total"] = len(records)

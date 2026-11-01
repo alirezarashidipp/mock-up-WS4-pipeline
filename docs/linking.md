@@ -9,7 +9,7 @@ data/run/LLM_OUTPUT.csv + data/mockup/ENG_ALL.csv
 
 ## Per incident
 
-1. Keep the complete LLM_OUTPUT row, including `attribution_evidence_strength` in new classifications. Only successful SUPPLIER classifications enter matching.
+1. Keep the complete LLM_OUTPUT row, including `evidence_column` and `attribution_evidence_strength` in new classifications. Only successful SUPPLIER classifications enter matching. A successful UNCERTAIN classification skips candidate search and the linking request; it is not a processing failure and does not stop the batch.
 2. Compare `supplier_name` with `THIRD_PARTY_NAME` and `THIRD_PARTY_NORMALISED_NAME`. Python normalizes case/punctuation and uses whole-word or fuzzy matching at 0.8. Keep every matching engagement row; name similarity retrieves candidates, not a confirmed link. Blank/Unknown names produce no candidates. Lexical matching can miss aliases such as EY versus Ernst & Young.
 3. Send the incident fields, prior model results, all candidate rows, and `prompts/linking.yml` to the LLM. Keep INCIDENT_ID local. Prior model results are context, not proof. Reuse `app/llm/llm_connection.py` and its OpenAI/Azure settings.
 4. The model chooses one candidate ENGAGEMENT_ID or null when evidence is insufficient or ambiguous. Return a short reason, self-reported confidence from 0 to 100, and separate incident/engagement source-column name lists, without quotes. This `link_confidence` concerns the engagement match; it is separate from the classification's 0-4 attribution evidence strength. Strong Supplier attribution does not by itself establish an engagement match.
@@ -27,7 +27,7 @@ data/run/LLM_OUTPUT.csv + data/mockup/ENG_ALL.csv
 | MATCHED | The model selected one supplied engagement. |
 | UNDECIDED | No name candidates, unknown supplier, or insufficient evidence to select one. |
 | NOT_APPLICABLE | The incident was classified HSBC; no linking request. |
-| SKIPPED | Classification did not succeed; no linking request. |
+| SKIPPED | Classification did not succeed or its valid result was UNCERTAIN; no candidate search or linking request. |
 | FAILED | The linking request or response failed validation. |
 
 Provider/invalid-response failures are saved where possible, then stop the batch; earlier rows remain saved. The shared writer retains schema and conflicting-ID checks. Use a separate output file for changed decisions rather than overwriting saved results.

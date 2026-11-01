@@ -10,7 +10,9 @@ LLM_OUTPUT.csv + ENG_ALL.csv -> Candidate search -> LLM linking -> INC_LINKED.cs
 INC_LINKED.csv -> Engagement dashboard -> Linked incidents -> Incident details
 ```
 
-The LLM tags each incident HSBC or SUPPLIER. For SUPPLIER it also extracts the supplier name, related product/service, action or failure, causal explanation, accountability reason, and supporting source column names without quotes. Extra recorded supplier facts go in `supplier_more_info`, left empty when none exist. Missing core supplier facts are Unknown. Each result needs one to ten supporting names, stored in one `supporting_evidence` CSV cell separated by commas. The dashboard keeps decision and supplier fields visible, with sources and processing status in a dropdown. The tag is a model assessment; `attribution_evidence_strength` rates its recorded support from 0 (unsupported) to 4 (very strong), not its probability of being correct. See the [five-level rubric and field order](docs/llm.md).
+The LLM tags each incident HSBC, SUPPLIER, or UNCERTAIN. UNCERTAIN is a successful result when the record cannot support choosing the accountable party; its rationale explains the missing or conflicting facts. For SUPPLIER it also extracts the supplier name, related product/service, action or failure, causal explanation, and accountability reason. Extra recorded supplier facts go in `supplier_more_info`, left empty when none exist. Missing core Supplier facts are Unknown; all six supplier fields are null for HSBC and UNCERTAIN.
+
+Each result includes one to ten source column names, saved together in exactly one `evidence_column` CSV cell, such as `INCIDENT_DESCRIPTION, ROOT_CAUSE_NOTES`. New results have no numbered evidence columns. The dashboard counts all three classifications separately from processing failures and keeps decision and Supplier fields visible, with evidence names and processing status in a dropdown. `attribution_evidence_strength` rates recorded support from 0 (unsupported) to 4 (very strong), not probability of correctness. UNCERTAIN uses 0-2 to describe attribution evidence, not confidence in uncertainty. See the [five-level rubric and field order](docs/llm.md).
 
 Model inputs are ordered as narrative, causes, closure/resolution, investigation history, supplier/product context, then remaining metadata. All non-ID values and their definitions are retained. Responses put root cause, supporting evidence, and a short rationale before classification and evidence strength, followed by supplier details.
 
@@ -55,7 +57,7 @@ After classification, optionally link incidents to engagements. Put the UTF-8 en
 .\.venv\Scripts\python.exe -m app.linking.pipeline
 ```
 
-It writes `data/run/INC_LINKED.csv`: original incident columns, selected engagement columns prefixed with `ENG_`, and the link decision. It uses [linking instructions](prompts/linking.yml) and the existing `.env` connection. Ambiguous or missing matches stay undecided. The classification evidence score is preserved; `link_confidence` remains a separate self-reported 0-100 value about the engagement match.
+It writes `data/run/INC_LINKED.csv`: original incident columns, selected engagement columns prefixed with `ENG_`, and the link decision. It uses [linking instructions](prompts/linking.yml) and the existing `.env` connection. Only successful Supplier classifications enter matching. UNCERTAIN rows are SKIPPED without a model call and do not stop the batch. Ambiguous or missing Supplier matches stay undecided. The classification evidence score is preserved; `link_confidence` remains a separate self-reported 0-100 value about the engagement match.
 
 To browse that output, start the separate engagement dashboard and open [http://127.0.0.1:8767/](http://127.0.0.1:8767/):
 
@@ -65,7 +67,7 @@ To browse that output, start the separate engagement dashboard and open [http://
 
 It reads only `data/run/INC_LINKED.csv`. Select an engagement to see its linked incidents, then select an incident for details. Refresh rereads the CSV. The classification dashboard on port 8766 is independent and does not need to be running.
 
-Preparation replaces CLEAN.csv on nonempty runs. LLM results append for new incident IDs; conflicting results for an existing ID are rejected. For an older output schema, including `llm_confidence`, configure a new output folder in `app/llm/pipeline.py` and update `RESULTS_FILE` in `app/ui/dashboard_app.py`. If linking, also update the input/output paths in `app/linking/pipeline.py` and `RESULTS_FILE` in `app/ui/engagement_dashboard.py`. Old confidence values are not converted to evidence strength; dashboards show Not recorded when the score is missing. CSV cells contain plain values, without evidence quote columns, JSON blobs, prompt text, or definitions. CSVs and credentials stay out of Git.
+Preparation replaces CLEAN.csv on nonempty runs. LLM results append for new incident IDs; conflicting results for an existing ID are rejected. For an older output schema, including `llm_confidence`, `supporting_evidence`, or numbered evidence columns, configure a new output folder in `app/llm/pipeline.py` and update `RESULTS_FILE` in `app/ui/dashboard_app.py`. If linking, also update the input/output paths in `app/linking/pipeline.py` and `RESULTS_FILE` in `app/ui/engagement_dashboard.py`. Old confidence values are not converted to evidence strength; dashboards show Not recorded when the score is missing and read legacy evidence without rewriting it. CSV cells contain plain values, without evidence quote columns, JSON blobs, prompt text, or definitions. CSVs and credentials stay out of Git.
 
 ## Documentation and tests
 

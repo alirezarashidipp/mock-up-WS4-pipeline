@@ -7,12 +7,19 @@ COLUMNS = ["INCIDENT_ID", *Classification.model_fields, "processing_status", "er
 
 def save_result(path, row, result, error=""):
     record = dict(row)
-    record.update({name: "" for name in COLUMNS if name != "INCIDENT_ID"})
-    record.update(processing_status="failed", error=error or "Invalid model output")
+    for name in COLUMNS:
+        if name != "INCIDENT_ID":
+            record[name] = ""
+    record["processing_status"] = "failed"
+    record["error"] = error or "Invalid model output"
+
     if result is not None:
-        record.update(result.model_dump(exclude={"supporting_evidence"}))
-        record["supporting_evidence"] = ", ".join(result.supporting_evidence)
-        record.update(processing_status="success", error="")
+        values = result.model_dump()
+        values["evidence_column"] = ", ".join(result.evidence_column)
+        record.update(values)
+        record["processing_status"] = "success"
+        record["error"] = ""
+
     saved, message = append_record(path, record)
     if not saved:
         print(message)

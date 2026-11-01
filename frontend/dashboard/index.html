@@ -36,20 +36,26 @@
   <section class="page-heading"><div><p class="eyebrow">INCIDENT ACCOUNTABILITY / WS4</p><h1>Incident classification</h1><p class="subtitle">LLM tags, supplier details, and supporting evidence from LLM_OUTPUT.csv.</p></div><button id="reload" type="button" class="button">Refresh</button></section>
   <p id="demo-note" class="demo-note" hidden>Demo: synthetic incidents and example model results.</p>
   <div id="message" class="message" role="status" aria-live="polite" hidden></div>
-  <section class="stats" aria-label="Classification counts"><div class="stat"><strong id="total-count">—</strong><span>Classified incidents</span></div><div class="stat"><strong id="HSBC-count">—</strong><span>HSBC</span></div><div class="stat"><strong id="SUPPLIER-count">—</strong><span>SUPPLIER</span></div><div class="stat"><strong id="failed-count">—</strong><span>Processing failures</span></div></section>
+  <section class="stats" aria-label="Classification counts">
+    <div class="stat"><strong id="total-count">—</strong><span>Classified incidents</span></div>
+    <div class="stat"><strong id="HSBC-count">—</strong><span>HSBC</span></div>
+    <div class="stat"><strong id="SUPPLIER-count">—</strong><span>SUPPLIER</span></div>
+    <div class="stat"><strong id="UNCERTAIN-count">—</strong><span>UNCERTAIN</span></div>
+    <div class="stat"><strong id="failed-count">—</strong><span>Processing failures</span></div>
+  </section>
   <section aria-labelledby="results-heading">
     <h2 id="results-heading">Model results</h2>
-    <p class="field-note">Evidence strength rates the recorded support for HSBC or SUPPLIER accountability, not the probability that the decision is correct. Older results without this score show Not recorded.</p>
+    <p class="field-note">UNCERTAIN means the record does not support choosing HSBC or SUPPLIER; it is a valid model result, not a processing failure. Evidence strength rates support for attributing responsibility to a party, not the probability that the decision is correct. Older results without this score show Not recorded.</p>
     <details>
       <summary>Evidence strength scale · 0 to 4</summary>
       <ul class="record-text">
-        <li><strong>0 · Unsupported:</strong> No recorded causal evidence distinguishes HSBC from Supplier. The selected tag is tentative.</li>
+        <li><strong>0 · Unsupported:</strong> No recorded causal evidence distinguishes HSBC from Supplier. Choose UNCERTAIN.</li>
         <li><strong>1 · Weak:</strong> Only indirect references or unconfirmed suspicion support the tag; key causal facts are missing.</li>
         <li><strong>2 · Moderate:</strong> Some causal evidence exists, but a material contradiction or missing causal link remains.</li>
         <li><strong>3 · Strong:</strong> Concrete facts support the responsible party and causal mechanism; remaining gaps do not substantially challenge the tag.</li>
         <li><strong>4 · Very strong:</strong> A clear documented causal finding has supporting details and no unresolved material counterevidence in the supplied record.</li>
       </ul>
-      <p class="field-note">A score of 4 does not mean 100% accuracy. Repeated copies of one statement are not independent evidence. This score does not rate supplier-name extraction or engagement matching.</p>
+      <p class="field-note">For UNCERTAIN, a score of 0-2 describes limited support for assigning responsibility to either party, not confidence in being uncertain. A score of 4 does not mean 100% accuracy. Repeated copies of one statement are not independent evidence. This score does not rate supplier-name extraction or engagement matching.</p>
     </details>
     <p id="dashboard-empty" class="field-note">LLM_OUTPUT.csv has no successful results yet.</p>
     <div id="incident-list" class="incident-list"></div>

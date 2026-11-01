@@ -79,11 +79,15 @@ def link_incident(incident, engagements, prompt):
     if incident.get("processing_status") != "success":
         link.update(link_status="SKIPPED", link_reason="Incident classification did not succeed.")
         return link, {}
-    if incident.get("classification") == "HSBC":
+    classification = incident.get("classification")
+    if classification == "HSBC":
         link.update(link_status="NOT_APPLICABLE", link_reason="HSBC incident; supplier engagement linking is not applicable.")
         return link, {}
-    if incident.get("classification") != "SUPPLIER":
-        link.update(link_status="FAILED", link_reason="Expected HSBC or SUPPLIER classification.", link_error="InvalidClassification")
+    if classification == "UNCERTAIN":
+        link.update(link_status="SKIPPED", link_reason="Classification is uncertain; supplier accountability is not established, so engagement matching was skipped.")
+        return link, {}
+    if classification != "SUPPLIER":
+        link.update(link_status="FAILED", link_reason="Expected HSBC, SUPPLIER, or UNCERTAIN classification.", link_error="InvalidClassification")
         return link, {}
     candidates = find_candidates(incident.get("supplier_name", ""), engagements)
     if not candidates:
