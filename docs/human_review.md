@@ -37,7 +37,7 @@ Preparation reads `data/run/INC_LINKED.csv` and writes `data/run/HUMAN_REVIEW.cs
 
 ## CSV fields
 
-All original model and engagement columns remain unchanged. Five additional columns store the current human decisions:
+All original model and engagement columns remain unchanged, including Python's `link_candidate_count` when present. Preserve its blank/zero/count values and show it in the link details dropdown. An older review file without that source column cannot be merged with the new linking schema; preserve it and use a fresh review output for the new batch. Five additional columns store the current human decisions:
 
 | Column | Values or purpose |
 | --- | --- |

@@ -74,7 +74,7 @@ def link_incident(incident, engagements, prompt, max_candidates=70):
     link = {
         "linked_engagement_id": "", "link_status": "UNDECIDED", "link_reason": "",
         "link_confidence": "", "link_incident_columns": [], "link_engagement_columns": [],
-        "link_error": "",
+        "link_error": "", "link_candidate_count": "",
     }
     if incident.get("processing_status") != "success":
         link.update(link_status="SKIPPED", link_reason="Incident classification did not succeed.")
@@ -90,6 +90,7 @@ def link_incident(incident, engagements, prompt, max_candidates=70):
         link.update(link_status="FAILED", link_reason="Expected HSBC, SUPPLIER, or UNCERTAIN classification.", link_error="InvalidClassification")
         return link, {}
     candidates = find_candidates(incident.get("supplier_name", ""), engagements, max_candidates)
+    link["link_candidate_count"] = len(candidates)
     if not candidates:
         link["link_reason"] = "Supplier name is missing or no similar supplier name was found in ENG_ALL.csv."
         return link, {}

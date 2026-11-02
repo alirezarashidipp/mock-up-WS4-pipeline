@@ -78,7 +78,7 @@ These incidents are still saved in INC_LINKED.csv with their original incident d
 1. Python checks each ENG_ALL row in CSV order. It checks `THIRD_PARTY_NAME` first, then `THIRD_PARTY_NORMALISED_NAME` if the first name does not match.
 2. Names are normalized for matching: lowercase, ASCII folding, and single spaces between words. For example, `  GOOGLE   UK  ` becomes `google uk`. Source values stay unchanged.
 3. Keep matching rows up to `LINK_MAX_CANDIDATES=70`, configured in `.env`. The first matches in CSV order are kept; there is no relevance ranking. If 10,000 rows contain only 30 Google matches, all 30 are kept.
-4. Send the incident information and all 30 complete candidate rows together in one LLM request. Keep INCIDENT_ID local.
+4. Python records `link_candidate_count=30`, then sends the incident information and all 30 complete candidate rows together in one LLM request. Keep INCIDENT_ID local. If 100 rows match but the cap is 70, the saved count is 70.
 
 Three illustrative candidates from that shortlist:
 
@@ -111,7 +111,7 @@ Python validates the selection and saves the result to **`data/run/INC_LINKED.cs
 
 Python accepts the returned source-name strings in `link_incident_columns` and `link_engagement_columns` without checking them against input headers. List types and nonempty lists for a selected engagement are still checked.
 
-Python adds `link_status`, `link_error`, and `link_confidence_scale=0-4`; these are not LLM output fields. When no linking call occurs, the score stays blank. Old files without the scale marker keep their legacy 0-100 values, even if a value is only 3; they are not converted to the new rubric. Use a fresh output file for new results because the CSV schema has changed.
+Python adds `link_status`, `link_error`, `link_candidate_count`, and `link_confidence_scale=0-4`; these are not LLM output fields. The candidate count is the shortlist size after the cap: zero for no candidates and blank when search is skipped. It remains saved after a failed request or response and does not prove delivery to the provider. When no linking call occurs, the score stays blank. Old files without the scale marker keep their legacy 0-100 values, even if a value is only 3; they are not converted to the new rubric. Preserve older files and use fresh linking and human-review outputs for the new schema, including files that already have the scale marker but lack `link_candidate_count`. Update the pipeline and dashboard paths for the new batch.
 
 The input CSVs remain unchanged. The engagement dashboard reads INC_LINKED.csv. See [Incident-to-engagement linking](linking.md) for all output columns and validation rules.
 
