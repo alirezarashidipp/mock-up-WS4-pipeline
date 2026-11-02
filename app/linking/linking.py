@@ -61,10 +61,6 @@ def select_engagement(client, model, incident, candidates, prompt):
         return None
     if result.linked_engagement_id is not None and result.link_confidence == 0:
         return None
-    if not set(result.link_incident_columns) <= fields.keys():
-        return None
-    if not set(result.link_engagement_columns) <= candidates[0].keys():
-        return None
     if result.linked_engagement_id is not None:
         selected = [row for row in candidates if row["ENGAGEMENT_ID"] == result.linked_engagement_id]
         if len(selected) != 1 or not result.linked_engagement_id.strip():
@@ -104,7 +100,7 @@ def link_incident(incident, engagements, prompt, max_candidates=70):
         link.update(link_status="FAILED", link_reason="Engagement request failed; check link_error.", link_error=type(error).__name__)
         return link, {}
     if result is None:
-        link.update(link_status="FAILED", link_reason="Response was empty, refused, incomplete, or referenced an invalid candidate or column.", link_error="InvalidModelOutput")
+        link.update(link_status="FAILED", link_reason="Response was empty, refused, incomplete, or did not satisfy the linking response checks.", link_error="InvalidModelOutput")
         return link, {}
     link.update(result.model_dump())
     if result.linked_engagement_id is None:

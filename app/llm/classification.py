@@ -29,7 +29,12 @@ def classify_rows(rows, definitions, output_file):
             fields = prepare_fields(row, definitions)
             try:
                 result = classify_row(client, model, fields, prompt)
-            except (OpenAIError, ValidationError, ValueError) as error:
+            except ValidationError as error:
+                message = validation_error_summary(error)
+                save_result(output_file, row, None, message)
+                print(f"Stopped: {message}. Earlier results are saved.")
+                return 1
+            except (OpenAIError, ValueError) as error:
                 save_result(output_file, row, None, type(error).__name__)
                 print(f"Stopped: {type(error).__name__}. Earlier results are saved.")
                 return 1
@@ -40,6 +45,16 @@ def classify_rows(rows, definitions, output_file):
             print(f"Saved incident {row['INCIDENT_ID']}")
     print(f"Output: {output_file}")
     return 0
+
+
+def validation_error_summary(error: ValidationError) -> str:
+    details = []
+    for item in error.errors(include_input=False, include_context=False, include_url=False):
+        field = item["loc"][0] if item["loc"] else "response"
+        if field not in Classification.model_fields:
+            field = "response"
+        details.append(f"{field}: {item['type']}")
+    return "ValidationError: " + "; ".join(details)
 
 
 def classification_schema() -> dict:
@@ -72,13 +87,13 @@ def classify_row(client: OpenAI, model: str, fields: list[dict], prompt: str) ->
         response_format=response_format,
         store=False,
     )
-    result = parse_response(response, fields)
+    result = parse_response(response)
     if result is None:
         return None
     return normalize_supplier_fields(result)
 
 
-def parse_response(response, fields: list[dict]) -> Classification | None:
+def parse_response(response) -> Classification | None:
     if not response.choices:
         return None
     choice = response.choices[0]
@@ -94,16 +109,6 @@ def parse_response(response, fields: list[dict]) -> Classification | None:
     if result.classification in ("HSBC", "SUPPLIER") and score == 0:
         return None
 
-    input_names = {field["name"] for field in fields}
-    seen_names = set()
-    for name in result.evidence_column:
-        if not name.strip():
-            return None
-        if name not in input_names:
-            return None
-        if name in seen_names:
-            return None
-        seen_names.add(name)
     return result
 
 

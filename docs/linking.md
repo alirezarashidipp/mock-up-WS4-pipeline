@@ -27,8 +27,22 @@ Linking uses provider defaults for temperature and output length, with no local 
 2. For each ENG_ALL row, compare `supplier_name` with `THIRD_PARTY_NAME` first; check `THIRD_PARTY_NORMALISED_NAME` only if the first name does not match. Add the row once if either matches, then move to the next row until the candidate limit is reached. Apply the same normalization to supplier and candidate names: Unicode NFKD, ASCII folding (remaining non-ASCII characters are dropped), lowercase, then join ASCII letter/number tokens with single spaces. Extra spaces and punctuation are removed as separators; words remain separated. Synthetic name example: `Google UK` becomes `google uk`, not `googleuk`. Match by whole-word containment or fuzzy similarity at 0.8. Name similarity retrieves candidates, not a confirmed link. Blank/Unknown names produce no candidates. Lexical matching can miss aliases such as EY versus Ernst & Young.
 3. Send the incident fields, prior model results, all shortlisted candidate rows, and `prompts/linking.yml` together in one LLM request per eligible incident. Candidate rows keep their original values; normalization is only for matching. Keep INCIDENT_ID local. Prior model results are context, not proof. Reuse `app/llm/llm_connection.py` and its OpenAI/Azure settings.
 4. The model chooses one candidate ENGAGEMENT_ID or null when evidence is insufficient or ambiguous. Return a short reason, `link_confidence` as an integer from 0 to 4 using the link evidence rubric below, and separate incident/engagement source-column name lists, without quotes. This score concerns the engagement match; it is separate from classification's attribution evidence strength. Strong Supplier attribution does not by itself establish an engagement match.
-5. Validate the response structure, selected ID against exactly one candidate, and source names against supplied headers. Reject noninteger scores, values outside 0-4, a selected engagement with score 0, and a null selection with score 3 or 4. Do not repair the selection or score. Copy the selected engagement's actual CSV values; do not generate its details with the model.
+5. Validate the response structure and selected ID against exactly one candidate. Evidence fields must be lists of strings; both lists must be nonempty for a selected engagement. Source names are not checked against input headers, deduplicated, or corrected. Reject noninteger scores, values outside 0-4, a selected engagement with score 0, and a null selection with score 3 or 4. Do not repair the selection or score. Copy the selected engagement's actual CSV values; do not generate its details with the model.
 6. Save that row before processing the next incident. Never modify either input CSV.
+
+## Remaining output checks
+
+| Check | Current behavior |
+| --- | --- |
+| Completion | Require a choice, `finish_reason=stop`, nonempty content, and no refusal. |
+| JSON schema | Require the five defined fields and their types; reject extra JSON fields. |
+| Reason | Require a string that is not empty or whitespace-only. |
+| Evidence strength | Require a strict integer 0-4; selected links allow 1-4 and null selections allow 0-2. |
+| Selected engagement | Require null or an ID matching exactly one supplied candidate; a selected ID cannot be blank. |
+| Evidence lists | Require lists of strings; both lists must be nonempty when an engagement is selected. |
+| Evidence names | No Python check of source membership, spelling, duplicates, or blank individual strings. |
+
+The five JSON field names remain part of the response schema. The removed checks concern source names inside the two evidence lists. CSV schema and conflicting-ID checks remain separate.
 
 ## Link evidence strength
 

@@ -15,7 +15,7 @@ HUMAN_REVIEW.csv -> Human decisions -> Save HUMAN_REVIEW.csv
 - No local tokenizer, tokenizer download, or input-token precheck runs. Input is not truncated; the provider's model limits still apply.
 - Structured output and incomplete-response validation remain active. `LINK_MAX_CANDIDATES=70` still caps engagement candidates. See [request defaults](llm.md#request-defaults).
 
-The archived diagram in `.archify/dataflow-ws4-pipeline-20261102-000851/` predates removal of the request settings. Its shared-budget description and frozen source snapshot are historical; the request defaults above describe the current code.
+The archived diagram in `.archify/dataflow-ws4-pipeline-20261102-000851/` and its frozen source snapshot are historical. The request defaults and output-validation rules in this document describe the current code.
 
 ## Three dashboards
 
@@ -48,7 +48,7 @@ The six supplier fields are:
 ## Other output fields
 
 - `key_root_cause`: the documented root cause in one sentence, or `null` if unknown.
-- `evidence_column`: a list of 1-10 distinct, nonblank standardized column names from this row's model input. Return names only, without source values or quotations. Python rejects unknown or repeated names and does not trim or correct them. A referenced source value may be empty to identify missing information.
+- `evidence_column`: a nonempty list of strings, with no fixed maximum count. The prompt requests relevant source column names, but Python does not check membership, spelling, duplicates, or blank individual names. Save entries in returned order without correction or deduplication.
 - `decision_rationale`: a short, evidence-based explanation of the classification.
 - `classification`: exactly `HSBC`, `SUPPLIER`, or `UNCERTAIN`.
 - `attribution_evidence_strength`: an integer from 0 to 4: unsupported, weak, moderate, strong, or very strong. This measures attribution evidence, not probability. Valid scores are 0-2 for `UNCERTAIN` and 1-4 for `HSBC` or `SUPPLIER`. Python rejects other combinations without changing the classification or score.
@@ -56,8 +56,9 @@ The six supplier fields are:
 ## CSV rules
 
 - Save `evidence_column` in one cell, with names separated by comma and space. Synthetic example: `COLUMN_X, COLUMN_Y`.
-- Preserve source columns and `INCIDENT_ID`; the LLM does not generate them. `INCIDENT_ID` is not sent to the LLM and cannot appear in `evidence_column`.
-- Python adds `processing_status` and `error`. Valid classifications use `success` with an empty error; provider failures or invalid responses use `failed`. Invalid evidence names or score/classification combinations follow the same failure path: save the failed row where possible and stop, preserving earlier results.
+- Preserve source columns and `INCIDENT_ID`; the LLM does not generate them. `INCIDENT_ID` is not sent to the LLM. Evidence source names are model-reported and are not checked against the input headers.
+- Pydantic output failures report only the response field and error type, such as `ValidationError: key_root_cause: string_too_short`; no incident text or raw model output is logged.
+- Python adds `processing_status` and `error`. Valid classifications use `success` with an empty error; provider failures or invalid responses use `failed`. Invalid response structure or score/classification combinations follow the same failure path: save the failed row where possible and stop, preserving earlier results.
 
 See [LLM classification and supplier extraction](llm.md) for the full rules and output order.
 
@@ -107,6 +108,8 @@ Python validates the selection and saves the result to **`data/run/INC_LINKED.cs
 - No candidates or an ambiguous selection becomes `link_status=UNDECIDED`; engagement columns remain empty.
 - HSBC is `NOT_APPLICABLE`; UNCERTAIN or failed classification is `SKIPPED`. These rows are saved without candidate search or a linking LLM call.
 - A linking request or response failure becomes `FAILED` and stops the batch after saving where possible.
+
+Python accepts the returned source-name strings in `link_incident_columns` and `link_engagement_columns` without checking them against input headers. List types and nonempty lists for a selected engagement are still checked.
 
 Python adds `link_status`, `link_error`, and `link_confidence_scale=0-4`; these are not LLM output fields. When no linking call occurs, the score stays blank. Old files without the scale marker keep their legacy 0-100 values, even if a value is only 3; they are not converted to the new rubric. Use a fresh output file for new results because the CSV schema has changed.
 

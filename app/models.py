@@ -33,8 +33,7 @@ class Classification(BaseModel):
     )
     evidence_column: list[str] = Field(
         min_length=1,
-        max_length=10,
-        description="One to ten standardized source column names that informed the decision; names only, without quotes."
+        description="One or more standardized source column names that informed the decision; names only, without quotes. No fixed maximum count."
     )
     decision_rationale: str = Field(
         min_length=1, description="A short evidence-based explanation of the accountability decision."

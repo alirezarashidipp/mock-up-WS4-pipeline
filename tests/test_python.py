@@ -200,19 +200,26 @@ class PythonTests(unittest.TestCase):
                 expected = None if label != "SUPPLIER" or name == "supplier_more_info" else "Unknown"
                 self.assertEqual(getattr(classified, name), expected)
 
-    def test_evidence_count_is_one_to_ten(self):
+    def test_evidence_has_no_fixed_maximum(self):
         result = json.loads(example_response("SUPPLIER").choices[0].message.content)
-        evidence = result["evidence_column"][0]
-        for count in (1, 2, 8, 10):
+        for count in (1, 11):
             with self.subTest(count=count):
-                result["evidence_column"] = [evidence] * count
-                parsed = Classification.model_validate(result)
-                self.assertEqual(len(parsed.evidence_column), count)
-        for count in (0, 11):
-            with self.subTest(count=count):
-                result["evidence_column"] = [evidence] * count
-                with self.assertRaises(ValidationError):
-                    Classification.model_validate(result)
+                names = [f"SYNTHETIC_COLUMN_{number}" for number in range(count)]
+                result["evidence_column"] = names
+                message = SimpleNamespace(content=json.dumps(result), refusal=None)
+                response = SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
+                parsed = classification.parse_response(response)
+                self.assertIsNotNone(parsed)
+                self.assertEqual(parsed.evidence_column, names)
+        names = ["SYNTHETIC_UNKNOWN", "SYNTHETIC_UNKNOWN", " "]
+        result["evidence_column"] = names
+        message = SimpleNamespace(content=json.dumps(result), refusal=None)
+        response = SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
+        parsed = classification.parse_response(response)
+        self.assertEqual(parsed.evidence_column, names)
+        result["evidence_column"] = []
+        with self.assertRaises(ValidationError):
+            Classification.model_validate(result)
         result["evidence_column"] = [{"column": "INCIDENT_DESCRIPTION", "quote": "Old format"}]
         with self.assertRaises(ValidationError):
             Classification.model_validate(result)
