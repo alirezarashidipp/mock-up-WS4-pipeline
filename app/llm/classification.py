@@ -1,5 +1,4 @@
 import json
-import os
 from pathlib import Path
 
 import yaml
@@ -7,7 +6,7 @@ from openai import OpenAI, OpenAIError
 from pydantic import ValidationError
 
 from app.llm.prepare_fields import prepare_fields
-from app.llm.llm_connection import llm_connection
+from app.llm.llm_connection import llm_connection, request_options
 from app.models import Classification, SUPPLIER_FIELDS
 from app.llm.save_csv import save_result
 
@@ -30,7 +29,7 @@ def classify_rows(rows, definitions, output_file):
             fields = prepare_fields(row, definitions)
             try:
                 result = classify_row(client, model, fields, prompt)
-            except (OpenAIError, ValidationError) as error:
+            except (OpenAIError, ValidationError, ValueError) as error:
                 save_result(output_file, row, None, type(error).__name__)
                 print(f"Stopped: {type(error).__name__}. Earlier results are saved.")
                 return 1
@@ -57,34 +56,31 @@ def classification_schema() -> dict:
 
 
 def classify_row(client: OpenAI, model: str, fields: list[dict], prompt: str) -> Classification | None:
-    options = {}
-    temperature = os.getenv("LLM_TEMPERATURE", "").strip()
-    if temperature:
-        options["temperature"] = float(temperature)
-
     payload = json.dumps(fields, ensure_ascii=False)
     schema = classification_schema()
+    messages = [
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": payload},
+    ]
+    response_format = {
+        "type": "json_schema",
+        "json_schema": {"name": "Classification", "strict": True, "schema": schema},
+    }
+    options = request_options(model, messages, response_format)
     response = client.chat.completions.create(
         model=model,
-        messages=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": payload},
-        ],
-        response_format={
-            "type": "json_schema",
-            "json_schema": {"name": "Classification", "strict": True, "schema": schema},
-        },
-        max_completion_tokens=2000,
+        messages=messages,
+        response_format=response_format,
         store=False,
         **options,
     )
-    result = parse_response(response)
+    result = parse_response(response, fields)
     if result is None:
         return None
     return normalize_supplier_fields(result)
 
 
-def parse_response(response) -> Classification | None:
+def parse_response(response, fields: list[dict]) -> Classification | None:
     if not response.choices:
         return None
     choice = response.choices[0]
@@ -94,8 +90,22 @@ def parse_response(response) -> Classification | None:
     if message.refusal or not message.content:
         return None
     result = Classification.model_validate_json(message.content)
-    if result.classification == "UNCERTAIN" and result.attribution_evidence_strength > 2:
+    score = result.attribution_evidence_strength
+    if result.classification == "UNCERTAIN" and score > 2:
         return None
+    if result.classification in ("HSBC", "SUPPLIER") and score == 0:
+        return None
+
+    input_names = {field["name"] for field in fields}
+    seen_names = set()
+    for name in result.evidence_column:
+        if not name.strip():
+            return None
+        if name not in input_names:
+            return None
+        if name in seen_names:
+            return None
+        seen_names.add(name)
     return result
 
 

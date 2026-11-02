@@ -75,7 +75,20 @@ class PythonTests(unittest.TestCase):
             {"INCIDENT_ID": "002", "INCIDENT_DESCRIPTION": "Synthetic supplier cause."},
             {"INCIDENT_ID": "003", "INCIDENT_DESCRIPTION": "Synthetic uncertain attribution."},
         ]
+        source_fields = {
+            "ROOT_CAUSE_NOTES": "Synthetic recorded cause.",
+            "PROBLEM_CLOSE_NOTES": "Synthetic closure finding.",
+            "IT_PROBLEM_DESCRIPTION": "Synthetic problem narrative.",
+            "INCIDENT_RESOLUTION_NOTES": "Synthetic restoration details.",
+            "INCIDENT_WORK_NOTES": "Synthetic investigation notes.",
+            "PROBLEM_WORK_NOTES": "Synthetic problem investigation.",
+            "MAJOR_INCIDENT_FINDINGS": "Synthetic confirmed finding.",
+        }
         definitions = {"INCIDENT_DESCRIPTION": "A synthetic incident narrative."}
+        for name in source_fields:
+            definitions[name] = "A synthetic supporting incident field."
+        for row in rows:
+            row.update(source_fields)
         responses = [example_response("HSBC"), example_response("SUPPLIER"), example_response("UNCERTAIN")]
         client = Mock()
         with TemporaryDirectory(dir=ROOT) as folder:
@@ -96,7 +109,12 @@ class PythonTests(unittest.TestCase):
                 messages = call.kwargs["messages"]
                 fields = json.loads(messages[1]["content"])
                 self.assertTrue(messages[0]["content"])
-                self.assertEqual(fields, [{"name": "INCIDENT_DESCRIPTION", "description": definitions["INCIDENT_DESCRIPTION"], "value": rows[index]["INCIDENT_DESCRIPTION"]}])
+                self.assertEqual(len(fields), len(definitions))
+                self.assertEqual({field["name"] for field in fields}, set(definitions))
+                for field in fields:
+                    name = field["name"]
+                    self.assertEqual(field["description"], definitions[name])
+                    self.assertEqual(field["value"], rows[index][name])
                 self.assertEqual(call.kwargs["temperature"], 3.0)
             saved, error = read_records(output)
             self.assertEqual(error, "")
@@ -142,12 +160,18 @@ class PythonTests(unittest.TestCase):
 
     def test_failed_request_is_saved_and_excluded_from_counts(self):
         rows = [{"INCIDENT_ID": "001", "INCIDENT_DESCRIPTION": "Synthetic cause."}, {"INCIDENT_ID": "002", "INCIDENT_DESCRIPTION": "Synthetic failed request."}]
+        for row in rows:
+            row["ROOT_CAUSE_NOTES"] = "Synthetic recorded cause."
+        definitions = {
+            "INCIDENT_DESCRIPTION": "Example description.",
+            "ROOT_CAUSE_NOTES": "Example cause notes.",
+        }
         client = Mock()
         client.chat.completions.create.side_effect = [example_response("HSBC"), OpenAIError("Synthetic request failure")]
         with TemporaryDirectory(dir=ROOT) as folder:
             output = Path(folder) / "LLM_OUTPUT.csv"
             with patch.object(classification, "llm_connection", return_value=nullcontext((client, "example-model"))), patch.dict(os.environ, {"LLM_TEMPERATURE": ""}):
-                self.assertEqual(classification.classify_rows(rows, {"INCIDENT_DESCRIPTION": "Example description."}, output), 1)
+                self.assertEqual(classification.classify_rows(rows, definitions, output), 1)
             saved, _ = read_records(output)
             self.assertEqual([row["processing_status"] for row in saved], ["success", "failed"])
             self.assertEqual(saved[1]["error"], "OpenAIError")
@@ -160,6 +184,7 @@ class PythonTests(unittest.TestCase):
         self.assertEqual(set(labels), {"HSBC", "SUPPLIER", "UNCERTAIN"})
         for label in ("HSBC", "SUPPLIER", "UNCERTAIN"):
             result = json.loads(example_response(label).choices[0].message.content)
+            result["evidence_column"] = ["INCIDENT_DESCRIPTION"]
             for name in SUPPLIER_FIELDS:
                 result[name] = "Unneeded supplier text" if label != "SUPPLIER" else None
             if label == "SUPPLIER":

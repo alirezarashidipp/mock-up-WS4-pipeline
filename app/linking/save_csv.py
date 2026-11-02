@@ -6,6 +6,7 @@ def save_linked(path, incident, engagement, engagement_columns, link):
     for name in engagement_columns:
         extra[f"ENG_{name}"] = engagement.get(name, "")
     extra.update(link)
+    extra["link_confidence_scale"] = "0-4"
     extra["link_incident_columns"] = ", ".join(link["link_incident_columns"])
     extra["link_engagement_columns"] = ", ".join(link["link_engagement_columns"])
     if incident.keys() & extra.keys():

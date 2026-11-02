@@ -39,11 +39,31 @@ system: |
   - link_reason: two to four concise sentences explaining the fit, relevant differences
     from alternatives, and limitations. If undecided, explain what prevents selection.
     Give a decision summary, not an internal step-by-step thought process.
-  - link_confidence: integer 0-100, self-reported confidence that a unique engagement
-    link is justified, not measured accuracy. Use low confidence when no link is chosen.
+  - link_confidence: integer 0-4 measuring the recorded evidence for a unique
+    engagement link, using the rubric below. This is not a probability or measured
+    accuracy. Use 0-2 when linked_engagement_id is null and 1-4 when selecting a link.
   - link_incident_columns: names of incident input columns that informed the decision.
   - link_engagement_columns: original ENG_ALL column names that informed the decision.
     Both column lists contain names only, without quotes, values, rankings, duplicates,
     or invented names. For a selected link include at least one column from each input.
     For an undecided result, list fields that explain the ambiguity when available;
     an empty list is allowed. Do not pad either list.
+
+  Link evidence strength rubric:
+  - 0 (UNSUPPORTED): No recorded evidence supports a unique engagement link.
+    Return null for linked_engagement_id.
+  - 1 (WEAK): Only indirect references or general overlap support a possible link;
+    important service or context facts are missing.
+  - 2 (MODERATE): Relevant service or context details support a possible link,
+    but material gaps or ambiguity remain.
+  - 3 (STRONG): Concrete incident and engagement facts support the relationship
+    and distinguish the candidate from the supplied alternatives.
+  - 4 (VERY_STRONG): An explicit documented connection has consistent supporting
+    details and no unresolved material contradiction among the supplied candidates.
+  Score the evidence available for a unique link, not confidence in abstaining.
+  Scores 1 or 2 do not force a selection; return null whenever the selection rules
+  above are not met. A shared supplier name or country suffix alone is insufficient.
+  Repeated statements are not independent evidence. A score of 4 does not mean
+  100% accuracy or prove the correct engagement was included in the shortlist.
+  The classification attribution_evidence_strength is separate: supplier
+  accountability does not establish which engagement applies.

@@ -12,7 +12,7 @@
     <a class="brand" href="#" aria-label="All engagements">
       <img class="brand-logo" src="/assets/pictures/HSBC_logo_%282018%29%20%281%29.svg" alt="HSBC" width="138" height="37">
       <span class="brand-divider" aria-hidden="true"></span>
-      <span class="brand-caption">WS4 / ENGAGEMENTS</span>
+      <span id="brand-caption" class="brand-caption">WS4 / ENGAGEMENTS</span>
     </a>
     <span id="mode" class="mode">Loading…</span>
   </header>
@@ -24,17 +24,71 @@
     </section>
     <p id="demo-note" class="demo-note" hidden>Demo: synthetic engagements, incidents, and model results.</p>
     <div id="message" class="message" role="status" aria-live="polite" hidden></div>
+    <section id="review-progress" aria-labelledby="review-progress-title" aria-live="polite" hidden>
+      <h2 id="review-progress-title">Human review progress</h2>
+      <p class="field-note">All saved incidents · These totals stay the same when searching or opening an incident.</p>
+      <div class="review-grid">
+        <section aria-labelledby="review-classification-title">
+          <h3 id="review-classification-title">Classification review</h3>
+          <div class="review-badges">
+            <span class="review-badge review-confirmed">Confirmed <strong id="review_classification_confirmed-count">—</strong></span>
+            <span class="review-badge review-pending">Pending <strong id="review_classification_pending-count">—</strong></span>
+            <span class="review-badge review-rejected">Rejected <strong id="review_classification_rejected-count">—</strong></span>
+            <span class="review-badge review-not_applicable">Not applicable <strong id="review_classification_not_applicable-count">—</strong></span>
+          </div>
+        </section>
+        <section aria-labelledby="review-link-title">
+          <h3 id="review-link-title">Link review</h3>
+          <div class="review-badges">
+            <span class="review-badge review-confirmed">Confirmed <strong id="review_link_confirmed-count">—</strong></span>
+            <span class="review-badge review-pending">Pending <strong id="review_link_pending-count">—</strong></span>
+            <span class="review-badge review-rejected">Rejected <strong id="review_link_rejected-count">—</strong></span>
+            <span class="review-badge review-invalidated">Invalidated <strong id="review_link_invalidated-count">—</strong></span>
+            <span class="review-badge review-not_applicable">Not applicable <strong id="review_link_not_applicable-count">—</strong></span>
+          </div>
+        </section>
+      </div>
+    </section>
     <nav class="eng-tabs" aria-label="Dashboard views">
       <a id="engagements-tab" href="#" aria-current="page">Engagements</a>
+      <a id="incidents-tab" href="#view=incidents" hidden>Incident first</a>
       <a id="unlinked-tab" href="#view=unlinked">Unlinked incidents <span id="unlinked_incidents-count">—</span></a>
     </nav>
-    <section id="counts" class="stats" aria-label="Incident and engagement counts">
-      <div class="stat"><strong id="engagements-count">—</strong><span>Engagements</span></div>
-      <div class="stat"><strong id="companies-count">—</strong><span>Companies</span></div>
-      <div class="stat"><strong id="linked_incidents-count">—</strong><span>Linked incidents</span></div>
-      <div class="stat"><strong id="hsbc_incidents-count">—</strong><span>HSBC · No link required</span></div>
-      <div class="stat"><strong id="supplier_unlinked_incidents-count">—</strong><span>Supplier · Not linked</span></div>
-      <div id="other-count-panel" class="stat" hidden><strong id="other_unlinked_incidents-count">—</strong><span>Failed / skipped / other</span></div>
+    <section id="counts" class="eng-summary" aria-label="Incident and engagement counts">
+      <section aria-labelledby="classification-summary-title">
+        <h2 id="classification-summary-title">Incident classification</h2>
+        <p id="source-note" class="eng-summary-note">Counts cover saved rows in INC_LINKED.csv. A partial run may contain only part of the input.</p>
+        <div class="stats">
+          <div class="stat"><strong id="total_incidents-count">—</strong><span>Total incidents</span></div>
+          <div class="stat"><strong id="classified_incidents-count">—</strong><span>Classified</span></div>
+          <div class="stat"><strong id="classified_hsbc-count">—</strong><span>HSBC</span></div>
+          <div class="stat"><strong id="classified_supplier-count">—</strong><span>SUPPLIER</span></div>
+          <div class="stat"><strong id="classified_uncertain-count">—</strong><span>UNCERTAIN</span></div>
+          <div class="stat"><strong id="unclassified_incidents-count">—</strong><span>Unclassified / failed</span></div>
+        </div>
+      </section>
+      <section id="linking-overview" aria-labelledby="linking-summary-title">
+        <h2 id="linking-summary-title">Engagement linking</h2>
+        <p id="linking-note" class="eng-summary-note">Successful SUPPLIER incidents are eligible for matching. A confirmed link is not guaranteed. HSBC and UNCERTAIN do not enter matching.</p>
+        <div class="stats">
+          <div class="stat"><strong id="eligible_incidents-count">—</strong><span>Eligible · SUPPLIER</span></div>
+          <div class="stat"><strong id="linked_incidents-count">—</strong><span id="linked-count-label">Linked incidents</span></div>
+          <div class="stat"><strong id="supplier_unlinked_incidents-count">—</strong><span>Supplier · No confirmed match</span></div>
+          <div class="stat"><strong id="link_failed_incidents-count">—</strong><span>Link failures</span></div>
+          <div class="stat"><strong id="engagements-count">—</strong><span id="engagements-count-label">Engagements</span></div>
+          <div class="stat"><strong id="companies-count">—</strong><span id="companies-count-label">Companies</span></div>
+        </div>
+      </section>
+      <section id="supplier-funnel" aria-labelledby="supplier-funnel-title" hidden>
+        <h2 id="supplier-funnel-title">Supplier linking journey</h2>
+        <p class="eng-summary-note">All saved incidents · A model match remains a proposal until both human decisions are confirmed.</p>
+        <div class="stats">
+          <div class="stat"><strong id="funnel-supplier-count">—</strong><span>Successful SUPPLIER</span></div>
+          <div class="stat"><strong id="supplier_model_linked_incidents-count">—</strong><span>Model matched</span></div>
+          <div class="stat"><strong id="supplier_without_model_link_incidents-count">—</strong><span>No model match</span></div>
+          <div class="stat"><strong id="funnel-confirmed-count">—</strong><span>Human-confirmed links</span></div>
+        </div>
+      </section>
     </section>
     <div class="eng-filters">
       <div id="search-panel" class="eng-search">
@@ -50,9 +104,19 @@
           <option value="other">Failed / skipped / other</option>
         </select>
       </div>
+      <div id="classification-filter-panel" class="eng-search" hidden>
+        <label for="classification-filter">Classification</label>
+        <select id="classification-filter">
+          <option value="all">All classifications</option>
+          <option value="HSBC">HSBC</option>
+          <option value="SUPPLIER">SUPPLIER</option>
+          <option value="UNCERTAIN">UNCERTAIN</option>
+          <option value="failed">Failed / unclassified</option>
+        </select>
+      </div>
     </div>
     <section id="view" aria-labelledby="page-title"></section>
-    <footer><span>HSBC · Engagement explorer / WS4</span><span>Source: INC_LINKED.csv</span></footer>
+    <footer><span id="footer-title">HSBC · Engagement explorer / WS4</span><span id="source-file">Source: INC_LINKED.csv</span></footer>
   </main>
 </body>
 </html>

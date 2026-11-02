@@ -1,11 +1,51 @@
+import json
 import os
 from contextlib import contextmanager
 from pathlib import Path
 
+import tiktoken
 from azure.core.exceptions import AzureError
 from azure.identity import EnvironmentCredential, get_bearer_token_provider
 from dotenv import load_dotenv
 from openai import AzureOpenAI, OpenAI, OpenAIError
+
+
+def read_token_limit(name, default):
+    try:
+        value = int(os.getenv(name, str(default)))
+    except ValueError:
+        print(f"Check {name}: use a positive integer.")
+        raise ValueError(f"{name} must be a positive integer.") from None
+    if value < 1:
+        print(f"Check {name}: use a positive integer.")
+        raise ValueError(f"{name} must be a positive integer.")
+    return value
+
+
+def estimate_input_tokens(model, messages, response_format):
+    try:
+        encoding = tiktoken.encoding_for_model(model)
+    except KeyError:
+        # Azure deployment names may not identify their underlying tokenizer.
+        encoding = tiktoken.get_encoding("o200k_base")
+    request_input = {"messages": messages, "response_format": response_format}
+    text = json.dumps(request_input, ensure_ascii=False)
+    # Provider framing can differ; this is a local estimate, not billed usage.
+    return len(encoding.encode(text, disallowed_special=()))
+
+
+def request_options(model, messages, response_format):
+    max_input = read_token_limit("LLM_MAX_INPUT_TOKENS", 32000)
+    max_output = read_token_limit("LLM_MAX_OUTPUT_TOKENS", 2000)
+    input_tokens = estimate_input_tokens(model, messages, response_format)
+    if input_tokens > max_input:
+        print(f"Request not sent: estimated input {input_tokens} tokens exceeds LLM_MAX_INPUT_TOKENS={max_input}.")
+        raise ValueError(f"Estimated input of {input_tokens} tokens exceeds LLM_MAX_INPUT_TOKENS={max_input}.")
+    options = {"max_completion_tokens": max_output}
+    temperature = os.getenv("LLM_TEMPERATURE", "").strip()
+    if temperature:
+        options["temperature"] = float(temperature)
+    return options
 
 
 @contextmanager

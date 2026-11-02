@@ -1,0 +1,450 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "WS4 · Classification, Linking & Human Review",
+    "locale": "en",
+    "output": ".archify/dataflow-ws4-pipeline-20261102-000851/ws4-pipeline.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/alirezarashidipp/mock-up-WS4-pipeline.git",
+      "revision": "1755de6df3fcdf6d658b27b2238ac081d6dbbb3b",
+      "link_mode": "local-only"
+    }
+  },
+  "stages": [
+    {
+      "label": "Sources"
+    },
+    {
+      "label": "Classification"
+    },
+    {
+      "label": "Linking"
+    },
+    {
+      "label": "Persist & review"
+    },
+    {
+      "label": "Dashboards"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "clean-csv",
+      "type": "database",
+      "label": "CLEAN.csv",
+      "sublabel": "Prepared incidents",
+      "stage": 0,
+      "row": 1,
+      "sources": [
+        {
+          "path": "docs/short_desription.md",
+          "line": 5,
+          "end_line": 9
+        }
+      ]
+    },
+    {
+      "id": "classify",
+      "type": "backend",
+      "label": "Classify + validate",
+      "sublabel": "LLM #1 · 11 fields",
+      "tag": "HSBC / SUPPLIER / UNCERTAIN",
+      "stage": 1,
+      "row": 1,
+      "sources": [
+        {
+          "path": "docs/short_desription.md",
+          "line": 30,
+          "end_line": 58
+        },
+        {
+          "path": "docs/short_desription.md",
+          "line": 14,
+          "end_line": 16
+        }
+      ]
+    },
+    {
+      "id": "classified-csv",
+      "type": "database",
+      "label": "LLM_OUTPUT.csv",
+      "sublabel": "Source + classification",
+      "stage": 1,
+      "row": 2,
+      "sources": [
+        {
+          "path": "docs/short_desription.md",
+          "line": 54,
+          "end_line": 69
+        }
+      ]
+    },
+    {
+      "id": "catalog",
+      "type": "database",
+      "label": "ENG_ALL.csv",
+      "sublabel": "Engagement catalog",
+      "tag": "Read-only source",
+      "stage": 0,
+      "row": 4,
+      "sources": [
+        {
+          "path": "docs/short_desription.md",
+          "line": 75,
+          "end_line": 88
+        },
+        {
+          "path": "docs/short_desription.md",
+          "line": 24,
+          "end_line": 28
+        }
+      ]
+    },
+    {
+      "id": "shortlist",
+      "type": "backend",
+      "label": "Prepare shortlist",
+      "sublabel": "First matching rows",
+      "tag": "Up to 70 · CSV order",
+      "stage": 1,
+      "row": 4,
+      "sources": [
+        {
+          "path": "docs/short_desription.md",
+          "line": 64,
+          "end_line": 78
+        }
+      ]
+    },
+    {
+      "id": "select",
+      "type": "backend",
+      "label": "Select + validate",
+      "sublabel": "LLM #2 · 5 fields",
+      "tag": "Candidate ID or null",
+      "stage": 2,
+      "row": 4,
+      "sources": [
+        {
+          "path": "docs/short_desription.md",
+          "line": 88,
+          "end_line": 109
+        }
+      ]
+    },
+    {
+      "id": "save-linked",
+      "type": "backend",
+      "label": "Save link result",
+      "sublabel": "Preserve source data",
+      "tag": "Includes bypassed rows",
+      "stage": 2,
+      "row": 2,
+      "sources": [
+        {
+          "path": "docs/short_desription.md",
+          "line": 102,
+          "end_line": 111
+        }
+      ]
+    },
+    {
+      "id": "linked-csv",
+      "type": "database",
+      "label": "INC_LINKED.csv",
+      "sublabel": "Source + model + ENG_",
+      "stage": 3,
+      "row": 2,
+      "sources": [
+        {
+          "path": "docs/short_desription.md",
+          "line": 102,
+          "end_line": 111
+        }
+      ]
+    },
+    {
+      "id": "prepare-review",
+      "type": "backend",
+      "label": "Prepare review",
+      "sublabel": "Preserve earlier decisions",
+      "tag": "5 local review fields",
+      "stage": 3,
+      "row": 3,
+      "sources": [
+        {
+          "path": "docs/short_desription.md",
+          "line": 124,
+          "end_line": 134
+        }
+      ]
+    },
+    {
+      "id": "review-csv",
+      "type": "database",
+      "label": "HUMAN_REVIEW.csv",
+      "sublabel": "Model proposals + reviews",
+      "stage": 3,
+      "row": 4,
+      "sources": [
+        {
+          "path": "docs/short_desription.md",
+          "line": 124,
+          "end_line": 143
+        }
+      ]
+    },
+    {
+      "id": "class-dashboard",
+      "type": "frontend",
+      "label": "Classification",
+      "sublabel": "8766 · read-only",
+      "tag": "3 classes + failures",
+      "stage": 4,
+      "row": 0,
+      "sources": [
+        {
+          "path": "docs/short_desription.md",
+          "line": 20,
+          "end_line": 26
+        }
+      ]
+    },
+    {
+      "id": "eng-dashboard",
+      "type": "frontend",
+      "label": "Engagements",
+      "sublabel": "8767 · read-only",
+      "tag": "Engagement > incident",
+      "stage": 4,
+      "row": 2,
+      "sources": [
+        {
+          "path": "docs/short_desription.md",
+          "line": 20,
+          "end_line": 26
+        },
+        {
+          "path": "docs/short_desription.md",
+          "line": 113,
+          "end_line": 118
+        }
+      ]
+    },
+    {
+      "id": "review-dashboard",
+      "type": "frontend",
+      "label": "Human review",
+      "sublabel": "8768 · shared review UI",
+      "tag": "Incident / engagement first",
+      "stage": 4,
+      "row": 4,
+      "sources": [
+        {
+          "path": "docs/short_desription.md",
+          "line": 24,
+          "end_line": 28
+        },
+        {
+          "path": "docs/short_desription.md",
+          "line": 134,
+          "end_line": 149
+        }
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "id": "prepared-fields",
+      "from": "clean-csv",
+      "to": "classify",
+      "label": "Prepared rows",
+      "variant": "emphasis"
+    },
+    {
+      "id": "save-classification",
+      "from": "classify",
+      "to": "classified-csv",
+      "label": "Save each row",
+      "variant": "emphasis"
+    },
+    {
+      "id": "class-display",
+      "from": "classified-csv",
+      "to": "class-dashboard",
+      "label": "Saved results"
+    },
+    {
+      "id": "all-source-rows",
+      "from": "classified-csv",
+      "to": "save-linked",
+      "label": "All source rows",
+      "variant": "emphasis"
+    },
+    {
+      "id": "supplier-eligibility",
+      "from": "classified-csv",
+      "to": "shortlist",
+      "label": "SUPPLIER success",
+      "variant": "emphasis"
+    },
+    {
+      "id": "catalog-search",
+      "from": "catalog",
+      "to": "shortlist",
+      "label": "Catalog rows"
+    },
+    {
+      "id": "nonempty-shortlist",
+      "from": "shortlist",
+      "to": "select",
+      "label": "Nonempty list",
+      "variant": "emphasis",
+      "classification": "Incident + rows"
+    },
+    {
+      "id": "no-candidates",
+      "from": "shortlist",
+      "to": "save-linked",
+      "label": "Empty: undecided",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "selected-decision",
+      "from": "select",
+      "to": "save-linked",
+      "label": "Decision + ENG_",
+      "variant": "emphasis"
+    },
+    {
+      "id": "save-linked-row",
+      "from": "save-linked",
+      "to": "linked-csv",
+      "label": "Save each row",
+      "variant": "emphasis"
+    },
+    {
+      "id": "eng-display",
+      "from": "linked-csv",
+      "to": "eng-dashboard",
+      "label": "Saved results"
+    },
+    {
+      "id": "review-input",
+      "from": "linked-csv",
+      "to": "prepare-review",
+      "label": "Source snapshot",
+      "variant": "emphasis"
+    },
+    {
+      "id": "prepare-review-store",
+      "from": "prepare-review",
+      "to": "review-csv",
+      "label": "Merge new IDs",
+      "variant": "emphasis"
+    },
+    {
+      "id": "existing-review-input",
+      "from": "review-csv",
+      "to": "prepare-review",
+      "label": "Existing reviews",
+      "route": "vertical-channel",
+      "fromSide": "left",
+      "toSide": "left",
+      "channelX": 640
+    },
+    {
+      "id": "read-reviews",
+      "from": "review-csv",
+      "to": "review-dashboard",
+      "label": "Read reviews",
+      "variant": "emphasis"
+    },
+    {
+      "id": "save-human-decision",
+      "from": "review-dashboard",
+      "to": "review-csv",
+      "label": "Validated review",
+      "route": "bottom-channel",
+      "fromSide": "bottom",
+      "toSide": "bottom"
+    },
+    {
+      "id": "catalog-inventory",
+      "from": "catalog",
+      "to": "review-dashboard",
+      "label": "Full catalog",
+      "fromSide": "bottom",
+      "toSide": "right",
+      "via": [[100, 706], [1038, 706], [1038, 613]]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Classification contract",
+      "items": [
+        "LLM #1 returns 11 fields. HSBC and UNCERTAIN have six null Supplier fields; SUPPLIER uses documented facts, Unknown for missing core facts.",
+        "UNCERTAIN is successful abstention. Attribution evidence strength is 0–4, not probability: UNCERTAIN 0–2; HSBC / SUPPLIER 1–4.",
+        "Python validates exact evidence names and score consistency. INCIDENT_ID stays local. Save source columns and one comma-separated evidence_column."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "The second LLM call is conditional",
+      "items": [
+        "Only successful SUPPLIER rows enter name matching. Normalize names for matching only; inspect THIRD_PARTY_NAME before THIRD_PARTY_NORMALISED_NAME.",
+        "Keep the first 70 matches by default, in ENG_ALL order. This is a candidate cap, not relevance ranking. Send complete shortlisted rows with incident context.",
+        "A nonempty shortlist permits LLM #2. Select one supplied ID or null; Python validates the decision and copies real engagement fields. No invented engagement."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Every processed row is retained",
+      "items": [
+        "HSBC bypasses search and call #2: NOT_APPLICABLE. UNCERTAIN and failed classification: SKIPPED. These rows still reach INC_LINKED.csv.",
+        "No candidates or an undecided model selection: UNDECIDED. Valid selection: MATCHED. Request or validation error: FAILED; save where possible, then stop.",
+        "Link evidence strength is separately 0–4: selected ID 1–4; null 0–2. No call means no score. Earlier saved rows and source CSVs remain intact."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Two views, one human decision store",
+      "items": [
+        "Incident first shows all saved incidents, classification counts and Supplier linking totals. Engagement first opens engagements, then their incidents.",
+        "Engagement first includes zero-incident ENG_ALL entries and saved proposal IDs missing from the catalog. If catalog loading fails, show saved proposals with a scope warning.",
+        "Both views share details, Yes/No controls and HUMAN_REVIEW.csv. Global Confirmed / Pending / Rejected / Invalidated counts remain separate from original model counts."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Review rules preserve model proposals",
+      "items": [
+        "Classification No requires a reason and invalidates an existing proposal. Confirming it again resets the invalidated link to Pending.",
+        "Link review requires confirmed SUPPLIER classification and an existing matched proposal. Link No requires a reason and leaves classification confirmed.",
+        "Only both confirmations fill hitl_linked_engagement_id. HSBC / UNCERTAIN have no link review. Original model labels, scores and ENG_ fields are preserved; no FINAL.csv."
+      ]
+    },
+    {
+      "dot": "orange",
+      "title": "Shared request budgets",
+      "items": [
+        ".env defaults: LLM_MAX_INPUT_TOKENS=32000 and LLM_MAX_OUTPUT_TOKENS=2000. Both are positive integers and apply to both calls.",
+        "Input is estimated locally over prompt, fields, candidate rows and response schema. Over budget: no request and no truncation. It is not exact provider usage.",
+        "Output uses max_completion_tokens, including reasoning where applicable. Incomplete JSON is rejected. The 70-candidate cap is independent of token limits."
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Source and scope",
+      "items": [
+        "Based on the current local docs/short_desription.md, frozen alongside this diagram. Source references point to that isolated documentation snapshot, not a published application commit.",
+        "The flow starts at CLEAN.csv. Upstream read / rename / clean is outside this view. Classification, linking and review are separate manually run stages.",
+        "This is a documented logical flow, not a live execution or measured result. Dashboards 8766 and 8767 are read-only; review makes no LLM call. No sample counts are presented as actual results."
+      ]
+    }
+  ]
+}

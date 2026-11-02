@@ -27,7 +27,9 @@ def names_match(supplier, candidate):
     return False
 
 
-def find_candidates(supplier_name, engagements):
+def find_candidates(supplier_name, engagements, max_candidates=70):
+    if max_candidates < 1:
+        raise ValueError("max_candidates must be a positive integer.")
     supplier = normalize_name(supplier_name)
     if supplier in ("", "unknown", "n a", "none", "null", "not known", "not available"):
         return []
@@ -38,5 +40,7 @@ def find_candidates(supplier_name, engagements):
             name = normalize_name(engagement.get(column, ""))
             if names_match(supplier, name):
                 candidates.append(engagement)
+                if len(candidates) >= max_candidates:
+                    return candidates
                 break
     return candidates

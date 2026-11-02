@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "dataflow",
+  "quality": "showcase",
+  "specification": {
+    "path": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\candidate.json",
+    "sha256": "536013e2d5e424bbdd8222bdfc6db15e2453fe6adac133838b09cedf641c51ff",
+    "bytes": 12818
+  },
+  "artifact": {
+    "path": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\ws4-pipeline.html",
+    "sha256": "c3c09afe41184f36d3d6a67f41b13f367ef6e4684ffadc6dd8d2cd90a03db581",
+    "bytes": 857390
+  },
+  "gates": {
+    "validate": "fail",
+    "deliver": "not-run",
+    "check": "not-run",
+    "browser-check": "not-run"
+  },
+  "failedStage": "validate",
+  "diagnostics": [
+    {
+      "code": "clean-flow/endpoint-side-direction",
+      "severity": "error",
+      "message": "[clean-flow/endpoint-side-direction] dataflow flows[16] id \"catalog-inventory\" \"catalog\" -> \"review-dashboard\" final segment 2 [1021, 706] -> [1021, 613] does not honor toSide \"right\" — it must run horizontal leftward from the right; keep automatic routing, or choose fromSide/toSide and via points whose first and final segments cross node borders perpendicularly.",
+      "subject": {
+        "diagramType": "dataflow",
+        "collection": "flows",
+        "index": 16,
+        "id": "catalog-inventory",
+        "from": "catalog",
+        "to": "review-dashboard"
+      },
+      "evidence": {
+        "endpoint": "target",
+        "authoredField": "toSide",
+        "sideOrigin": "authored",
+        "side": "right",
+        "segmentIndex": 2,
+        "from": [
+          1021,
+          706
+        ],
+        "to": [
+          1021,
+          613
+        ],
+        "expectedAxis": "horizontal",
+        "expectedDirection": "leftward from the right"
+      },
+      "supportedFixes": [
+        "keep automatic routing, or choose fromSide/toSide and via points whose first and final segments cross node borders perpendicularly"
+      ]
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\review-3\\ws4-pipeline.finalize.json",
+    "summaryReceipt": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\review-3\\ws4-pipeline.finalize-summary.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-02T00:10:34.299Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 886,
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  },
+  "nextAction": {
+    "action": "edit-in-place",
+    "candidate": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\candidate.json",
+    "constraint": "Preserve unaffected semantics and geometry; apply each diagnostic's supportedFixes, or the fix its message names, and do not replace the whole candidate.",
+    "then": "finalize-once"
+  }
+}

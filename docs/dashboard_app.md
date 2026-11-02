@@ -18,7 +18,7 @@ data/run/LLM_OUTPUT.csv -> read successful model results -> count tags -> displa
 ## Boundaries
 
 - LLM_OUTPUT.csv is the only data input. The app imports no LLM or review modules, makes no model calls, and writes no files.
-- No human approval, correction, final-decision queue, or FINAL.csv input remains. Tags are model assessments, not human-approved outcomes.
+- This dashboard has no human approval, correction, final-decision queue, or FINAL.csv input. Tags are model assessments, not human-approved outcomes. [Human review](human_review.md) runs separately on port 8768.
 - A missing or empty input produces an empty dashboard. Older HSBC/SUPPLIER rows can lack supplier details; display unrecorded details as Unknown without changing the CSV or inventing facts. Invalid processing statuses or classification labels outside HSBC, SUPPLIER, and UNCERTAIN return an error. REVIEW_STATUS is not used.
 - Older results without `attribution_evidence_strength` show Not recorded. Never convert legacy `llm_confidence` percentages into evidence-strength scores. Unexpected nonblank scores display Invalid score. The [classification document](llm.md) defines the new response schema and rubric.
 - Refresh rereads the file. There is no automatic polling or notification from the LLM pipeline.

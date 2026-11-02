@@ -17,11 +17,28 @@ CLEAN.csv -> one row per request -> validate response -> save LLM_OUTPUT.csv -> 
    - `attribution_evidence_strength`: integer 0-4 describing recorded support for attributing responsibility, using the rubric below. For UNCERTAIN, use 0-2 for the available attribution evidence, not certainty about being uncertain. This replaces `llm_confidence` in new results.
    - `supplier_name`, `supplier_product_or_service`, `supplier_action_or_failure`, `supplier_causal_explanation`, `supplier_accountability_reason`: null for HSBC and UNCERTAIN; documented details or Unknown for SUPPLIER.
    - `supplier_more_info`: additional documented supplier facts not covered by the five core fields; null for HSBC/UNCERTAIN or when no extra information exists. Save as one plain-text CSV column.
-   - `evidence_column`: one to ten standardized source column names as strings, for example `["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"]`. No evidence quotations or source values are returned. For UNCERTAIN, names can identify fields showing ambiguity or missing causal information. At least one name is required; ten is a maximum, not a target.
-5. `parse_response` checks completion/refusal, validates the Pydantic response, and rejects an UNCERTAIN score above 2. Empty evidence lists, more than ten names, or scores that are not integers from 0 to 4 are invalid. `normalize_supplier_fields` sets supplier fields to null for HSBC/UNCERTAIN; blank core Supplier facts become Unknown, while empty supplier_more_info stays null. Store returned evidence names as text. Absence of supplier evidence alone does not establish HSBC responsibility.
+   - `evidence_column`: one to ten distinct, nonblank standardized source column names from this row's model input, for example `["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"]`. No evidence quotations or source values are returned. For UNCERTAIN, names can identify fields showing ambiguity or missing causal information. At least one name is required; ten is a maximum, not a target.
+5. `parse_response(response, fields)` checks completion/refusal and validates the Pydantic response. It rejects HSBC/SUPPLIER with score 0 and UNCERTAIN with score 3 or 4. It also checks that each evidence name is nonblank, appears exactly in the supplied input field names, and is not repeated. Names are not trimmed, corrected, or deduplicated; valid names keep their returned order. A source value may be empty when it identifies missing information. INCIDENT_ID cannot be evidence because it is not sent to the model. Empty evidence lists, more than ten names, or scores that are not integers from 0 to 4 remain invalid. `normalize_supplier_fields` sets supplier fields to null for HSBC/UNCERTAIN; blank core Supplier facts become Unknown, while empty supplier_more_info stays null. Absence of supplier evidence alone does not establish HSBC responsibility.
 6. Call `app/llm/save_csv.py:save_result` before requesting the next row. Save source values, scalar response fields, `processing_status`, and `error` to LLM_OUTPUT.csv. There is no human review status or approval step.
 
-UNCERTAIN is a valid classification with `processing_status=success`; it does not stop the batch. A provider failure or invalid response has `processing_status=failed`. A missing supplier name alone does not require UNCERTAIN when Supplier accountability is otherwise supported. A documented technical cause may remain available even when the accountable party is uncertain.
+UNCERTAIN is a valid classification with `processing_status=success`; it does not stop the batch. A provider failure or invalid response has `processing_status=failed`. Failed evidence-name or score/classification checks use this same failure path: save the failed row where possible, stop the batch, and preserve earlier results. Python does not repair the names or change the classification. A missing supplier name alone does not require UNCERTAIN when Supplier accountability is otherwise supported. A documented technical cause may remain available even when the accountable party is uncertain.
+
+## Token limits
+
+Both classification and linking read these settings from the project `.env`:
+
+```dotenv
+LLM_MAX_INPUT_TOKENS=32000
+LLM_MAX_OUTPUT_TOKENS=2000
+```
+
+Both values must be positive integers. Omitted settings use the defaults above; blank, zero, negative, or noninteger values are rejected.
+
+Before each completion request, the shared connection module estimates input tokens with `tiktoken` over the serialized messages and response-format schema. This includes the system prompt, field names, definitions, values, and, for linking, every shortlisted candidate row. It uses the model's encoding when recognized and falls back to `o200k_base` for unknown model or Azure deployment names. Provider framing and schema processing can differ, so this is a local estimate, not an exact billed count or a guarantee that the model's context window will accept the request. Tokenizer data may be downloaded and cached on first use; counting itself sends no incident data and makes no LLM call.
+
+An estimate above `LLM_MAX_INPUT_TOKENS` raises `ValueError` before the completion call. No prompt, source value, definition, or candidate row is truncated. Invalid limits and over-budget requests follow the existing failed-row/save-and-stop path, preserving earlier results. The input budget is separate from the linking candidate-count cap.
+
+`LLM_MAX_OUTPUT_TOKENS` is forwarded as Chat Completions `max_completion_tokens`. It caps generated completion tokens, including reasoning tokens where applicable; it does not promise that many visible JSON tokens. Existing finish-reason checks still reject incomplete output. Both limits must also suit the selected model's provider limits.
 
 ## Input and output order
 
@@ -66,7 +83,7 @@ The rationale remains a short evidence-based explanation, not a detailed interna
 
 This is a model assessment of the supplied evidence, not a probability or measured accuracy. Zero does not mean the tag is false, and four does not guarantee it is true. Repeated statements are not independent evidence. A missing supplier name does not automatically weaken an otherwise supported Supplier attribution. Supplier-name certainty and engagement-link confidence are separate questions.
 
-For UNCERTAIN, a score of 0-2 describes how much causal support is available for assigning responsibility to one party. It does not measure confidence in abstaining. Python rejects UNCERTAIN responses with scores of 3 or 4; it does not automatically convert a valid party classification into UNCERTAIN based on its score.
+For UNCERTAIN, a score of 0-2 describes how much causal support is available for assigning responsibility to one party. It does not measure confidence in abstaining. Valid scores are 0-2 for UNCERTAIN and 1-4 for HSBC/SUPPLIER. Python rejects UNCERTAIN with scores of 3 or 4 and HSBC/SUPPLIER with score 0; it does not automatically change the classification or score. Scores of 1 or 2 do not force a party classification to UNCERTAIN.
 
 The model returns only the integer; dashboards derive its label. The provider schema restricts the score to the five integers, and Pydantic also rejects invalid values locally. No logprobs or extra model calls are added.
 
@@ -80,3 +97,15 @@ The model returns only the integer; dashboards derive its label. The provider sc
 - Older outputs with `llm_confidence`, `supporting_evidence`, numbered evidence columns, human-review fields, UNDECIDED tags, or the previous model schema are not silently migrated. A 0-100 confidence value cannot be converted into this evidence rubric. Use a separate output folder for the new schema; update dashboard and linking input/output paths accordingly. The writer rejects appending the new schema to an older output. Dashboards show Not recorded when the evidence score is absent and read legacy evidence columns without rewriting them. Existing CSVs, including earlier FINAL.csv files, remain untouched.
 
 Implementation: `app/llm/pipeline.py` -> `app/llm/classification.py` -> `app/llm/save_csv.py`.
+
+## Explicit live connection check
+
+Run from the project root:
+
+```powershell
+.\.venv\Scripts\python.exe -B -m unittest discover -s tests -p check_llm_connection.py -v
+```
+
+`tests/check_llm_connection.py` prepares one visibly synthetic incident with the existing field definitions and classification YAML prompt. It reuses `llm_connection` and `classify_row`, so the selected OpenAI/Azure provider, configured temperature, estimated input budget, output cap, `store=False`, strict JSON schema, and existing response validation all apply. Success requires a valid structured classification, not a particular label or exact evidence score. Empty, refused, incomplete, malformed, or semantically inconsistent responses fail.
+
+The check makes one logical completion request when its configuration and input budget are valid; the shared SDK retry setting still applies. It reads no incident CSV and writes no CSV output. Console output contains a fixed success message or a sanitized exception type, not raw provider messages or generated text. Ordinary `test_*.py` discovery skips this live check. Passing it verifies that request's connectivity and classification contract; it does not establish classification accuracy or validate the linking schema.

@@ -1,9 +1,7 @@
-import os
-
 from openai import OpenAIError
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from app.llm.llm_connection import llm_connection
+from app.llm.llm_connection import llm_connection, request_options
 from app.linking.candidates import find_candidates
 from app.linking.save_csv import save_linked
 
@@ -18,7 +16,13 @@ class EngagementLink(BaseModel):
 
     linked_engagement_id: str | None
     link_reason: str = Field(min_length=1)
-    link_confidence: int = Field(ge=0, le=100)
+    link_confidence: int = Field(
+        ge=0,
+        le=4,
+        strict=True,
+        json_schema_extra={"enum": [0, 1, 2, 3, 4]},
+        description="Recorded support for a unique engagement link: 0 unsupported, 1 weak, 2 moderate, 3 strong, 4 very strong. Use 0-2 when no engagement is selected; selected links require 1-4. Not a probability.",
+    )
     link_incident_columns: list[str]
     link_engagement_columns: list[str]
 
@@ -31,21 +35,19 @@ def select_engagement(client, model, incident, candidates, prompt):
     for field in schema["properties"].values():
         for keyword in ("minLength", "minimum", "maximum"):
             field.pop(keyword, None)
-    options = {}
-    temperature = os.getenv("LLM_TEMPERATURE", "").strip()
-    if temperature:
-        options["temperature"] = float(temperature)
+    messages = [
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": payload.model_dump_json()},
+    ]
+    response_format = {
+        "type": "json_schema",
+        "json_schema": {"name": "EngagementLink", "strict": True, "schema": schema},
+    }
+    options = request_options(model, messages, response_format)
     response = client.chat.completions.create(
         model=model,
-        messages=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": payload.model_dump_json()},
-        ],
-        response_format={
-            "type": "json_schema",
-            "json_schema": {"name": "EngagementLink", "strict": True, "schema": schema},
-        },
-        max_completion_tokens=2000,
+        messages=messages,
+        response_format=response_format,
         store=False,
         **options,
     )
@@ -56,6 +58,10 @@ def select_engagement(client, model, incident, candidates, prompt):
         return None
     result = EngagementLink.model_validate_json(choice.message.content)
     if not result.link_reason.strip():
+        return None
+    if result.linked_engagement_id is None and result.link_confidence > 2:
+        return None
+    if result.linked_engagement_id is not None and result.link_confidence == 0:
         return None
     if not set(result.link_incident_columns) <= fields.keys():
         return None
@@ -70,7 +76,7 @@ def select_engagement(client, model, incident, candidates, prompt):
     return result
 
 
-def link_incident(incident, engagements, prompt):
+def link_incident(incident, engagements, prompt, max_candidates=70):
     link = {
         "linked_engagement_id": "", "link_status": "UNDECIDED", "link_reason": "",
         "link_confidence": "", "link_incident_columns": [], "link_engagement_columns": [],
@@ -89,7 +95,7 @@ def link_incident(incident, engagements, prompt):
     if classification != "SUPPLIER":
         link.update(link_status="FAILED", link_reason="Expected HSBC, SUPPLIER, or UNCERTAIN classification.", link_error="InvalidClassification")
         return link, {}
-    candidates = find_candidates(incident.get("supplier_name", ""), engagements)
+    candidates = find_candidates(incident.get("supplier_name", ""), engagements, max_candidates)
     if not candidates:
         link["link_reason"] = "Supplier name is missing or no similar supplier name was found in ENG_ALL.csv."
         return link, {}
@@ -110,7 +116,7 @@ def link_incident(incident, engagements, prompt):
     return link, selected
 
 
-def link_incidents(incidents, engagements, prompt, output_file):
+def link_incidents(incidents, engagements, prompt, output_file, max_candidates=70):
     if not incidents or not engagements:
         print("LLM_OUTPUT.csv and ENG_ALL.csv must contain rows.")
         return 1
@@ -119,7 +125,7 @@ def link_incidents(incidents, engagements, prompt, output_file):
         print("ENG_ALL.csv needs ENGAGEMENT_ID and THIRD_PARTY_NAME or THIRD_PARTY_NORMALISED_NAME.")
         return 1
     for incident in incidents:
-        link, engagement = link_incident(incident, engagements, prompt)
+        link, engagement = link_incident(incident, engagements, prompt, max_candidates)
         if not save_linked(output_file, incident, engagement, columns, link):
             return 1
         print(f"Saved incident {incident['INCIDENT_ID']}: {link['link_status']}")

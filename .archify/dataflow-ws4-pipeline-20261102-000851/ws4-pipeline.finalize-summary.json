@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "dataflow",
+  "quality": "showcase",
+  "specification": {
+    "path": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\candidate.json",
+    "sha256": "7646ec20cb4e000099acec090d28188641c7b9991770f3d5e7156dea6ccbd758",
+    "bytes": 12553
+  },
+  "artifact": {
+    "path": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\ws4-pipeline.html",
+    "sha256": "1d43b9c73949a26caeba391faeb50dac8eae6bf2e08f8c99b6e8056eb5e1820b",
+    "bytes": 856662
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\ws4-pipeline.finalize.json",
+    "summaryReceipt": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\ws4-pipeline.finalize-summary.json",
+    "browserCheckReceipt": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\ws4-pipeline.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-02T00:10:34.299Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 4753,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}
