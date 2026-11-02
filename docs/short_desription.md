@@ -68,8 +68,10 @@ See [LLM classification and supplier extraction](llm.md) for the full rules and 
 The first dashboard keeps the model result and saves the human decision separately in CLASSIFICATION_REVIEW.csv:
 
 1. Approve a model HSBC/SUPPLIER classification, or choose No and supply a reason plus the corrected class. A reviewer can also resolve UNCERTAIN or a processing failure with a manual HSBC/SUPPLIER decision and reason.
-2. If the reviewed class is Supplier, separately approve the model supplier name, or choose No, explain why, and select the correct name from SUPPLIER_NAME.csv. Missing/Unknown names also require a catalog choice. Changing classification resets the supplier decision.
+2. If the reviewed class is Supplier, separately approve the model supplier name, or choose No, explain why, and select the correct name from SUPPLIER_NAME.csv. Missing/Unknown names also require a catalog choice. Saving a classification decision again resets the supplier decision, even when the selected class stays the same.
 3. If the facts or correct supplier are unavailable, leave the decision Needs review. Status becomes green only after a successful save. Original model labels, supplier details, and scores are preserved.
+
+No opens a form; only a successful save changes the decision. A saved correction is `corrected`; an unresolved choice is `needs_review`, shown as Needs more information. Untouched incidents appear pending but are not written to CLASSIFICATION_REVIEW.csv until a decision is saved.
 
 The six added fields are `classification_review_status`, `reviewed_classification`, `classification_review_reason`, `supplier_review_status`, `reviewed_supplier_name`, and `supplier_review_reason`. Approved and corrected are completed human decisions; pending and Needs review are not. Supplier status is not applicable for HSBC. Source changes invalidate earlier approval until reviewed again.
 
@@ -83,9 +85,18 @@ Saving review does not call an LLM. The next `python -m app.linking.pipeline` ru
 - Approved/corrected HSBC is saved as NOT_APPLICABLE, with no candidate search or linking call.
 - Pending, Needs review, incomplete supplier decisions, and stale reviews stay out of INC_LINKED.csv until resolved. Original UNCERTAIN or failed results can enter only after an explicit human decision.
 
-The output preserves original incident/model values and the six review fields. Identical already-saved reviewed rows are skipped on rerun. Changing a saved incident's source or human decision requires a fresh output batch.
+The output preserves original incident/model values and the six review fields. Identical already-saved reviewed rows are skipped on rerun, except FAILED linking results, which require a fresh output to retry. Changing a saved incident's source or human decision requires a fresh output batch.
 
 **Synthetic correction example:** the model says Supplier/Google. The reviewer approves Supplier but rejects Google, records a reason, and selects Microsoft from the catalog. Candidate search uses Microsoft; the original Google proposal stays available for comparison.
+
+| Saved field | Synthetic value |
+| --- | --- |
+| `classification` / `supplier_name` | SUPPLIER / Google (original model values) |
+| `classification_review_status` / `reviewed_classification` | approved / SUPPLIER |
+| `supplier_review_status` / `reviewed_supplier_name` | corrected / Microsoft |
+| `supplier_review_reason` | The incident identifies the Microsoft service, not Google. |
+
+The supplier-name rejection does not undo the classification approval. Both decisions are complete, so the next linking run uses Microsoft.
 
 ## Engagement linking example
 

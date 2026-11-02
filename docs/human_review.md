@@ -20,6 +20,8 @@ Engagement first reads the full `data/mockup/ENG_ALL.csv` catalog, including eng
 
 Incident first lists every saved HUMAN_REVIEW.csv row: matched or unmatched Supplier incidents, HSBC, UNCERTAIN, failed classifications, and rejected reviews. Search the list and filter by All, HSBC, SUPPLIER, UNCERTAIN, or failed/unclassified results. Both modes use the same saved decisions and the same Yes/No panels. An incident-first save stays in that mode. Breadcrumbs return to the selected list, and saved detail URLs or Refresh preserve the view.
 
+The Incident first filters use the original model classification and processing status. An original failed row corrected to Supplier can still appear under failed/unclassified while its accepted human class and link review are available in the details.
+
 The separate Unlinked incidents tab remains available. Rejected and invalidated links appear there as well as under their original engagement proposal; this is two views of the same saved incident, not duplicate CSV rows.
 
 ## Run
@@ -34,6 +36,8 @@ From the project root, prepare the review file before starting the review server
 Open `http://127.0.0.1:8768/`. Use Engagement first, Incident first, or Unlinked incidents to reach an incident. Review controls appear in its details. Saved confirmations are green; rejection requires a reason. Refresh reloads the saved data.
 
 Preparation reads `data/run/INC_LINKED.csv` and writes `data/run/HUMAN_REVIEW.csv`. It preserves every source field and identifier. On rerun, it keeps prior decisions and adds new incident IDs. It does not remove previously saved incidents. A changed source row or schema is rejected instead of attaching an old approval to changed evidence; use a separate review output for a changed batch. Empty input leaves existing files unchanged. Run preparation while the review server is stopped.
+
+The six earlier classification-review fields are a snapshot copied from INC_LINKED.csv. This dashboard does not reread CLASSIFICATION_REVIEW.csv. Later changes in the first dashboard do not automatically update this file; changed reviewed inputs require fresh linking results and a new post-link review output.
 
 ## CSV fields
 

@@ -12,7 +12,7 @@ Before explaining or changing a stage, read its document and inspect the current
 - Data preparation, renaming, or cleaning: [docs/data_preparation.md](docs/data_preparation.md).
 - LLM requests, supplier extraction, response schema, or CSV saving: [docs/llm.md](docs/llm.md).
 - Engagement candidate search, linking requests, or INC_LINKED.csv: [docs/linking.md](docs/linking.md).
-- Classification dashboard input, counts, or display: [docs/dashboard_app.md](docs/dashboard_app.md).
+- Classification dashboard input, supplier catalog, pre-link human decisions, counts, or display: [docs/dashboard_app.md](docs/dashboard_app.md).
 - Engagement dashboard grouping, navigation, or details: [docs/engagement_dashboard.md](docs/engagement_dashboard.md).
 - Human review preparation, decisions, or HUMAN_REVIEW.csv: [docs/human_review.md](docs/human_review.md).
 

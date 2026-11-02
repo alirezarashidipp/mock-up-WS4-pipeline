@@ -52,7 +52,7 @@ py -3.11 -m venv .venv
    .\.venv\Scripts\python.exe -m app.ui.dashboard_app
    ```
 
-The classification dashboard preserves LLM_OUTPUT.csv and saves human decisions separately in `data/run/CLASSIFICATION_REVIEW.csv`. First approve the model's HSBC/SUPPLIER classification, or choose No and record a reason plus the corrected class. UNCERTAIN and processing failures can receive a manual decision with a reason. If the reviewed class is Supplier, separately approve its model name or select the correct name from SUPPLIER_NAME.csv with a reason. Insufficient information stays Needs review. Only persisted approvals or corrections count as complete. Click Refresh to reread results; stop with Ctrl+C. See [classification review](docs/dashboard_app.md) for scenarios and fields.
+The classification dashboard preserves LLM_OUTPUT.csv and saves human decisions separately in `data/run/CLASSIFICATION_REVIEW.csv`. First approve the model's HSBC/SUPPLIER classification, or choose No and record a reason plus the corrected class. UNCERTAIN and processing failures can receive a manual decision with a reason. If the reviewed class is Supplier, separately approve its model name or select the correct name from SUPPLIER_NAME.csv with a reason. Insufficient information stays Needs review. Only persisted approvals or corrections count as complete. Click Refresh to reread results; stop with Ctrl+C. See [classification review scenarios](docs/dashboard_app.md#decision-scenarios) and the [supplier CSV format](docs/dashboard_app.md#supplier-catalog).
 
 After classification review, link approved incidents to engagements. Put the UTF-8 engagement file at `data/mockup/ENG_ALL.csv`, then run this separate pipeline. Saving a dashboard decision does not call an LLM; it makes the incident eligible for this next run:
 
@@ -93,8 +93,27 @@ Preparation replaces CLEAN.csv on nonempty runs. LLM results append for new inci
 
 Older INC_LINKED.csv files without `link_confidence_scale` keep their legacy 0-100 link confidence, including values between 0 and 4. The engagement dashboard labels them as legacy values without conversion. The writer rejects appending the new schema to files missing the classification-review fields, `link_confidence_scale`, or `link_candidate_count`; use a fresh linking output file or batch folder and point the engagement dashboard at it. For human review, update its input and use a fresh review output and matching dashboard path. Existing files and prior review decisions remain preserved; historical candidate counts are not backfilled.
 
+## Saved files and batch paths
+
+| File | What it stores | Writer |
+| --- | --- | --- |
+| `data/run/LLM_OUTPUT.csv` | Original incident fields and model classification results. | Classification pipeline. Human review leaves it unchanged. |
+| `data/run/CLASSIFICATION_REVIEW.csv` | Original row plus six pre-link review fields for IDs with saved decisions. | Classification dashboard. Untouched rows appear pending without being written. |
+| `data/run/INC_LINKED.csv` | Approved incidents, their review fields, and linking results. | Linking pipeline. |
+| `data/run/HUMAN_REVIEW.csv` | Linking snapshot plus five later `hitl_` decisions. | Post-link preparation and review dashboard. |
+
+When switching batches, keep the paired paths aligned:
+
+- The classification dashboard's `RESULTS_FILE` and linking pipeline's `INCIDENT_FILE` must refer to the same LLM_OUTPUT.csv.
+- Set `REVIEW_FILE` in `app/classification_review.py` for the shared classification-review output; the dashboard and linking pipeline import it. `SUPPLIERS_FILE` in the same module points to the read-only name catalog.
+- Set the linking pipeline's `OUTPUT_FILE` and engagement dashboard's `RESULTS_FILE` to the same new INC_LINKED.csv.
+- Set the post-link preparation's `INPUT_FILE` to that linking output and its `OUTPUT_FILE` to a matching HUMAN_REVIEW.csv. The post-link dashboard imports that output path.
+
+Restart affected dashboard processes after editing these path constants. A changed linking schema needs fresh linking and post-link review outputs; existing classification approvals can still be used when they match the current LLM_OUTPUT rows. A changed classification source schema also requires a fresh CLASSIFICATION_REVIEW.csv. Keep the earlier files.
+
 ## Documentation and tests
 
+- [Short description and review example](docs/short_desription.md)
 - [Data preparation](docs/data_preparation.md)
 - [LLM classification and supplier extraction](docs/llm.md)
 - [Incident-to-engagement linking](docs/linking.md)
