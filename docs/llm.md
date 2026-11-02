@@ -1,118 +1,99 @@
-# LLM classification and supplier extraction
+# Classification in the unified incident workflow
 
-Entry point: `python -m app.llm.pipeline` from the project root.
+Run `python -m app.llm.pipeline` from the project root. Data preparation remains a separate, unchanged step; see [data preparation](data_preparation.md).
 
 ```text
-CLEAN.csv -> one row per request -> validate response -> save LLM_OUTPUT.csv -> dashboard
+CLEAN.csv + field definitions + ENG_ALL.csv
+    -> initialize every incident as pending in INCIDENTS.csv
+    -> classify one incident -> save classification
+    -> for Supplier: find engagement suggestions -> save default proposal
+    -> continue with the next incident
 ```
 
-## Per request
+The single [incident dashboard](dashboard_app.md) reads `data/run/INCIDENTS.csv`. Automatic linking does not wait for human approval. The human later reviews classification, supplier name, and engagement in that order. HSBC and UNCERTAIN do not receive automatic engagement requests.
 
-1. Read the next row from `data/run/CLEAN.csv`; retain INCIDENT_ID locally.
-2. `app/llm/prepare_fields.py` builds `{name, description, value}` objects for non-ID columns, using `fields/definitions.yml`, in the input order below. It preserves all original values, including empty values.
-3. Send the `system` value from `prompts/classification.yml` plus that row's fields. Repeat the prompt and definitions on every independent request.
-4. Parse the response with the Pydantic `Classification` model:
-   - `classification`: HSBC, SUPPLIER, or UNCERTAIN. HSBC/SUPPLIER represent causal accountability rather than infrastructure ownership. Use UNCERTAIN when missing facts, conflicting evidence, or shared responsibility prevent choosing a party; explain why in `decision_rationale`.
-   - `key_root_cause`, `decision_rationale`: documented cause and concise attribution explanation.
-   - `attribution_evidence_strength`: integer 0-4 describing recorded support for attributing responsibility, using the rubric below. For UNCERTAIN, use 0-2 for the available attribution evidence, not certainty about being uncertain. This replaces `llm_confidence` in new results.
-   - `supplier_name`, `supplier_product_or_service`, `supplier_action_or_failure`, `supplier_causal_explanation`, `supplier_accountability_reason`: null for HSBC and UNCERTAIN; documented details or Unknown for SUPPLIER.
-   - `supplier_more_info`: additional documented supplier facts not covered by the five core fields; null for HSBC/UNCERTAIN or when no extra information exists. Save as one plain-text CSV column.
-   - `evidence_column`: a list of strings naming source columns; the prompt requests relevant names from this row's input, for example `["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"]`. No evidence quotations or source values are returned. For UNCERTAIN, names can identify fields showing ambiguity or missing causal information. An empty list is accepted and saves a blank evidence cell; there is no fixed maximum count.
-5. `parse_response(response)` checks completion/refusal and validates the Pydantic response. It rejects HSBC/SUPPLIER with score 0 and UNCERTAIN with score 3 or 4. Evidence is a list of strings, which may be empty, with no fixed maximum count. Python does not check the names against input fields, reject duplicate or blank individual names, or correct spelling. Entries keep their returned order. The prompt still asks for relevant source columns; this is a model instruction, not a Python-enforced guarantee. `normalize_supplier_fields` sets supplier fields to null for HSBC/UNCERTAIN; blank core Supplier facts become Unknown, while empty supplier_more_info stays null.
-6. Call `app/llm/save_csv.py:save_result` before requesting the next row. Save source values, scalar response fields, `processing_status`, and `error` to LLM_OUTPUT.csv. This model-output file contains no human-review decisions; the classification dashboard saves those separately in CLASSIFICATION_REVIEW.csv before linking.
+## Classification request
 
-UNCERTAIN is a valid classification with `processing_status=success`; it does not stop the batch. A provider failure or invalid response has `processing_status=failed`. Invalid response structure or score/classification combinations use this same failure path: save the failed row where possible, stop the batch, and preserve earlier results. Python does not repair the names or change the classification. A missing supplier name alone does not require UNCERTAIN when Supplier accountability is otherwise supported. A documented technical cause may remain available even when the accountable party is uncertain.
+1. Keep `INCIDENT_ID` locally. `app/llm/prepare_fields.py` sends every other source column as `{name, description, value}`, with descriptions from `fields/definitions.yml`. Values, including empty values, remain complete.
+2. Send the instructions from `prompts/classification.yml` and the prepared fields to `classify_row`. Each request is independent and includes the prompt and definitions again.
+3. Request strict JSON schema output and validate it with the Pydantic `Classification` model. Require a complete, non-refused response.
+4. Convert the result to flat fields with `classification_values`, then save the incident before starting its linking request or the next incident. This function only builds values; `app/incidents.py` owns persistence.
 
-## Remaining output checks
+Model input order is narrative, recorded causes, closure/resolution, investigation history, supplier/product context, then remaining metadata in source order. Every non-ID field needs a definition and appears once. Input ordering does not change source CSV columns or establish which evidence is authoritative.
 
-| Check | Current behavior |
+## Classification response
+
+The model returns these 11 fields in this order:
+
+| Field | Meaning |
+| --- | --- |
+| `key_root_cause` | Documented root cause in one sentence, or null when unknown. |
+| `evidence_column` | List of source-column names that informed the result. |
+| `decision_rationale` | Short evidence-based explanation of attribution and any material gaps. |
+| `classification` | HSBC, SUPPLIER, or UNCERTAIN. |
+| `attribution_evidence_strength` | Strict integer 0-4 describing recorded attribution evidence. |
+| `supplier_name` | Documented base supplier name, such as AXA, or Unknown. |
+| `supplier_product_or_service` | Documented product/service, or Unknown. |
+| `supplier_action_or_failure` | Documented supplier action, defect, or omission, or Unknown. |
+| `supplier_causal_explanation` | How the supplier action caused the incident, or Unknown. |
+| `supplier_accountability_reason` | Why responsibility belongs to the supplier, or Unknown. |
+| `supplier_more_info` | Additional nonduplicated supplier facts, or null. |
+
+HSBC/SUPPLIER represent causal accountability. Use UNCERTAIN when the record cannot support choosing a party, and describe the missing or conflicting facts. UNCERTAIN is a successful result, not a processing failure. A missing supplier name alone does not require UNCERTAIN when supplier responsibility is otherwise supported.
+
+For SUPPLIER, extract the base name only when supported by the record; do not invent a parent company. Preserve useful documented legal-entity or country details in `supplier_more_info`. The source text remains unchanged. The base name enables retrieval of related ENG_ALL names; it does not prove an engagement match.
+
+All six supplier fields become null for HSBC and UNCERTAIN. Blank core Supplier fields become Unknown; empty `supplier_more_info` stays null. CSV nulls are saved as blank cells. Rationale is a concise decision summary, not a detailed internal thought process.
+
+## Validation and evidence
+
+| Check | Behavior |
 | --- | --- |
 | Completion | Require a choice, `finish_reason=stop`, nonempty content, and no refusal. |
-| JSON schema | Require the 11 defined fields and their types; reject extra JSON fields. |
-| Classification | Accept only HSBC, SUPPLIER, or UNCERTAIN. |
-| Evidence strength | Require a strict integer 0-4; HSBC/SUPPLIER allow 1-4, UNCERTAIN allows 0-2. |
-| Root cause | Accept a nonempty string or null; an empty string is invalid. |
-| Rationale | Require a nonempty string. |
-| Evidence list | List of strings; an empty list is accepted and there is no fixed maximum count. |
-| Evidence names | No Python check of source membership, spelling, duplicates, or blank individual strings. |
-| Supplier fields | Require string or null; normalize values according to the selected class. |
+| Structure | Require the 11 schema fields and their types; reject additional JSON fields. |
+| Class and score | HSBC/SUPPLIER allow 1-4; UNCERTAIN allows 0-2. Reject inconsistent results without changing class or score. |
+| Score type | Reject strings, booleans, floats, and integers outside 0-4. |
+| Root cause and rationale | Root cause is a nonempty string or null; rationale is a nonempty string. |
+| Evidence list | Require a list of strings. Empty lists are accepted; there is no maximum count. |
+| Evidence names | Do not check source-name membership, spelling, uniqueness, or blank individual strings. Do not trim, correct, or deduplicate entries. |
+| Supplier fields | Require strings or null and apply the class-specific normalization above. |
 
-The names of JSON response fields, such as `classification`, are still part of the schema. The removed checks concern the source names inside evidence lists. CSV identifier/schema/conflicting-record checks remain separate from LLM response validation.
+The prompt asks for relevant evidence-column names. Python preserves the returned order and joins them with comma and space in one CSV cell. An empty list saves a blank cell. Source values remain in their own columns. No evidence quotes, numbered evidence columns, definitions, prompt text, or JSON blobs are written to the CSV.
 
-## Request defaults
-
-Classification and linking use the selected provider's defaults for temperature and output length. Requests omit `temperature`, `max_tokens`, and `max_completion_tokens`. There is no local token-counting step, tokenizer download, or input-token precheck. The provider's model limits still apply; input is not truncated.
-
-Strict JSON schema, Pydantic validation, refusal checks, and incomplete-response checks remain active. The shared connection keeps its 60-second SDK timeout and one SDK retry. `LINK_MAX_CANDIDATES` independently limits shortlisted rows.
-
-## Input and output order
-
-`FIELD_ORDER` in `app/llm/prepare_fields.py` lists the priority columns in these groups:
-
-1. Incident/problem narrative: short descriptions, descriptions, and summaries.
-2. Recorded causes: `ROOT_CAUSE_NOTES`, `IT_INCIDENT_CAUSE_DETAILS`, `PROBLEM_TASK_CAUSE_NOTES`, root-cause code, and causing-change ID.
-3. Closure/resolution: close notes, resolution descriptions/details, fix notes, workaround, and read-across details.
-4. Investigation history: incident/problem work notes, major-incident findings, and additional comments.
-5. Context: supplier names, configuration items, business services, assignment groups, and ownership.
-6. Remaining metadata and additional columns, in their original source order.
-
-Only columns present in the row are sent. Every non-ID column still needs a definition and is included exactly once. Reordering affects only the model payload; it does not reorder source CSVs or saved source fields. Field position and names do not establish authority: recorded confirmation, timing, and counterevidence matter across all fields.
-
-The Pydantic model defines this response schema order, also used for new CSV result columns after the source columns:
-
-```text
-key_root_cause
-evidence_column
-decision_rationale
-classification
-attribution_evidence_strength
-supplier_name
-supplier_product_or_service
-supplier_action_or_failure
-supplier_causal_explanation
-supplier_accountability_reason
-supplier_more_info
-```
-
-The rationale remains a short evidence-based explanation, not a detailed internal thought process. Schema order controls the serialized response, not the model's internal reasoning. This ordering is a design choice; offline checks do not establish improved classification accuracy.
-
-## Attribution evidence strength
-
-| Score | Display label | Recorded support for the selected attribution |
+| Score | Label | Attribution evidence |
 | --- | --- | --- |
-| 0 | UNSUPPORTED | No recorded causal evidence distinguishes HSBC from Supplier; choose UNCERTAIN. |
-| 1 | WEAK | Only indirect references or unconfirmed suspicion support the tag; key causal facts are absent. |
-| 2 | MODERATE | Some relevant causal evidence exists, but a material contradiction or missing causal link remains. |
-| 3 | STRONG | Concrete facts support the responsible party and mechanism; remaining gaps do not substantially challenge the tag. |
-| 4 | VERY_STRONG | A clear documented causal finding has supporting details, with no unresolved material counterevidence in the supplied record. |
+| 0 | Unsupported | No recorded causal evidence distinguishes a party. |
+| 1 | Weak | Indirect references or unconfirmed suspicion; important causal facts are absent. |
+| 2 | Moderate | Relevant evidence with material gaps or unresolved contradiction. |
+| 3 | Strong | Concrete facts support the responsible party and mechanism. |
+| 4 | Very strong | Documented causal finding, corroborating details, and no unresolved material counterevidence. |
 
-This is a model assessment of the supplied evidence, not a probability or measured accuracy. Zero does not mean the tag is false, and four does not guarantee it is true. Repeated statements are not independent evidence. A missing supplier name does not automatically weaken an otherwise supported Supplier attribution. Supplier-name certainty and engagement-link confidence are separate questions.
+These scores are model assessments of the recorded evidence, not probabilities or measured accuracy. UNCERTAIN scores describe support for attributing a party, not confidence in uncertainty. Scores 1-2 do not automatically force HSBC/SUPPLIER to become UNCERTAIN. Supplier-name review and engagement evidence are separate decisions.
 
-For UNCERTAIN, a score of 0-2 describes how much causal support is available for assigning responsibility to one party. It does not measure confidence in abstaining. Valid scores are 0-2 for UNCERTAIN and 1-4 for HSBC/SUPPLIER. Python rejects UNCERTAIN with scores of 3 or 4 and HSBC/SUPPLIER with score 0; it does not automatically change the classification or score. Scores of 1 or 2 do not force a party classification to UNCERTAIN.
+## Provider defaults
 
-The model returns only the integer; dashboards derive its label. The provider schema restricts the score to the five integers, and Pydantic also rejects invalid values locally. No logprobs or extra model calls are added.
+Classification and [linking](linking.md) reuse `app/llm/llm_connection.py` for OpenAI or Azure. Both use `store=False`, strict JSON schema, and local Pydantic validation. The provider schema omits unsupported validation limits while Python retains them.
 
-## Storage and failures
+Requests omit `temperature`, `max_tokens`, and `max_completion_tokens`. There is no local token counting, tokenizer download, or input truncation. Provider context limits still apply. The shared connection uses a 60-second SDK timeout and one SDK retry. `LINK_MAX_CANDIDATES` independently limits engagement rows prepared for the linking call.
 
-- Each source value and scalar result has its own CSV column. Join source names with comma and space in exactly one `evidence_column` cell, for example `INCIDENT_DESCRIPTION, ROOT_CAUSE_NOTES`. The CSV writer quotes that cell automatically so its commas do not create additional columns. New outputs contain neither `supporting_evidence`, numbered evidence columns, nor evidence quotation columns. The model uses a JSON list for validation; the saved CSV cell is plain text, not a JSON blob.
-- Keep prompt and definitions in YAML. Store no JSON blobs, definition columns, or prompt text in CSV; arrays are reconstructed only for display/API responses.
-- Process sequentially. Successful HSBC, SUPPLIER, and UNCERTAIN rows have `processing_status=success`; failed responses are saved as failed where possible and stop the batch, preserving earlier results.
-- Pydantic response failures record a safe field/type summary in `error` and the console, such as `ValidationError: key_root_cause: string_too_short`. Only recognized response field names and error types are included; unknown field names become `response`. Source values and raw model output are never logged.
-- A saved failed row still reserves its INCIDENT_ID. To retry it with a different result, preserve the old output under another name or use a fresh batch/output path. Existing rows are not overwritten.
-- Every non-ID column needs a definition. Connection settings use `.env` via `app/llm/llm_connection.py`.
-- Existing output files do not block starting requests. The shared CSV writer still requires nonempty IDs, compatible source/result columns, and no conflicting result for an existing ID.
-- Older outputs with `llm_confidence`, `supporting_evidence`, numbered evidence columns, human-review fields, UNDECIDED tags, or the previous model schema are not silently migrated. A 0-100 confidence value cannot be converted into this evidence rubric. Use a separate output folder for the new schema; update dashboard and linking input/output paths accordingly. The writer rejects appending the new schema to an older output. Dashboards show Not recorded when the evidence score is absent and read legacy evidence columns without rewriting them. Existing CSVs, including earlier FINAL.csv files, remain untouched.
+## Saving, stopping, and resuming
 
-Implementation: `app/llm/pipeline.py` -> `app/llm/classification.py` -> `app/llm/save_csv.py`.
+`app/llm/pipeline.py` coordinates `classify_row` and the reusable `find_engagements` function. Before requests begin, all current CLEAN rows are saved as pending incidents so the dashboard can show the complete batch. Each incident then progresses through classification and, for SUPPLIER, engagement suggestions before the next row starts.
+
+`INCIDENTS.csv` contains all source columns, the 11 classification fields, `processing_status` and `error`, 25 flat linking fields, nine human-review fields, and a Python-managed row_revision. It also contains an `ENG_`-prefixed column for each ENG_ALL field. These cells copy the actual selected engagement row: initially the model default, then the accepted human choice when changed. No selection leaves them blank. Model proposal IDs, reasons, and scores remain separate from human decisions. The dashboard also reads the current catalog when browsing alternatives.
+
+Classification processing is `pending`, `success`, or `failed`. Classification and linking failures are saved where possible and stop the batch; earlier results remain saved. Rerunning retries unfinished or failed work without repeating a successful classification unnecessarily. Rows with a recorded human classification decision are skipped, preventing a model rerun from replacing human work.
+
+Pydantic classification failures record only recognized response field names and error types, such as `ValidationError: key_root_cause: string_too_short`. Unknown field names become `response`. Other failures record exception types. Raw responses, source values, and credentials are not logged.
+
+The incident store checks schema, nonblank unique IDs, and unchanged source values. Changed source rows or columns require a fresh batch output. This processing-stage validation does not change the cleaning pipeline. Writes use an operating-system lock, atomic replacement, and a current row-version check that includes the incrementing revision so dashboard and CLI saves cannot silently overwrite each other.
+
+Older `LLM_OUTPUT.csv`, `INC_LINKED.csv`, `CLASSIFICATION_REVIEW.csv`, `HUMAN_REVIEW.csv`, and other historical CSVs remain untouched and are not automatically imported. Use the new `INCIDENTS.csv` workflow; old confidence values are not converted to the new evidence scales.
 
 ## Explicit live connection check
-
-Run from the project root:
 
 ```powershell
 .\.venv\Scripts\python.exe -B -m unittest discover -s tests -p check_llm_connection.py -v
 ```
 
-`tests/check_llm_connection.py` prepares one visibly synthetic incident with the existing field definitions and classification YAML prompt. It reuses `llm_connection` and `classify_row`, so the selected OpenAI/Azure provider, provider defaults for temperature and output length, `store=False`, strict JSON schema, and existing response validation all apply. No local tokenizer runs before the request. Success requires a valid structured classification, not a particular label or exact evidence score. Empty, refused, incomplete, malformed, or semantically inconsistent responses fail.
-
-The check makes one logical completion request when its connection settings are valid; the shared SDK retry setting still applies. It reads no incident CSV and writes no CSV output. Console output contains a fixed success message or a sanitized exception type, not raw provider messages or generated text. Ordinary `test_*.py` discovery skips this live check. Passing it verifies that request's connectivity and classification contract; it does not establish classification accuracy or validate the linking schema.
+This existing check prepares one visibly synthetic incident and reuses the classification prompt, field definitions, shared connection, and `classify_row`. It reads and writes no incident CSV. A pass establishes connectivity and a valid classification response for that request, not classification accuracy or support for the separate linking response schema. Ordinary `test_*.py` discovery skips this explicitly named live check. Mocked/offline checks do not verify live provider behavior.

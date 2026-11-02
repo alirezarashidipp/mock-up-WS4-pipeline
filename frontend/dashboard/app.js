@@ -1,393 +1,547 @@
 const $ = id => document.getElementById(id);
 let records = [];
-let activeFilter = "total";
 let supplierNames = [];
-let savingReview = false;
-let loadingDashboard = false;
+let activeFilter = "total";
+let expandedId = readHash();
+let busy = false;
+let engagementCache = new Map();
+
+function element(tag, className = "", text = "") {
+  const node = document.createElement(tag);
+  node.className = className;
+  node.textContent = text;
+  return node;
+}
 
 function addField(container, label, value) {
-  const section = document.createElement("section");
-  const heading = document.createElement("h3");
-  const text = document.createElement("p");
-  heading.textContent = label;
-  text.textContent = value || "Unknown";
-  text.className = "record-text";
-  section.append(heading, text);
-  container.append(section);
+  const field = element("section", "field");
+  field.append(element("h4", "", label));
+  const text = value === null || value === undefined || value === "" ? "Not recorded" : String(value);
+  field.append(element("p", "record-text", text));
+  container.append(field);
+}
+
+function button(label, action, className = "button") {
+  const control = element("button", className, label);
+  control.type = "button";
+  control.addEventListener("click", action);
+  return control;
+}
+
+function disclosure(title) {
+  const details = element("details", "detail-section");
+  details.append(element("summary", "", title));
+  return details;
 }
 
 function evidenceStrength(value) {
-  if (value == null || String(value).trim() === "") return "Not recorded";
+  if (value === null || value === undefined || String(value).trim() === "") return "Not recorded";
   const score = String(value).trim();
   if (!/^[0-4]$/.test(score)) return "Invalid score";
   const labels = ["Unsupported", "Weak", "Moderate", "Strong", "Very strong"];
   return score + "/4 · " + labels[Number(score)];
 }
 
-function recordCard(row) {
-  const card = document.createElement("article");
-  card.className = "incident-card";
-  card.dataset.incidentId = row.incident_id;
-  const header = document.createElement("header");
-  header.className = "incident-heading";
-  const id = document.createElement("p");
-  id.className = "incident-id";
-  id.textContent = row.incident_id;
-  const title = document.createElement("h3");
-  title.className = "incident-title";
-  title.textContent = row.summary || "Incident details";
-  header.append(id, title);
-  card.append(header);
-
-  if (row.processing_status === "failed") {
-    addField(card, "Processing status", "Failed");
-    addField(card, "Processing error", row.error || "No error details recorded.");
-  } else {
-    const decision = document.createElement("div");
-    decision.className = "incident-decision";
-    addField(decision, "Model classification", row.classification);
-    addField(decision, "Attribution evidence strength", evidenceStrength(row.attribution_evidence_strength));
-    card.append(decision);
-    addField(card, "Decision rationale", row.decision_rationale);
-    if (row.classification === "SUPPLIER") {
-      const supplier = document.createElement("div");
-      supplier.className = "supplier-grid";
-      for (const [label, value] of [
-        ["Supplier", row.supplier_name],
-        ["Product, service, or infrastructure", row.supplier_product_or_service],
-        ["Supplier action, defect, or omission", row.supplier_action_or_failure],
-        ["How it caused the incident or impact", row.supplier_causal_explanation],
-        ["Why the supplier is accountable", row.supplier_accountability_reason],
-        ["Additional supplier information", row.supplier_more_info || "No additional information recorded."]
-      ]) addField(supplier, label, value);
-      card.append(supplier);
-    }
-
-    const details = document.createElement("details");
-    const summary = document.createElement("summary");
-    summary.textContent = "Evidence and processing details · " + row.evidence_column.length + " source columns";
-    details.append(summary);
-    const content = document.createElement("div");
-    content.className = "incident-secondary";
-    addField(content, "Processing status", row.processing_status);
-    addField(content, "Key root cause", row.key_root_cause);
-    const evidence = document.createElement("section");
-    const heading = document.createElement("h3");
-    heading.textContent = "Source columns informing the decision";
-    evidence.append(heading);
-    if (!row.evidence_column.length) {
-      const empty = document.createElement("p");
-      empty.textContent = "No supporting source columns returned.";
-      evidence.append(empty);
-    }
-    for (const columnName of row.evidence_column) {
-      const text = document.createElement("p");
-      text.textContent = columnName;
-      text.className = "record-text";
-      evidence.append(text);
-    }
-    content.append(evidence);
-    details.append(content);
-    card.append(details);
-  }
-  if (row.review) card.append(reviewControls(row));
-  const inputs = document.createElement("details");
-  const inputSummary = document.createElement("summary");
-  inputSummary.textContent = "Source fields";
-  inputs.append(inputSummary);
-  const sourceFields = document.createElement("div");
-  sourceFields.className = "incident-secondary";
-  for (const [name, value] of Object.entries(row.input)) addField(sourceFields, name, value || "(empty)");
-  inputs.append(sourceFields);
-  card.append(inputs);
-  return card;
+function readHash() {
+  try { return decodeURIComponent(location.hash.slice(1)); }
+  catch { return ""; }
 }
 
-function renderRecords() {
-  const visible = records.filter(row => {
-    if (activeFilter === "failed") return row.processing_status === "failed";
-    if (row.processing_status !== "success") return false;
-    return activeFilter === "total" || row.classification === activeFilter;
-  });
-  let label = "Classified incidents";
-  for (const button of document.querySelectorAll("[data-filter]")) {
-    const selected = button.dataset.filter === activeFilter;
-    button.setAttribute("aria-pressed", String(selected));
-    if (selected) label = button.querySelector("span").textContent;
-  }
-  $("results-heading").textContent = label;
-  $("filter-summary").textContent = visible.length + (visible.length === 1 ? " incident shown" : " incidents shown");
-  $("dashboard-empty").textContent = "No incidents found for " + label + ".";
-  $("dashboard-empty").hidden = visible.length > 0;
-  $("incident-list").replaceChildren();
-  for (const row of visible) $("incident-list").append(recordCard(row));
+function setExpandedId(id) {
+  expandedId = id;
+  const url = location.pathname + location.search + (id ? "#" + encodeURIComponent(id) : "");
+  history.replaceState(null, "", url);
 }
 
-function reviewStateLabel(status) {
-  const labels = {
-    pending: "Pending", approved: "Approved", corrected: "Corrected by reviewer",
-    needs_review: "Needs more information", not_applicable: "Not applicable"
-  };
-  return labels[status] || "Pending";
-}
-
-function isApproved(status) {
-  return status === "approved" || status === "corrected";
-}
-
-function hasModelSupplier(row) {
+function usableModelSupplier(row) {
   const name = (row.supplier_name || "").trim().toLowerCase();
   const missing = ["", "unknown", "n/a", "n a", "none", "null", "not known", "not available"];
   return row.processing_status === "success" && row.classification === "SUPPLIER" && !missing.includes(name);
 }
 
-function actionButton(label) {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "button";
-  button.textContent = label;
-  return button;
+function reviewBadge(status, complete) {
+  let label = "Pending";
+  if (status === "approved") label = "Approved";
+  if (status === "disagree") label = complete ? "Corrected by reviewer" : "Disagreed · unresolved";
+  if (status === "not_applicable") label = "Not applicable";
+  return element("span", "badge " + (complete ? "confirmed" : ""), label);
 }
 
-function reviewPanel(row, target) {
-  const review = row.review;
-  const status = target === "classification" ? review.classification_review_status : review.supplier_review_status;
-  const panel = document.createElement("section");
-  panel.className = "classification-review-panel review-" + status;
+function modelLabel(row) {
+  if (row.processing_status === "failed") return "Processing failure";
+  if (row.processing_status === "pending") return "Awaiting processing";
+  return row.classification || "Not classified";
+}
+
+function sourceFields(row) {
+  if (Array.isArray(row.input_fields)) return row.input_fields;
+  return Object.entries(row.input_fields || {}).map(([name, value]) => ({name, value}));
+}
+
+function incidentTitle(row) {
+  const values = sourceFields(row);
+  for (const name of ["SHORT_DESCRIPTION", "INCIDENT_SHORT_DESCRIPTION", "INCIDENT_DESCRIPTION", "IT_PROBLEM_DESCRIPTION"]) {
+    const field = values.find(item => item.name === name && item.value);
+    if (field) return String(field.value);
+  }
+  return row.key_root_cause || "Incident details";
+}
+
+function recordCard(row) {
+  const card = element("details", "incident-card");
+  card.dataset.incidentId = row.incident_id;
+  card.open = row.incident_id === expandedId;
+  const summary = element("summary", "incident-summary");
+  const title = element("div", "incident-heading");
+  title.append(element("span", "incident-id", row.incident_id));
+  title.append(element("h3", "incident-title", incidentTitle(row)));
+  const badges = element("div", "summary-badges");
+  badges.append(element("span", "badge model-badge", modelLabel(row)));
+  if (row.effective_supplier_name) badges.append(element("span", "supplier-label", row.effective_supplier_name));
+  badges.append(element("span", "badge " + (row.review_complete ? "confirmed" : ""), row.review_complete ? "Review complete" : "Pending review"));
+  summary.append(title, badges);
+  card.append(summary);
+  const body = element("div", "incident-body");
+  card.append(body);
+  let mounted = false;
+  function mount() {
+    if (mounted) return;
+    mounted = true;
+    const steps = element("div", "review-steps");
+    steps.append(classificationPanel(row), supplierPanel(row), engagementPanel(row));
+    body.append(steps, modelDetails(row), inputDetails(row));
+  }
+  if (card.open) mount();
+  card.addEventListener("toggle", () => {
+    if (!card.isConnected) return;
+    if (card.open) {
+      setExpandedId(row.incident_id);
+      for (const other of document.querySelectorAll(".incident-card[open]")) {
+        if (other !== card) other.open = false;
+      }
+      mount();
+    } else if (expandedId === row.incident_id) {
+      setExpandedId("");
+    }
+  });
+  return card;
+}
+
+function panelHeader(row, target, number, title, complete) {
+  const panel = element("section", "review-panel" + (complete ? " review-complete" : ""));
   panel.dataset.reviewTarget = target;
-  const heading = document.createElement("h3");
-  heading.textContent = target === "classification" ? "1. Classification review" : "2. Supplier name review";
-  const badge = document.createElement("span");
-  badge.className = "classification-review-badge";
-  badge.textContent = reviewStateLabel(status);
-  panel.append(heading, badge);
-  const savedValue = target === "classification" ? review.reviewed_classification : review.reviewed_supplier_name;
-  const savedReason = target === "classification" ? review.classification_review_reason : review.supplier_review_reason;
-  if (savedValue) addField(panel, "Human decision", savedValue);
-  if (savedReason) addField(panel, "Saved reason", savedReason);
-
-  if (target === "supplier" && (!isApproved(review.classification_review_status) || review.reviewed_classification !== "SUPPLIER")) {
-    const note = document.createElement("p");
-    note.className = "field-note";
-    note.textContent = review.reviewed_classification === "HSBC"
-      ? "No supplier name review is needed for HSBC."
-      : "Approve or correct the classification to SUPPLIER first.";
-    panel.append(note);
-    return panel;
+  panel.tabIndex = -1;
+  const header = element("div", "step-heading");
+  header.append(element("span", "step-number", number));
+  header.append(element("h3", "", title));
+  const badge = reviewBadge(row[target + "_review_status"], complete);
+  if (target === "engagement" && row.engagement_review_status === "disagree" && !row.reviewed_engagement_id) {
+    badge.textContent = "Rejected · no engagement accepted";
+    badge.className = "badge rejected";
   }
-
-  const canApprove = target === "classification"
-    ? row.processing_status === "success" && ["HSBC", "SUPPLIER"].includes(row.classification)
-    : hasModelSupplier(row);
-  const proposedValue = target === "classification" ? row.classification : row.supplier_name;
-  const note = document.createElement("p");
-  note.className = "field-note";
-  note.textContent = canApprove
-    ? "Approve the model's " + (target === "classification" ? "classification: " : "supplier name: ") + proposedValue + ". Choose No to correct it."
-    : "Choose a human decision and explain it. If evidence is insufficient, keep the review open.";
-  panel.append(note);
-
-  const error = document.createElement("p");
-  error.className = "classification-review-error";
-  error.setAttribute("role", "alert");
-  error.hidden = true;
-  const actions = document.createElement("div");
-  actions.className = "classification-review-actions";
-  if (canApprove) {
-    const approve = actionButton("Approved");
-    approve.addEventListener("click", () => saveReview(row, target, {decision: "approved"}, panel, error));
-    actions.append(approve);
-  }
-  const change = actionButton(canApprove ? "No" : "Record human decision");
-  actions.append(change);
-  panel.append(actions);
-
-  const form = document.createElement("form");
-  form.className = "classification-review-form";
-  form.hidden = true;
-  const choiceLabel = document.createElement("label");
-  choiceLabel.textContent = target === "classification" ? "Correct classification" : "Select supplier";
-  const choice = document.createElement("select");
-  choice.required = true;
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent = "Choose an option";
-  choice.append(placeholder);
-  const options = target === "classification" ? ["HSBC", "SUPPLIER"] : supplierNames;
-  for (const name of options) {
-    const option = document.createElement("option");
-    option.value = name;
-    option.textContent = name;
-    choice.append(option);
-  }
-  const unresolved = document.createElement("option");
-  unresolved.value = "__needs_review__";
-  unresolved.textContent = target === "classification" ? "Cannot determine yet" : "Cannot determine / supplier not listed";
-  choice.append(unresolved);
-  choiceLabel.append(choice);
-  form.append(choiceLabel);
-  if (target === "supplier" && !supplierNames.length) {
-    const missing = document.createElement("p");
-    missing.className = "field-note";
-    missing.textContent = "Supplier choices are unavailable. Restore SUPPLIER_NAME.csv to select a supplier, or leave this review open.";
-    form.append(missing);
-  }
-  const reasonLabel = document.createElement("label");
-  reasonLabel.textContent = "Reason (required)";
-  const reason = document.createElement("textarea");
-  reason.required = true;
-  reason.maxLength = 2000;
-  reason.rows = 3;
-  reasonLabel.append(reason);
-  form.append(reasonLabel);
-  const formActions = document.createElement("div");
-  formActions.className = "classification-review-actions";
-  const save = actionButton("Save human decision");
-  save.type = "submit";
-  const cancel = actionButton("Cancel");
-  formActions.append(save, cancel);
-  form.append(formActions);
-  change.addEventListener("click", () => {
-    form.hidden = false;
-    error.hidden = true;
-    choice.focus();
-  });
-  cancel.addEventListener("click", () => {
-    form.hidden = true;
-    error.hidden = true;
-    change.focus();
-  });
-  form.addEventListener("submit", event => {
-    event.preventDefault();
-    if (!reason.value.trim()) {
-      error.textContent = "Write a reason before saving this decision.";
-      error.hidden = false;
-      reason.focus();
-      return;
-    }
-    const decision = {
-      decision: choice.value === "__needs_review__" ? "needs_review" : "corrected",
-      reason: reason.value.trim()
-    };
-    if (decision.decision === "corrected") {
-      if (target === "classification") decision.classification = choice.value;
-      else decision.supplier_name = choice.value;
-    }
-    saveReview(row, target, decision, panel, error);
-  });
-  panel.append(form, error);
+  panel.append(header, badge);
+  const value = target === "classification" ? row.reviewed_classification : target === "supplier" ? row.reviewed_supplier_name : row.reviewed_engagement_id;
+  if (value) addField(panel, "Saved human decision", value);
+  const reason = row[target + "_review_reason"];
+  if (reason) addField(panel, "Saved reason", reason);
   return panel;
 }
 
-function reviewControls(row) {
-  const section = document.createElement("section");
-  section.className = "classification-review";
-  if (row.review.review_stale) {
-    const stale = document.createElement("p");
-    stale.className = "classification-review-error";
-    stale.textContent = "The source result changed. Previous approval no longer applies; review this incident again.";
-    section.append(stale);
+function reviewError(panel) {
+  const error = element("p", "form-error");
+  error.hidden = true;
+  error.setAttribute("role", "alert");
+  panel.append(error);
+  return error;
+}
+
+function selectField(form, label, options, value = "") {
+  const wrapper = element("label", "form-label", label);
+  const select = element("select");
+  for (const [optionValue, text] of options) {
+    const option = element("option", "", text);
+    option.value = optionValue;
+    select.append(option);
   }
-  const panels = document.createElement("div");
-  panels.className = "classification-review-grid";
-  panels.append(reviewPanel(row, "classification"), reviewPanel(row, "supplier"));
-  section.append(panels);
-  const state = document.createElement("p");
-  state.className = "classification-review-readiness";
-  const review = row.review;
-  if (!isApproved(review.classification_review_status)) state.textContent = "Awaiting classification review.";
-  else if (review.reviewed_classification === "HSBC") state.textContent = "Review complete · HSBC. No supplier linking required.";
-  else if (!isApproved(review.supplier_review_status)) state.textContent = "Awaiting supplier name review.";
-  else state.textContent = "Ready for linking · human classification and supplier name are approved.";
-  section.append(state);
-  return section;
+  select.value = value;
+  wrapper.append(select);
+  form.append(wrapper);
+  return select;
+}
+
+function reasonField(form, value = "") {
+  const wrapper = element("label", "form-label", "Reason (required)");
+  const input = element("textarea");
+  input.rows = 3;
+  input.maxLength = 2000;
+  input.required = true;
+  input.value = value;
+  wrapper.append(input);
+  form.append(wrapper);
+  return input;
+}
+
+function classificationPanel(row) {
+  const panel = panelHeader(row, "classification", "1", "Classification", row.classification_complete);
+  addField(panel, "Original model result", modelLabel(row));
+  if (row.processing_status === "success") {
+    addField(panel, "Attribution evidence strength", evidenceStrength(row.attribution_evidence_strength));
+    addField(panel, "Model rationale", row.decision_rationale);
+  }
+  if (row.processing_status === "pending") {
+    panel.append(element("p", "field-note", "Waiting for automatic classification before human review."));
+    return panel;
+  }
+  if (row.processing_status === "failed") addField(panel, "Processing error", row.error);
+  const canApprove = row.processing_status === "success" && ["HSBC", "SUPPLIER"].includes(row.classification);
+  if (!canApprove) panel.append(element("p", "field-note", "Choose HSBC or Supplier with a reason to continue. UNCERTAIN keeps this incident at classification."));
+  const error = reviewError(panel);
+  const actions = element("div", "actions");
+  const approve = button("Approved", () => saveReview(row, "classification", {decision: "approved"}, panel, error), "button primary");
+  approve.disabled = !canApprove || row.classification_review_status === "approved";
+  const form = element("form", "correction-form");
+  form.hidden = true;
+  const select = selectField(form, "Correct classification", [["", "Select a classification"], ["HSBC", "HSBC"], ["SUPPLIER", "Supplier"], ["UNCERTAIN", "Uncertain — keep unresolved"]], row.classification_review_status === "disagree" ? row.reviewed_classification : "");
+  select.required = true;
+  const reason = reasonField(form, row.classification_review_reason || "");
+  const submit = element("button", "button primary", "Save human decision");
+  submit.type = "submit";
+  form.append(submit);
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+    if (!reason.value.trim()) { reason.setCustomValidity("Enter a reason."); reason.reportValidity(); return; }
+    saveReview(row, "classification", {decision: "disagree", classification: select.value, reason: reason.value}, panel, error);
+  });
+  reason.addEventListener("input", () => reason.setCustomValidity(""));
+  actions.append(approve, button("Disagree", () => { form.hidden = !form.hidden; if (!form.hidden) select.focus(); }));
+  panel.append(actions, form, element("p", "field-note", "Saving another classification resets the later human decisions."));
+  return panel;
+}
+
+function supplierPanel(row) {
+  const panel = panelHeader(row, "supplier", "2", "Supplier name", row.supplier_complete && row.effective_classification === "SUPPLIER");
+  addField(panel, "Model base name", row.supplier_name);
+  if (!row.classification_complete || row.effective_classification !== "SUPPLIER") {
+    const note = row.classification_complete && row.effective_classification === "HSBC"
+      ? "HSBC needs no supplier or engagement review."
+      : "Complete the classification as Supplier first.";
+    panel.append(element("p", "field-note", note));
+    return panel;
+  }
+  const error = reviewError(panel);
+  const actions = element("div", "actions");
+  const approve = button("Approved", () => saveReview(row, "supplier", {decision: "approved"}, panel, error), "button primary");
+  approve.disabled = !usableModelSupplier(row) || row.supplier_review_status === "approved";
+  const form = element("form", "correction-form");
+  form.hidden = true;
+  const options = [["", "Select a base supplier name"], ...supplierNames.map(name => [name, name])];
+  const select = selectField(form, "Supplier catalog", options, row.supplier_review_status === "disagree" ? row.reviewed_supplier_name : "");
+  select.required = true;
+  select.disabled = !supplierNames.length;
+  const reason = reasonField(form, row.supplier_review_reason || "");
+  const submit = element("button", "button primary", "Save name and find engagements");
+  submit.type = "submit";
+  submit.disabled = !supplierNames.length;
+  form.append(submit);
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+    if (!reason.value.trim()) { reason.setCustomValidity("Enter a reason."); reason.reportValidity(); return; }
+    saveReview(row, "supplier", {decision: "disagree", supplier_name: select.value, reason: reason.value}, panel, error);
+  });
+  reason.addEventListener("input", () => reason.setCustomValidity(""));
+  actions.append(approve, button("Disagree", () => { form.hidden = !form.hidden; if (!form.hidden) select.focus(); }));
+  panel.append(actions, form, element("p", "field-note", "A changed base name reruns engagement finding now and resets engagement approval."));
+  if (!supplierNames.length) panel.append(element("p", "notice", "No supplier catalog options are available. An existing usable model name can still be approved."));
+  return panel;
+}
+
+function engagementPanel(row) {
+  const complete = ["approved", "disagree"].includes(row.engagement_review_status) && Boolean(row.reviewed_engagement_id);
+  const panel = panelHeader(row, "engagement", "3", "Engagement", complete);
+  if (row.classification_complete && row.effective_classification === "HSBC") {
+    panel.append(element("p", "field-note", "No engagement is needed for HSBC."));
+    return panel;
+  }
+  const counts = element("div", "match-counts");
+  for (const [label, value] of [["Name matches", row.link_match_count], ["LLM candidates", row.link_candidate_count], ["Suggestions", row.link_suggestion_count]]) {
+    const item = element("div");
+    item.append(element("strong", "", value === "" || value == null ? "—" : String(value)), element("span", "", label));
+    counts.append(item);
+  }
+  panel.append(counts);
+  addField(panel, "Automatic proposal status", row.link_status);
+  if (row.link_supplier_name) addField(panel, "Base name used for search", row.link_supplier_name);
+  if (row.link_reason) addField(panel, "Model recommendation", row.link_reason);
+  if (row.link_error) addField(panel, "Finding error", row.link_error);
+  const saved = {};
+  for (const [key, value] of Object.entries(row)) {
+    if (key.startsWith("ENG_") && value !== "") saved[key.slice(4)] = value;
+  }
+  if (Object.keys(saved).length) {
+    const snapshot = engagementDetails(saved);
+    snapshot.querySelector("summary").textContent = "Saved selected engagement details";
+    panel.append(snapshot);
+  }
+  if (!row.classification_complete || !row.supplier_complete) panel.append(element("p", "notice", "Proposals can be inspected now. Approve classification and supplier name before deciding on an engagement."));
+  const content = element("div", "engagement-content");
+  content.append(element("p", "field-note", "Loading engagement matches…"));
+  panel.append(content);
+  queueMicrotask(() => loadEngagements(row, panel, content));
+  return panel;
+}
+
+async function loadEngagements(row, panel, content) {
+  try {
+    const key = row.incident_id + ":" + row.review_version;
+    let data = engagementCache.get(key);
+    if (!data) {
+      const response = await fetch("/api/incidents/" + encodeURIComponent(row.incident_id) + "/engagements", {cache: "no-store"});
+      data = await response.json();
+      if (!response.ok) throw new Error(apiError(data, "Could not load engagements."));
+      engagementCache.set(key, data);
+    }
+    if (!content.isConnected) return;
+    renderEngagements(row, data, panel, content);
+  } catch (failure) {
+    if (!content.isConnected) return;
+    content.replaceChildren(element("p", "form-error", failure.message));
+    content.append(button("Reload matches", () => loadEngagements(row, panel, content)));
+  }
+}
+
+function engagementName(item) {
+  return item.ENGAGEMENT_NAME || item.ENGAGEMENT_DESCRIPTION || item.THIRD_PARTY_NAME || item.THIRD_PARTY_NORMALISED_NAME || "Engagement";
+}
+
+function engagementDetails(item) {
+  const details = disclosure("Engagement details");
+  const fields = element("div", "source-grid");
+  for (const [name, value] of Object.entries(item || {})) addField(fields, name, value);
+  details.append(fields);
+  return details;
+}
+
+function renderEngagements(row, data, panel, content) {
+  content.replaceChildren();
+  if (data.error) content.append(element("p", "notice", data.error));
+  if (data.link_stale || data.review_version !== row.review_version) content.append(element("p", "notice", "The incident or catalog has changed. Refresh the page and find engagements again before approval."));
+  const matches = data.matches || [];
+  const suggestions = data.suggestions || [];
+  const defaultId = data.selected_engagement_id || row.linked_engagement_id || "";
+  addField(content, "Model default", defaultId || "No default selected");
+  if (defaultId) {
+    addField(content, "Default link evidence strength", evidenceStrength(row.link_confidence));
+    content.append(element("p", "field-note", "A default is saved automatically. Human approval is a separate decision."));
+  }
+  const choices = disclosure("Model suggestions · " + suggestions.length + " of at most 5");
+  choices.classList.add("suggestions");
+  for (const suggestion of suggestions) {
+    const item = element("article", "suggestion" + (suggestion.engagement_id === defaultId ? " default-suggestion" : ""));
+    const title = suggestion.engagement_id + " · " + engagementName(suggestion.engagement || {});
+    item.append(element("h4", "", title));
+    if (suggestion.engagement_id === defaultId) item.append(element("span", "badge", "Model default"));
+    item.append(element("p", "field-note", "Link evidence: " + evidenceStrength(suggestion.evidence_strength)));
+    item.append(element("p", "record-text", suggestion.reason));
+    item.append(engagementDetails(suggestion.engagement || {}));
+    choices.append(item);
+  }
+  if (!suggestions.length) choices.append(element("p", "field-note", "No suitable engagement suggestion has been saved."));
+  content.append(choices);
+  const all = disclosure("Browse all " + matches.length + " normalized name matches");
+  all.append(element("p", "field-note", "Source order. These name matches are not a relevance ranking. Only the capped candidates were prepared for the model."));
+  for (const match of matches) {
+    const item = disclosure(match.ENGAGEMENT_ID + " · " + engagementName(match));
+    const fields = element("div", "source-grid");
+    for (const [name, value] of Object.entries(match)) addField(fields, name, value);
+    item.append(fields);
+    all.append(item);
+  }
+  if (!matches.length) all.append(element("p", "field-note", "No matching engagement rows found."));
+  content.append(all);
+  const error = reviewError(content);
+  const allowed = row.classification_complete && row.supplier_complete && row.effective_classification === "SUPPLIER";
+  if (!allowed) return;
+  const current = !data.link_stale && data.review_version === row.review_version;
+  const form = element("form", "correction-form");
+  const options = [["", "None of these engagements"], ...matches.map(item => [item.ENGAGEMENT_ID, item.ENGAGEMENT_ID + " · " + engagementName(item)])];
+  const hasHumanDecision = ["approved", "disagree"].includes(row.engagement_review_status);
+  const selected = hasHumanDecision ? (row.reviewed_engagement_id || "") : defaultId;
+  const select = selectField(form, "Engagement choice (all name matches)", options, selected);
+  select.disabled = !current;
+  const reasonArea = element("div");
+  reasonArea.hidden = true;
+  const reason = reasonField(reasonArea, row.engagement_review_reason || "");
+  const save = element("button", "button primary", "Save engagement decision");
+  save.type = "submit";
+  save.disabled = !current;
+  reasonArea.append(save);
+  const actions = element("div", "actions");
+  const approve = button("Approved", () => saveReview(row, "engagement", {decision: "approved", engagement_id: defaultId}, panel, error), "button primary");
+  function updateChoice() {
+    approve.disabled = !current || !defaultId || select.value !== defaultId || row.engagement_review_status === "approved";
+    if (select.value !== defaultId) reasonArea.hidden = false;
+  }
+  select.addEventListener("change", updateChoice);
+  const disagree = button("Disagree", () => { reasonArea.hidden = !reasonArea.hidden; if (!reasonArea.hidden) reason.focus(); });
+  disagree.disabled = !current;
+  actions.append(approve, disagree);
+  form.append(actions, reasonArea);
+  form.addEventListener("submit", event => {
+    event.preventDefault();
+    if (!reason.value.trim()) { reason.setCustomValidity("Enter a reason."); reason.reportValidity(); return; }
+    saveReview(row, "engagement", {decision: "disagree", engagement_id: select.value, reason: reason.value}, panel, error);
+  });
+  reason.addEventListener("input", () => reason.setCustomValidity(""));
+  updateChoice();
+  content.append(form);
+  const retryLabel = row.link_status === "RUNNING" ? "Restart engagement finding" : "Find engagements again";
+  const retry = button(retryLabel, () => saveRequest(row, "engagement", "/api/incidents/" + encodeURIComponent(row.incident_id) + "/refresh-links", {version: row.review_version}, panel, error));
+  content.append(retry, element("p", "field-note", "Finding again replaces proposals and resets engagement approval. Selecting another match or none requires a reason."));
+}
+
+function modelDetails(row) {
+  const details = disclosure("Model evidence and supplier details");
+  const fields = element("div", "source-grid");
+  addField(fields, "Processing status", row.processing_status);
+  addField(fields, "Key root cause", row.key_root_cause);
+  const evidence = Array.isArray(row.evidence_column) ? row.evidence_column.join(", ") : row.evidence_column;
+  addField(fields, "Evidence columns", evidence);
+  if (row.classification === "SUPPLIER") {
+    for (const [label, value] of [["Supplier base name", row.supplier_name], ["Product or service", row.supplier_product_or_service], ["Supplier action or failure", row.supplier_action_or_failure], ["Causal explanation", row.supplier_causal_explanation], ["Accountability reason", row.supplier_accountability_reason], ["Additional supplier information", row.supplier_more_info]]) addField(fields, label, value);
+  }
+  details.append(fields);
+  return details;
+}
+
+function inputDetails(row) {
+  const details = disclosure("Original incident fields");
+  const fields = element("div", "source-grid");
+  for (const item of sourceFields(row)) addField(fields, item.name, item.value);
+  details.append(fields);
+  return details;
+}
+
+function renderRecords() {
+  const query = $("search").value.trim().toLowerCase();
+  const reviewFilter = $("review-filter").value;
+  const visible = records.filter(row => {
+    if (activeFilter === "failed" || activeFilter === "pending") {
+      if (row.processing_status !== activeFilter) return false;
+    } else if (activeFilter !== "total" && (row.processing_status !== "success" || row.classification !== activeFilter)) return false;
+    if (reviewFilter === "pending" && row.review_complete) return false;
+    if (reviewFilter === "complete" && !row.review_complete) return false;
+    const searchText = [row.incident_id, incidentTitle(row), row.supplier_name, row.effective_supplier_name, row.classification, row.linked_engagement_id, row.reviewed_engagement_id].join(" ").toLowerCase();
+    return !query || searchText.includes(query);
+  });
+  let label = "All incidents";
+  for (const control of document.querySelectorAll("[data-filter]")) {
+    const selected = control.dataset.filter === activeFilter;
+    control.setAttribute("aria-pressed", String(selected));
+    if (selected) label = control.querySelector("span").textContent;
+  }
+  $("results-heading").textContent = label;
+  $("filter-summary").textContent = visible.length + " of " + records.length + " incidents shown";
+  $("dashboard-empty").hidden = visible.length > 0;
+  $("dashboard-empty").textContent = "No incidents match " + label.toLowerCase() + " and the selected search or review filter.";
+  $("incident-list").replaceChildren(...visible.map(recordCard));
 }
 
 function showDashboard(data) {
-  $("mode").textContent = data.demo ? "Demo · synthetic data" : "Classification review";
-  $("demo-note").hidden = !data.demo;
-  for (const key of ["total", "HSBC", "SUPPLIER", "UNCERTAIN", "failed"]) {
-    $(key + "-count").textContent = data.counts[key];
-  }
-  for (const key of ["classification_approved", "classification_pending", "supplier_pending", "ready_for_linking"]) {
-    $("review-" + key + "-count").textContent = data.review_counts ? data.review_counts[key] : "—";
-  }
+  records = data.incidents || [];
   supplierNames = data.supplier_names || [];
-  $("supplier-catalog-note").textContent = data.supplier_catalog_note || "";
-  $("supplier-catalog-note").hidden = !data.supplier_catalog_note;
-  records = data.records;
+  engagementCache.clear();
+  $("mode").textContent = data.demo ? "Synthetic demonstration" : "Incident review";
+  $("demo-note").hidden = !data.demo;
+  for (const key of ["total", "HSBC", "SUPPLIER", "UNCERTAIN", "failed", "pending"]) $(key + "-count").textContent = data.counts[key] ?? 0;
+  $("review-complete-count").textContent = data.counts.review_complete ?? 0;
+  $("review-pending-count").textContent = data.counts.review_pending ?? 0;
+  $("human-linked-count").textContent = data.counts.human_linked ?? 0;
+  $("review-progress").max = Math.max(1, data.counts.total || 0);
+  $("review-progress").value = data.counts.review_complete || 0;
+  for (const [id, value] of [["supplier-catalog-note", data.supplier_catalog_note], ["engagement-catalog-note", data.engagement_catalog_note]]) {
+    $(id).textContent = value || "";
+    $(id).hidden = !value;
+  }
   renderRecords();
 }
 
-async function saveReview(row, target, decision, panel, error) {
-  if (savingReview || loadingDashboard) return;
-  savingReview = true;
-  error.hidden = true;
-  const controls = [...document.querySelectorAll("button, select, textarea")];
-  const disabledStates = controls.map(control => control.disabled);
+function apiError(data, fallback) {
+  if (typeof data.detail === "string") return data.detail;
+  if (typeof data.error === "string" && data.error) return data.error;
+  return fallback;
+}
+
+function lockControls() {
+  const controls = [...document.querySelectorAll("button, input, select, textarea")];
+  const states = controls.map(control => control.disabled);
   for (const control of controls) control.disabled = true;
+  return () => controls.forEach((control, index) => { control.disabled = states[index]; });
+}
+
+function saveReview(row, target, decision, panel, error) {
+  const payload = {incident_id: row.incident_id, version: row.review_version, target, ...decision};
+  return saveRequest(row, target, "/api/review", payload, panel, error);
+}
+
+async function saveRequest(row, target, url, payload, panel, error) {
+  if (busy) return;
+  busy = true;
+  const unlock = lockControls();
+  error.hidden = true;
   panel.setAttribute("aria-busy", "true");
+  $("message").className = "message";
+  $("message").textContent = target === "supplier" || url.endsWith("refresh-links") ? "Saving and finding engagements… Please wait for the saved result." : "Saving human decision…";
+  $("message").hidden = false;
   try {
-    const response = await fetch("/api/classification-review", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({INCIDENT_ID: row.incident_id, version: row.review.review_version, target, ...decision})
-    });
+    const response = await fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(payload)});
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Could not save the review. Refresh and try again.");
+    if (!response.ok) throw new Error(apiError(data, "Could not save. Refresh and try again."));
     showDashboard(data);
-    const savedCard = [...document.querySelectorAll(".incident-card")].find(card => card.dataset.incidentId === row.incident_id);
-    if (savedCard) {
-      const savedPanel = savedCard.querySelector('[data-review-target="' + target + '"]');
-      savedPanel.tabIndex = -1;
-      savedPanel.focus({preventScroll: true});
-    }
+    const saved = records.find(item => item.incident_id === row.incident_id);
+    const failedFinding = saved && saved.link_status === "FAILED" && (target === "supplier" || url.endsWith("refresh-links"));
+    $("message").textContent = failedFinding
+      ? "Decision saved, but engagement finding failed. Review the error and use Find engagements again to retry."
+      : "Decision saved. Review status and engagement proposals have been refreshed.";
+    const card = [...document.querySelectorAll(".incident-card")].find(item => item.dataset.incidentId === row.incident_id);
+    const savedPanel = card && card.querySelector('[data-review-target="' + target + '"]');
+    if (savedPanel) savedPanel.focus({preventScroll: true});
   } catch (failure) {
     error.textContent = failure.message;
     error.hidden = false;
+    $("message").className = "message error";
+    $("message").textContent = failure.message;
   } finally {
-    savingReview = false;
+    busy = false;
     panel.removeAttribute("aria-busy");
-    controls.forEach((control, index) => { control.disabled = disabledStates[index]; });
+    unlock();
   }
 }
 
 async function loadDashboard() {
-  if (savingReview || loadingDashboard) return;
-  loadingDashboard = true;
-  const controls = [...document.querySelectorAll("#incident-list button, #incident-list select, #incident-list textarea")];
-  const disabledStates = controls.map(control => control.disabled);
-  for (const control of controls) control.disabled = true;
-  $("reload").disabled = true;
-  for (const button of document.querySelectorAll("[data-filter]")) button.disabled = true;
+  if (busy) return;
+  busy = true;
+  const unlock = lockControls();
   $("message").hidden = true;
   try {
     const response = await fetch("/api/dashboard", {cache: "no-store"});
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Could not load model results.");
+    if (!response.ok || data.error) throw new Error(apiError(data, "Could not load incidents."));
     showDashboard(data);
-    for (const button of document.querySelectorAll("[data-filter]")) button.disabled = false;
-  } catch (error) {
-    records = [];
-    $("filter-summary").textContent = "";
-    $("message").textContent = error.message;
+  } catch (failure) {
+    $("message").textContent = failure.message;
     $("message").className = "message error";
     $("message").hidden = false;
-    $("incident-list").replaceChildren();
-    $("dashboard-empty").hidden = true;
-    $("supplier-catalog-note").hidden = true;
-    for (const element of document.querySelectorAll("[id$='-count']")) element.textContent = "—";
   } finally {
-    loadingDashboard = false;
-    controls.forEach((control, index) => { control.disabled = disabledStates[index]; });
-    $("reload").disabled = false;
+    busy = false;
+    unlock();
   }
 }
-for (const button of document.querySelectorAll("[data-filter]")) {
-  button.addEventListener("click", () => {
-    activeFilter = button.dataset.filter;
-    renderRecords();
-  });
+
+for (const control of document.querySelectorAll("[data-filter]")) {
+  control.addEventListener("click", () => { activeFilter = control.dataset.filter; renderRecords(); });
 }
+$("search").addEventListener("input", renderRecords);
+$("review-filter").addEventListener("change", renderRecords);
 $("reload").addEventListener("click", loadDashboard);
+window.addEventListener("hashchange", () => { expandedId = readHash(); renderRecords(); });
 loadDashboard();

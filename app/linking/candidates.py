@@ -28,19 +28,19 @@ def names_match(supplier, candidate):
 
 
 def find_candidates(supplier_name, engagements, max_candidates=70):
-    if max_candidates < 1:
-        raise ValueError("max_candidates must be a positive integer.")
+    if max_candidates is not None and (type(max_candidates) is not int or max_candidates < 1):
+        raise ValueError("max_candidates must be a positive integer or None.")
     supplier = normalize_name(supplier_name)
     if supplier in ("", "unknown", "n a", "none", "null", "not known", "not available"):
         return []
-    # shortcut: lexical matching can miss aliases; add explicit aliases if real records need them.
+    # Lexical matching can miss aliases such as EY versus Ernst & Young.
     candidates = []
     for engagement in engagements:
         for column in ("THIRD_PARTY_NAME", "THIRD_PARTY_NORMALISED_NAME"):
             name = normalize_name(engagement.get(column, ""))
             if names_match(supplier, name):
                 candidates.append(engagement)
-                if len(candidates) >= max_candidates:
+                if max_candidates is not None and len(candidates) >= max_candidates:
                     return candidates
                 break
     return candidates

@@ -1,3 +1,5 @@
+"""The single incident dashboard: inspect proposals and review three ordered steps."""
+
 import csv
 from pathlib import Path
 from typing import Literal
@@ -9,107 +11,217 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.classification_review import (
-    REVIEW_COLUMNS, REVIEW_FILE, REVIEW_LOCK, SUPPLIERS_FILE,
-    classification_is_approved, load_reviewed_rows, ready_for_linking,
-    save_review, supplier_options,
+from app.incidents import (
+    CLASSES, ENGAGEMENT_FILE, RESULTS_FILE, SUPPLIERS_FILE,
+    apply_classification_review, apply_supplier_review, classification_complete,
+    effective_classification, effective_supplier_name, engagement_values, read_incidents,
+    review_complete, row_version, save_incident, source_fields,
+    supplier_complete, supplier_options,
+)
+from app.linking.candidates import find_candidates
+from app.linking.linking import (
+    catalog_hash, empty_link, find_engagements, load_max_candidates, read_engagements,
 )
 
+
 ROOT = Path(__file__).resolve().parents[2]
-RESULTS_FILE = ROOT / "data/run/LLM_OUTPUT.csv"
-app = FastAPI(title="HSBC Incident Dashboard", docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(title="HSBC Incident Review", docs_url=None, redoc_url=None, openapi_url=None)
 app.state.results_file = RESULTS_FILE
-app.state.review_file = REVIEW_FILE
 app.state.suppliers_file = SUPPLIERS_FILE
+app.state.engagements_file = ENGAGEMENT_FILE
 app.state.demo = False
 
 
-class ClassificationReviewDecision(BaseModel):
+class ReviewDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    INCIDENT_ID: str = Field(min_length=1, strict=True)
+    incident_id: str = Field(min_length=1, strict=True)
     version: str = Field(pattern=r"^[0-9a-f]{64}$", strict=True)
-    target: Literal["classification", "supplier"]
-    decision: Literal["approved", "corrected", "needs_review"]
-    classification: Literal["", "HSBC", "SUPPLIER"] = ""
+    target: Literal["classification", "supplier", "engagement"]
+    decision: Literal["approved", "disagree"]
+    classification: Literal["", "HSBC", "SUPPLIER", "UNCERTAIN"] = ""
     supplier_name: str = Field(default="", strict=True)
+    engagement_id: str = Field(default="", strict=True)
     reason: str = Field(default="", max_length=2000, strict=True)
 
 
+class RefreshLinks(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    version: str = Field(pattern=r"^[0-9a-f]{64}$", strict=True)
+
+
 def read_evidence_columns(row):
-    names = []
-    for column in ("evidence_column", "supporting_evidence"):
-        if column in row:
-            for value in (row[column] or "").split(","):
-                name = value.strip()
-                if name:
-                    names.append(name)
-            return names
-
-    # Read older numbered columns without rewriting the saved file.
-    for column, value in row.items():
-        if column.startswith("evidence_") and column.endswith("_column") and value:
-            names.append(value)
-    return names
+    return [name.strip() for name in row.get("evidence_column", "").split(",") if name.strip()]
 
 
-def get_dashboard_data(path, review_path=None, suppliers_path=None):
-    rows = []
+def get_dashboard_data(path=RESULTS_FILE, suppliers_path=SUPPLIERS_FILE, engagements_path=ENGAGEMENT_FILE):
+    rows = read_incidents(path)
+    names, supplier_note = supplier_options(suppliers_path)
+    engagement_note = ""
     try:
-        if review_path is not None:
-            rows = load_reviewed_rows(path, review_path)
-        elif path.exists():
-            with path.open(encoding="utf-8-sig", newline="") as file:
-                rows = list(csv.DictReader(file))
-        counts = {"total": 0, "HSBC": 0, "SUPPLIER": 0, "UNCERTAIN": 0, "failed": 0}
-        records = []
-        for row in rows:
-            status = row["processing_status"]
-            if status not in ("success", "failed"):
-                return {"error": "LLM_OUTPUT.csv contains an invalid processing status."}
-            classification = row.get("classification", "")
-            if status == "success":
-                if classification not in ("HSBC", "SUPPLIER", "UNCERTAIN"):
-                    return {"error": "Classification must be HSBC, SUPPLIER, or UNCERTAIN."}
-                counts[classification] += 1
-                counts["total"] += 1
-            else:
-                counts["failed"] += 1
-            record = {
-                "incident_id": row["INCIDENT_ID"],
-                "summary": row.get("INCIDENT_SHORT_DESCRIPTION", ""),
-                "classification": classification,
-                "processing_status": status,
-                "error": row.get("error", ""),
-                "input": {name: value for name, value in row.items() if name.isupper()},
-                "evidence_column": read_evidence_columns(row),
-            }
-            for name in ("key_root_cause", "decision_rationale", "attribution_evidence_strength", "supplier_name",
-                         "supplier_product_or_service", "supplier_action_or_failure",
-                         "supplier_causal_explanation", "supplier_accountability_reason", "supplier_more_info"):
-                record[name] = row.get(name, "")
-            if review_path is not None:
-                record["review"] = {name: row[name] for name in REVIEW_COLUMNS}
-                record["review"]["review_version"] = row["review_version"]
-                record["review"]["review_stale"] = row["review_stale"]
-            records.append(record)
-        data = {"records": records, "counts": counts}
-        if review_path is not None:
-            names, note = supplier_options(suppliers_path or SUPPLIERS_FILE)
-            data["supplier_names"] = names
-            data["supplier_catalog_note"] = note
-            approved = sum(classification_is_approved(row) for row in rows)
-            data["review_counts"] = {
-                "classification_approved": approved,
-                "classification_pending": len(rows) - approved,
-                "supplier_pending": sum(classification_is_approved(row) and row["reviewed_classification"] == "SUPPLIER" and not ready_for_linking(row) for row in rows),
-                "ready_for_linking": sum(ready_for_linking(row) for row in rows),
-            }
-        return data
-    except ValueError as error:
-        return {"error": str(error)}
-    except (OSError, UnicodeError, csv.Error, KeyError, TypeError):
-        return {"error": "Could not read LLM_OUTPUT.csv. Check its columns and UTF-8 encoding, or generate a new batch with supplier details."}
+        read_engagements(engagements_path)
+    except (OSError, UnicodeError, csv.Error, ValueError):
+        engagement_note = "ENG_ALL.csv is missing or invalid. Engagement suggestions and approval require the catalog."
+    counts = {"total": len(rows), "classified": 0, "HSBC": 0, "SUPPLIER": 0, "UNCERTAIN": 0,
+              "failed": 0, "pending": 0, "review_pending": 0, "review_complete": 0, "human_linked": 0}
+    for target in ("classification", "supplier", "engagement"):
+        for status in ("approved", "disagree", "pending", "not_applicable"):
+            counts[f"{target}_{status}"] = 0
+    incidents = []
+    for row in rows:
+        if row["processing_status"] == "success":
+            counts["classified"] += 1
+            counts[row["classification"]] += 1
+        else:
+            counts[row["processing_status"]] += 1
+        complete = review_complete(row)
+        counts["review_complete" if complete else "review_pending"] += 1
+        if complete and row["reviewed_engagement_id"]:
+            counts["human_linked"] += 1
+        for target in ("classification", "supplier", "engagement"):
+            counts[f"{target}_{row[target + '_review_status']}"] += 1
+        incident = dict(row)
+        incident.update(
+            incident_id=row["INCIDENT_ID"],
+            summary=row.get("INCIDENT_SHORT_DESCRIPTION", ""),
+            review_version=row_version(row),
+            effective_classification=effective_classification(row),
+            effective_supplier_name=effective_supplier_name(row),
+            classification_complete=classification_complete(row),
+            supplier_complete=supplier_complete(row),
+            review_complete=complete,
+            input_fields=[{"name": name, "value": value} for name, value in source_fields(row).items()],
+            evidence_column=read_evidence_columns(row),
+        )
+        incidents.append(incident)
+    return {"incidents": incidents, "counts": counts, "supplier_names": names,
+            "supplier_catalog_note": supplier_note, "engagement_catalog_note": engagement_note,
+            "error": "", "demo": False}
+
+
+def current_incident(incident_id, version=None):
+    rows = read_incidents(app.state.results_file)
+    row = next((row for row in rows if row["INCIDENT_ID"] == incident_id), None)
+    if row is None:
+        raise ValueError("This incident no longer exists. Refresh the dashboard.")
+    if version is not None and row_version(row) != version:
+        raise ValueError("This incident changed after you opened it. Refresh before saving.")
+    return row
+
+
+def engagement_data(row):
+    engagements = read_engagements(app.state.engagements_file)
+    name = row["link_supplier_name"] or effective_supplier_name(row)
+    matches = find_candidates(name, engagements, None)
+    by_id = {engagement["ENGAGEMENT_ID"]: engagement for engagement in matches}
+    suggestions = []
+    for number in range(1, 6):
+        prefix = f"link_{number}_"
+        engagement_id = row[prefix + "engagement_id"]
+        if engagement_id:
+            suggestions.append({
+                "engagement_id": engagement_id,
+                "reason": row[prefix + "reason"],
+                "evidence_strength": row[prefix + "evidence_strength"],
+                "engagement": by_id.get(engagement_id, {}),
+            })
+    stale = bool(row["link_catalog_hash"] and row["link_catalog_hash"] != catalog_hash(engagements))
+    return {"review_version": row_version(row), "matches": matches, "suggestions": suggestions,
+            "selected_engagement_id": row["linked_engagement_id"],
+            "reviewed_engagement_id": row["reviewed_engagement_id"], "link_stale": stale,
+            "match_count": len(matches), "candidate_count": row["link_candidate_count"],
+            "suggestion_count": len(suggestions), "supplier_name": name,
+            "saved_engagement": {key[4:]: value for key, value in row.items() if key.startswith("ENG_")}, "error": ""}
+
+
+def apply_engagement_review(row, decision):
+    if not supplier_complete(row):
+        raise ValueError("Complete classification and supplier-name reviews before reviewing engagement.")
+    if row["link_status"] == "RUNNING":
+        raise ValueError("Wait for engagement suggestions to finish before saving a decision.")
+    if row["link_supplier_name"] != row["reviewed_supplier_name"]:
+        raise ValueError("Refresh engagement suggestions for the current supplier before approving a link.")
+    data = engagement_data(row)
+    if data["link_stale"] or not row["link_catalog_hash"]:
+        raise ValueError("The engagement catalog changed. Refresh suggestions before saving a decision.")
+    selected = decision.engagement_id
+    if decision.decision == "approved":
+        if not selected or selected != row["linked_engagement_id"]:
+            raise ValueError("Approved must confirm the model default. Choose Disagree and give a reason to change it.")
+    if selected and selected not in {item["ENGAGEMENT_ID"] for item in data["matches"]}:
+        raise ValueError("Choose an engagement from the current supplier's matching catalog rows.")
+    updated = dict(row)
+    engagements = read_engagements(app.state.engagements_file)
+    if row["link_catalog_hash"] != catalog_hash(engagements):
+        raise ValueError("The engagement catalog changed. Refresh suggestions before saving a decision.")
+    updated.update(engagement_values(row, engagements, selected))
+    updated["engagement_review_status"] = decision.decision
+    updated["reviewed_engagement_id"] = selected
+    updated["engagement_review_reason"] = decision.reason.strip() if decision.decision == "disagree" else ""
+    return updated
+
+
+def refresh_engagements(row):
+    """Save the changed name first, then recompute; discard a stale model response."""
+    if not supplier_complete(row):
+        raise ValueError("Complete classification and supplier-name reviews before refreshing engagements.")
+    updated = dict(row)
+    name = row["reviewed_supplier_name"]
+    updated.update(empty_link(name, status="RUNNING", reason="Finding engagement suggestions."))
+    updated.update({key: "" for key in row if key.startswith("ENG_")})
+    updated["engagement_review_status"] = "pending"
+    updated["reviewed_engagement_id"] = ""
+    updated["engagement_review_reason"] = ""
+    running = save_incident(app.state.results_file, updated, row_version(row))
+    try:
+        max_candidates = load_max_candidates()
+        engagements = read_engagements(app.state.engagements_file)
+        engagement_values(running, engagements, "")
+        proposal = find_engagements(running, engagements, name, max_candidates)
+        proposal.update(engagement_values(running, engagements, proposal["linked_engagement_id"]))
+    except (OSError, UnicodeError, csv.Error, ValueError) as error:
+        proposal = empty_link(name, status="FAILED", reason="Could not prepare engagement suggestions. Check the catalog and settings, then retry.")
+        proposal["link_error"] = type(error).__name__
+    updated = dict(running)
+    updated.update(proposal)
+    return save_incident(app.state.results_file, updated, row_version(running))
+
+
+def save_review(decision):
+    row = current_incident(decision.incident_id, decision.version)
+    if decision.decision == "disagree" and not decision.reason.strip():
+        raise ValueError("Disagree requires a nonblank reason.")
+    if decision.target == "classification":
+        updated = apply_classification_review(row, decision)
+    elif decision.target == "supplier":
+        names, _ = supplier_options(app.state.suppliers_file)
+        updated = apply_supplier_review(row, decision, names)
+    else:
+        updated = apply_engagement_review(row, decision)
+    if decision.target in ("classification", "supplier") and effective_classification(updated) == "SUPPLIER":
+        updated.update({key: "" for key in row if key.startswith("ENG_")})
+        if updated["linked_engagement_id"]:
+            try:
+                engagements = read_engagements(app.state.engagements_file)
+                if updated["link_catalog_hash"] == catalog_hash(engagements):
+                    updated.update(engagement_values(updated, engagements, updated["linked_engagement_id"]))
+            except (OSError, UnicodeError, csv.Error, ValueError):
+                # Classification review still works while the catalog is unavailable.
+                pass
+    saved = save_incident(app.state.results_file, updated, decision.version)
+    if decision.target == "supplier":
+        name_changed = saved["reviewed_supplier_name"] != saved["link_supplier_name"]
+        missing_proposal = saved["link_status"] in ("PENDING", "SKIPPED", "NOT_APPLICABLE")
+        if name_changed or missing_proposal:
+            saved = refresh_engagements(saved)
+    return saved
+
+
+def error_response(error):
+    if isinstance(error, ValueError):
+        status = 409 if "changed after you opened" in str(error) else 422
+        return JSONResponse({"error": str(error)}, status_code=status)
+    return JSONResponse({"error": "Could not read or save the incident files. Check UTF-8 CSV structure and file access, then refresh."}, status_code=400)
 
 
 @app.middleware("http")
@@ -132,7 +244,7 @@ async def local_requests(request: Request, call_next):
 
 @app.exception_handler(RequestValidationError)
 async def invalid_request(request, error):
-    return JSONResponse({"error": "Invalid review request. Supply an incident, decision, reason, and current review version."}, status_code=422)
+    return JSONResponse({"error": "Invalid review request. Supply a decision and the current incident version."}, status_code=422)
 
 
 @app.get("/")
@@ -142,22 +254,39 @@ def dashboard_page():
 
 @app.get("/api/dashboard")
 def dashboard_data():
-    with REVIEW_LOCK:
-        data = get_dashboard_data(app.state.results_file, app.state.review_file, app.state.suppliers_file)
-    data["demo"] = app.state.demo
-    status = 400 if "error" in data else 200
-    return JSONResponse(data, status_code=status)
-
-
-@app.post("/api/classification-review")
-def save_classification_review(decision: ClassificationReviewDecision):
     try:
-        save_review(app.state.results_file, app.state.review_file, app.state.suppliers_file, decision)
-    except ValueError as error:
-        status = 409 if "changed after you opened" in str(error) else 422
-        return JSONResponse({"error": str(error)}, status_code=status)
-    except (OSError, UnicodeError, csv.Error):
-        return JSONResponse({"error": "Could not save CLASSIFICATION_REVIEW.csv. Check the file and refresh before retrying."}, status_code=400)
+        data = get_dashboard_data(app.state.results_file, app.state.suppliers_file, app.state.engagements_file)
+        data["demo"] = app.state.demo
+        return JSONResponse(data)
+    except (ValueError, OSError, UnicodeError, csv.Error) as error:
+        return error_response(error)
+
+
+@app.get("/api/incidents/{incident_id}/engagements")
+def incident_engagements(incident_id: str):
+    try:
+        row = current_incident(incident_id)
+        return JSONResponse(engagement_data(row))
+    except (ValueError, OSError, UnicodeError, csv.Error) as error:
+        return error_response(error)
+
+
+@app.post("/api/review")
+def review_incident(decision: ReviewDecision):
+    try:
+        save_review(decision)
+    except (ValueError, OSError, UnicodeError, csv.Error) as error:
+        return error_response(error)
+    return dashboard_data()
+
+
+@app.post("/api/incidents/{incident_id}/refresh-links")
+def rerun_links(incident_id: str, request: RefreshLinks):
+    try:
+        row = current_incident(incident_id, request.version)
+        refresh_engagements(row)
+    except (ValueError, OSError, UnicodeError, csv.Error) as error:
+        return error_response(error)
     return dashboard_data()
 
 

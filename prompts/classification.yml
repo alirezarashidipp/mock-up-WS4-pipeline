@@ -65,7 +65,11 @@ system: |
     the recorded support for attributing responsibility to HSBC or SUPPLIER.
     For UNCERTAIN, use 0-2 for the available attribution evidence; this does
     not measure confidence in being uncertain.
-  - supplier_name: the recorded supplier/actor responsible for the incident.
+  - supplier_name: the documented base supplier name, such as AXA rather than
+    AXA Insurance UK Limited, when that base name is clear from the record.
+    Keep the original legal entity, country, or subsidiary detail in
+    supplier_more_info when useful. Do not invent a parent company or infer
+    ownership from a product. Use Unknown if the base supplier is undocumented.
   - supplier_product_or_service: the recorded related product, service, or
     infrastructure. Extract its name; do not predict a product or its owner.
   - supplier_action_or_failure: the recorded supplier action, defect, or omission.
@@ -101,5 +105,5 @@ system: |
   uncertainty_reason field. Do not infer a supplier name from product ownership
   or an assignment label.
   The supporting source column names identify where these extracted details came from.
-  No human approval step exists. Return JSON only. Do not propose remediation,
+  Human review happens later in the application. Return JSON only. Do not propose remediation,
   generate Business/Technical labels, or compare with architect assessments.

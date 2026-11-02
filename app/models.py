@@ -48,7 +48,7 @@ class Classification(BaseModel):
         description="Evidence for attributing responsibility: 0 unsupported, 1 weak, 2 moderate, 3 strong, 4 very strong. For UNCERTAIN use 0-2, not confidence in uncertainty. Not a probability."
     )
     supplier_name: str | None = Field(
-        description="For SUPPLIER, the responsible supplier or actor named in the record, or Unknown; otherwise null."
+        description="For SUPPLIER, the documented base supplier name (for example AXA), without legal-entity or country suffixes when the base name is clear, or Unknown; otherwise null."
     )
     supplier_product_or_service: str | None = Field(
         description="For SUPPLIER, the related product, service, or infrastructure recorded, or Unknown; otherwise null."

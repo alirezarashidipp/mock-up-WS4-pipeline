@@ -3,14 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Incident classification | HSBC</title>
+  <title>Incident review | HSBC</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/pictures/HSBC_logo_(2018) (1).svg">
   <link rel="stylesheet" href="/assets/style.css">
   <script src="/assets/dashboard/app.js" defer></script>
 </head>
-<body class="classification-app">
+<body>
+  <a class="skip-link" href="#incident-list">Skip to incidents</a>
   <header class="topbar">
-    <a class="brand" href="/" aria-label="HSBC incident classification dashboard">
-      <!-- Artwork from pictures/HSBC_logo_(2018) (1).svg. -->
+    <a class="brand" href="/" aria-label="HSBC incident review dashboard">
       <svg class="brand-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 315.9 85" role="img" aria-labelledby="hsbc-logo-title">
 <title id="hsbc-logo-title">HSBC</title>
 <rect x="42.6" width="85" height="85" fill="#ffffff"/>
@@ -28,51 +29,48 @@
 <path d="M301.2,61c-11.5,0-16.6-7.3-16.6-18.2s5.7-18.8,17-18.8c7.1,0,14,3.2,14.2,11.2h-8c-0.4-3.6-2.8-5.4-6.2-5.4
 	c-7,0-9.1,7.5-9.1,13.2c0,5.7,2.1,12.3,8.8,12.3c3.5,0,6.1-1.9,6.6-5.5h8C315.1,58,308.6,61,301.2,61z"/>
 </svg>
-      <span class="brand-divider" aria-hidden="true"></span><span class="brand-caption">WS4 / INCIDENT DASHBOARD</span>
+      <span class="brand-divider" aria-hidden="true"></span><span class="brand-caption">WS4 / INCIDENT REVIEW</span>
     </a>
     <span class="mode" id="mode">Connecting…</span>
   </header>
-<main>
-  <section class="page-heading"><div><p class="eyebrow">INCIDENT ACCOUNTABILITY / WS4</p><h1>Incident classification</h1><p class="subtitle">Review model classifications and supplier names. Approved Supplier decisions become eligible for linking.</p></div><button id="reload" type="button" class="button">Refresh</button></section>
-  <p id="demo-note" class="demo-note" hidden>Demo: synthetic incidents and example model results.</p>
-  <div id="message" class="message" role="status" aria-live="polite" hidden></div>
-  <section class="stats" aria-label="Classification counts">
-    <button type="button" class="stat stat-filter" data-filter="total" aria-pressed="true" aria-controls="incident-list" disabled><strong id="total-count">—</strong><span>Classified incidents</span></button>
-    <button type="button" class="stat stat-filter" data-filter="HSBC" aria-pressed="false" aria-controls="incident-list" disabled><strong id="HSBC-count">—</strong><span>HSBC</span></button>
-    <button type="button" class="stat stat-filter" data-filter="SUPPLIER" aria-pressed="false" aria-controls="incident-list" disabled><strong id="SUPPLIER-count">—</strong><span>SUPPLIER</span></button>
-    <button type="button" class="stat stat-filter" data-filter="UNCERTAIN" aria-pressed="false" aria-controls="incident-list" disabled><strong id="UNCERTAIN-count">—</strong><span>UNCERTAIN</span></button>
-    <button type="button" class="stat stat-filter" data-filter="failed" aria-pressed="false" aria-controls="incident-list" disabled><strong id="failed-count">—</strong><span>Processing failures</span></button>
-  </section>
-  <section class="classification-review-overview" aria-labelledby="review-overview-heading">
-    <h2 id="review-overview-heading">Human review progress</h2>
-    <p class="field-note">Counts cover all saved incidents. Model counts above stay unchanged when a reviewer corrects a result.</p>
-    <div class="stats">
-      <div class="stat"><strong id="review-classification_approved-count">—</strong><span>Classification approved / corrected</span></div>
-      <div class="stat"><strong id="review-classification_pending-count">—</strong><span>Classification awaiting decision</span></div>
-      <div class="stat"><strong id="review-supplier_pending-count">—</strong><span>Supplier name awaiting decision</span></div>
-      <div class="stat"><strong id="review-ready_for_linking-count">—</strong><span>Ready for linking</span></div>
+  <main>
+    <section class="page-heading">
+      <div><p class="eyebrow">INCIDENT ACCOUNTABILITY / WS4</p><h1>Incident review</h1><p class="subtitle">Automatic classification and engagement proposals. Three human decisions, one incident at a time.</p></div>
+      <button id="reload" type="button" class="button">Refresh</button>
+    </section>
+    <p id="demo-note" class="notice" hidden>Synthetic demonstration data and example model results.</p>
+    <p id="message" class="message" role="status" aria-live="polite" hidden></p>
+    <section class="stats" aria-label="Filter by original model result">
+      <button type="button" class="stat" data-filter="total" aria-pressed="true" aria-controls="incident-list"><strong id="total-count">—</strong><span>All incidents</span></button>
+      <button type="button" class="stat" data-filter="HSBC" aria-pressed="false" aria-controls="incident-list"><strong id="HSBC-count">—</strong><span>HSBC</span></button>
+      <button type="button" class="stat" data-filter="SUPPLIER" aria-pressed="false" aria-controls="incident-list"><strong id="SUPPLIER-count">—</strong><span>Supplier</span></button>
+      <button type="button" class="stat" data-filter="UNCERTAIN" aria-pressed="false" aria-controls="incident-list"><strong id="UNCERTAIN-count">—</strong><span>Uncertain</span></button>
+      <button type="button" class="stat" data-filter="failed" aria-pressed="false" aria-controls="incident-list"><strong id="failed-count">—</strong><span>Processing failures</span></button>
+      <button type="button" class="stat" data-filter="pending" aria-pressed="false" aria-controls="incident-list"><strong id="pending-count">—</strong><span>Awaiting processing</span></button>
+    </section>
+    <section class="review-overview" aria-labelledby="review-heading">
+      <div><h2 id="review-heading">Human review progress</h2><p class="field-note">All saved incidents. Model proposals remain separate from human decisions.</p></div>
+      <p><strong id="review-complete-count">—</strong> complete <span aria-hidden="true">/</span> <strong id="review-pending-count">—</strong> pending <span class="linked-count"><strong id="human-linked-count">—</strong> human-confirmed links</span></p>
+      <progress id="review-progress" value="0" max="1" aria-label="Completed incident reviews"></progress>
+    </section>
+    <p id="supplier-catalog-note" class="notice" hidden></p>
+    <p id="engagement-catalog-note" class="notice" hidden></p>
+    <div class="filters">
+      <label>Find an incident<input id="search" type="search" placeholder="Incident ID, description, supplier…" autocomplete="off"></label>
+      <label>Human review<select id="review-filter"><option value="all">All review states</option><option value="pending">Pending review</option><option value="complete">Review complete</option></select></label>
     </div>
-    <p id="supplier-catalog-note" class="classification-catalog-note" role="status" hidden></p>
-  </section>
-  <section aria-labelledby="results-heading">
-    <h2 id="results-heading">Classified incidents</h2>
-    <p id="filter-summary" class="field-note" role="status" aria-live="polite"></p>
-    <p class="field-note">UNCERTAIN means the record does not support choosing HSBC or SUPPLIER; it is a valid model result, not a processing failure. Evidence strength rates support for attributing responsibility to a party, not the probability that the decision is correct. Older results without this score show Not recorded.</p>
-    <details>
-      <summary>Evidence strength scale · 0 to 4</summary>
-      <ul class="record-text">
-        <li><strong>0 · Unsupported:</strong> No recorded causal evidence distinguishes HSBC from Supplier. Choose UNCERTAIN.</li>
-        <li><strong>1 · Weak:</strong> Only indirect references or unconfirmed suspicion support the tag; key causal facts are missing.</li>
-        <li><strong>2 · Moderate:</strong> Some causal evidence exists, but a material contradiction or missing causal link remains.</li>
-        <li><strong>3 · Strong:</strong> Concrete facts support the responsible party and causal mechanism; remaining gaps do not substantially challenge the tag.</li>
-        <li><strong>4 · Very strong:</strong> A clear documented causal finding has supporting details and no unresolved material counterevidence in the supplied record.</li>
-      </ul>
-      <p class="field-note">For UNCERTAIN, a score of 0-2 describes limited support for assigning responsibility to either party, not confidence in being uncertain. A score of 4 does not mean 100% accuracy. Repeated copies of one statement are not independent evidence. This score does not rate supplier-name extraction or engagement matching.</p>
+    <section aria-labelledby="results-heading">
+      <div class="list-heading"><h2 id="results-heading">All incidents</h2><p id="filter-summary" class="field-note" role="status" aria-live="polite"></p></div>
+      <p id="dashboard-empty" class="empty" hidden>No incidents match this filter.</p>
+      <div id="incident-list" class="incident-list" tabindex="-1"></div>
+    </section>
+    <details class="rubrics">
+      <summary>How to read the evidence scores</summary>
+      <p>Both scores use 0–4: unsupported, weak, moderate, strong, very strong. They describe evidence, not measured probabilities.</p>
+      <p><strong>Attribution:</strong> support for assigning responsibility to HSBC or a supplier. UNCERTAIN uses 0–2 and waits for a definite human classification.</p>
+      <p><strong>Engagement:</strong> support for a particular engagement in the supplied candidates. Name similarity alone does not establish the correct engagement. A saved model default still needs your explicit approval.</p>
     </details>
-    <p id="dashboard-empty" class="field-note">No incidents match this filter.</p>
-    <div id="incident-list" class="incident-list"></div>
-  </section>
-  <footer><span>HSBC · Incident classification / WS4</span><span>Model results: LLM_OUTPUT.csv · Human decisions saved separately</span></footer>
-</main>
+    <footer><span>HSBC · Incident review / WS4</span><span>Saved results and decisions · INCIDENTS.csv</span></footer>
+  </main>
 </body>
 </html>
