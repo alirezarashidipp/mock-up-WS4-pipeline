@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "2499eeaf-620c-4f9e-b0b3-cb9b5b1d63fe",
+  "status": "current",
+  "command": "deliver",
+  "type": "dataflow",
+  "input": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\candidate.json",
+  "output": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\ws4-pipeline.html",
+  "specification": {
+    "sha256": "fca639438e12665a852ccb51be8deb117848afa6799b831fed44d7f068ad5c93",
+    "bytes": 12815
+  },
+  "artifact": {
+    "sha256": "1cededa167ff0f7ff8eed6811e55601f7d2fea90ed1931d54e2d2aae26c8cc51",
+    "bytes": 857414
+  }
+}

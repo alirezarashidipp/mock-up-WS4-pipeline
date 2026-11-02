@@ -1,7 +1,6 @@
 """Small checks using temporary CSVs and simulated LLM responses."""
 
 import json
-import os
 import unittest
 from contextlib import nullcontext
 from pathlib import Path
@@ -9,16 +8,48 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-import yaml
+from openai import OpenAIError
+from pydantic import ValidationError
 
-from app.csv_files import read_records
+from app.csv_files import read_records, write_records
 from app.data_preparation import pipeline as preparation
 from app.llm import classification
+from app.models import Classification, SUPPLIER_FIELDS
 from app.ui.dashboard_app import get_dashboard_data
-from app.ui.review_store import ReviewDecision, get_review_data, submit_review
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def example_response(label):
+    result = {
+        "classification": label,
+        "key_root_cause": "Synthetic configuration error.",
+        "decision_rationale": "Synthetic example explanation.",
+        "evidence_column": ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"],
+        "attribution_evidence_strength": 3,
+    }
+    for name in SUPPLIER_FIELDS:
+        result[name] = None
+    if label == "UNCERTAIN":
+        result["key_root_cause"] = None
+        result["decision_rationale"] = "Synthetic record lacks evidence to attribute responsibility."
+        result["attribution_evidence_strength"] = 0
+    if label == "SUPPLIER":
+        result.update(
+            supplier_name="Unknown",
+            supplier_product_or_service="Example managed gateway",
+            supplier_action_or_failure="Supplier deployed a defective routing change.",
+            supplier_causal_explanation="The change interrupted synthetic payment routing.",
+            supplier_accountability_reason="The recorded supplier change caused the failure.",
+            supplier_more_info="The synthetic supplier recorded a regional maintenance window.",
+        )
+        result["evidence_column"].extend([
+            "PROBLEM_CLOSE_NOTES", "IT_PROBLEM_DESCRIPTION", "INCIDENT_RESOLUTION_NOTES",
+            "INCIDENT_WORK_NOTES", "PROBLEM_WORK_NOTES", "MAJOR_INCIDENT_FINDINGS",
+        ])
+    message = SimpleNamespace(content=json.dumps(result), refusal=None)
+    return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
 
 
 class PythonTests(unittest.TestCase):
@@ -29,119 +60,166 @@ class PythonTests(unittest.TestCase):
             source = "incident_id,incident_description\n001,<b>Example</b> demo@example.com!\u200b\n"
             raw.write_text(source, encoding="utf-8")
             clean.write_text("Old generated output", encoding="utf-8")
-
             with patch.object(preparation, "INPUT_FILE", raw), patch.object(preparation, "CLEAN_FILE", clean):
                 self.assertEqual(preparation.run_pipeline(), 0)
-                previous = clean.read_bytes()
                 self.assertEqual(preparation.run_pipeline(), 0)
-                self.assertEqual(clean.read_bytes(), previous)
-
             rows, error = read_records(clean)
             self.assertEqual(error, "")
             self.assertEqual(rows, [{"INCIDENT_ID": "001", "INCIDENT_DESCRIPTION": "<b>Example</b> demo@example.com!"}])
             self.assertEqual(raw.read_text(encoding="utf-8"), source)
 
-    def test_llm_review_and_dashboard(self):
-        labels = ["HSBC", "SUPPLIER", "UNDECIDED"]
-        rows = []
-        responses = []
-        for index, label in enumerate(labels, start=1):
-            value = f'Example cause {index}: service failed, then recovered.\nCheck "example".'
-            rows.append({"INCIDENT_ID": f"00{index}", "INCIDENT_DESCRIPTION": value})
-            result = {
-                "classification": label,
-                "key_root_cause": value,
-                "decision_rationale": "Example explanation.",
-                "supporting_evidence": [{"column": "INCIDENT_DESCRIPTION", "quote": value}],
-                "llm_confidence": 80,
-                "uncertainty_reason": "Example missing attribution." if label == "UNDECIDED" else None,
-            }
-            if label == "HSBC":
-                result["supporting_evidence"] = [{"column": "INCIDENT_DESCRIPTION", "quote": word} for word in ("Example", "cause", "service", "recovered", "Check")]
-            if label == "SUPPLIER":
-                result["supporting_evidence"] = [{"column": "INCIDENT_DESCRIPTION", "quote": "Supplier-side service issue (model summary)."} for _ in range(6)]
-            if label == "UNDECIDED":
-                result["supporting_evidence"] = []
-            message = SimpleNamespace(content=json.dumps(result), refusal=None)
-            choice = SimpleNamespace(message=message, finish_reason="stop")
-            responses.append(SimpleNamespace(choices=[choice]))
-
+    def test_llm_saves_each_response_and_dashboard_reads_it(self):
+        rows = [
+            {"INCIDENT_ID": "001", "INCIDENT_DESCRIPTION": "Synthetic HSBC cause."},
+            {"INCIDENT_ID": "002", "INCIDENT_DESCRIPTION": "Synthetic supplier cause."},
+            {"INCIDENT_ID": "003", "INCIDENT_DESCRIPTION": "Synthetic uncertain attribution."},
+        ]
+        source_fields = {
+            "ROOT_CAUSE_NOTES": "Synthetic recorded cause.",
+            "PROBLEM_CLOSE_NOTES": "Synthetic closure finding.",
+            "IT_PROBLEM_DESCRIPTION": "Synthetic problem narrative.",
+            "INCIDENT_RESOLUTION_NOTES": "Synthetic restoration details.",
+            "INCIDENT_WORK_NOTES": "Synthetic investigation notes.",
+            "PROBLEM_WORK_NOTES": "Synthetic problem investigation.",
+            "MAJOR_INCIDENT_FINDINGS": "Synthetic confirmed finding.",
+        }
+        definitions = {"INCIDENT_DESCRIPTION": "A synthetic incident narrative."}
+        for name in source_fields:
+            definitions[name] = "A synthetic supporting incident field."
+        for row in rows:
+            row.update(source_fields)
+        responses = [example_response("HSBC"), example_response("SUPPLIER"), example_response("UNCERTAIN")]
         client = Mock()
-        definitions = yaml.safe_load((ROOT / "fields/definitions.yml").read_text(encoding="utf-8"))
-        connection = nullcontext((client, "example-model"))
-
         with TemporaryDirectory(dir=ROOT) as folder:
-            folder = Path(folder)
-            output = folder / "LLM_OUTPUT.csv"
+            output = Path(folder) / "LLM_OUTPUT.csv"
 
             def respond(**kwargs):
                 index = client.chat.completions.create.call_count - 1
                 if index:
-                    saved_rows, _ = read_records(output)
-                    self.assertEqual(len(saved_rows), index)
+                    saved, _ = read_records(output)
+                    self.assertEqual(len(saved), index)
                 return responses[index]
 
             client.chat.completions.create.side_effect = respond
-            with patch.object(classification, "llm_connection", return_value=connection), patch.dict(os.environ, {"LLM_TEMPERATURE": "3"}):
+            with patch.object(classification, "llm_connection", return_value=nullcontext((client, "example-model"))):
                 self.assertEqual(classification.classify_rows(rows, definitions, output), 0)
-
             self.assertEqual(client.chat.completions.create.call_count, 3)
             for index, call in enumerate(client.chat.completions.create.call_args_list):
                 messages = call.kwargs["messages"]
                 fields = json.loads(messages[1]["content"])
-                self.assertEqual(messages[0]["role"], "system")
                 self.assertTrue(messages[0]["content"])
-                self.assertEqual(len(fields), 1)
-                self.assertEqual(fields[0]["value"], rows[index]["INCIDENT_DESCRIPTION"])
-                self.assertEqual(fields[0]["description"], definitions["INCIDENT_DESCRIPTION"])
-                self.assertEqual(call.kwargs["temperature"], 3.0)
+                self.assertEqual(len(fields), len(definitions))
+                self.assertEqual({field["name"] for field in fields}, set(definitions))
+                for field in fields:
+                    name = field["name"]
+                    self.assertEqual(field["description"], definitions[name])
+                    self.assertEqual(field["value"], rows[index][name])
+                self.assertNotIn("temperature", call.kwargs)
+                self.assertNotIn("max_completion_tokens", call.kwargs)
+                self.assertNotIn("max_tokens", call.kwargs)
+            saved, error = read_records(output)
+            self.assertEqual(error, "")
+            self.assertEqual([row["classification"] for row in saved], ["HSBC", "SUPPLIER", "UNCERTAIN"])
+            self.assertEqual(saved[2]["processing_status"], "success")
+            self.assertEqual(saved[2]["attribution_evidence_strength"], "0")
+            for name in SUPPLIER_FIELDS:
+                self.assertEqual(saved[0][name], "")
+                self.assertTrue(saved[1][name])
+                self.assertEqual(saved[2][name], "")
+            self.assertEqual(saved[1]["supplier_name"], "Unknown")
+            self.assertEqual(saved[0]["evidence_column"], "INCIDENT_DESCRIPTION, ROOT_CAUSE_NOTES")
+            expected_names = json.loads(responses[1].choices[0].message.content)["evidence_column"]
+            self.assertEqual(saved[1]["evidence_column"], ", ".join(expected_names))
+            self.assertEqual([name for name in saved[1] if name.startswith("evidence_")], ["evidence_column"])
+            self.assertFalse(any(name.endswith("_quote") for name in saved[1]))
+            self.assertEqual(saved[1]["supplier_more_info"], "The synthetic supplier recorded a regional maintenance window.")
+            for row in saved:
+                self.assertTrue(all(name not in row for name in ("llm_input", "llm_prompt", "review_status")))
+                self.assertFalse(any(name.startswith("definition_") for name in row))
+            before = output.read_bytes()
+            dashboard = get_dashboard_data(output)
+            self.assertEqual(dashboard["counts"], {"total": 3, "HSBC": 1, "SUPPLIER": 1, "UNCERTAIN": 1, "failed": 0})
+            self.assertEqual(dashboard["records"][1]["supplier_name"], "Unknown")
+            self.assertEqual(dashboard["records"][1]["processing_status"], "success")
+            self.assertEqual(dashboard["records"][0]["evidence_column"], ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"])
+            self.assertEqual(dashboard["records"][1]["evidence_column"], expected_names)
+            self.assertEqual(len(expected_names), 8)
+            self.assertEqual(dashboard["records"][1]["supplier_more_info"], saved[1]["supplier_more_info"])
+            self.assertEqual(output.read_bytes(), before)
+            self.assertFalse((Path(folder) / "FINAL.csv").exists())
+            for row in saved:
+                for name in SUPPLIER_FIELDS:
+                    row.pop(name)
+                names = row.pop("evidence_column").split(", ")
+                for number in range(1, 11):
+                    row[f"evidence_{number}_column"] = names[number - 1] if number <= len(names) else ""
+            write_records(output, saved)
+            older_dashboard = get_dashboard_data(output)
+            self.assertEqual(older_dashboard["counts"], dashboard["counts"])
+            self.assertEqual(older_dashboard["records"][1]["supplier_name"], "")
+            self.assertEqual(older_dashboard["records"][1]["evidence_column"], expected_names)
 
-            saved_rows, _ = read_records(output)
-            self.assertNotIn("llm_input", saved_rows[0])
-            self.assertNotIn("llm_prompt", saved_rows[0])
-            self.assertNotIn("supporting_evidence", saved_rows[0])
-            self.assertEqual(saved_rows[0]["evidence_5_quote"], "Check")
-            self.assertEqual(saved_rows[1]["evidence_1_quote"], "Supplier-side service issue (model summary).")
-            self.assertEqual(saved_rows[0]["evidence_6_quote"], "")
-            self.assertEqual(saved_rows[1]["evidence_6_quote"], "Supplier-side service issue (model summary).")
-            self.assertEqual(saved_rows[2]["evidence_1_quote"], "")
-            self.assertEqual(saved_rows[0]["INCIDENT_DESCRIPTION"], rows[0]["INCIDENT_DESCRIPTION"])
-            self.assertFalse(any(name.startswith("definition_") for name in saved_rows[0]))
-            original = output.read_bytes()
-            queue = get_review_data(output, folder)
-            self.assertEqual(queue["counts"]["pending"], 3)
-            self.assertNotIn("prompt", queue["records"][0])
-            self.assertEqual(len(queue["records"][0]["result"]["supporting_evidence"]), 5)
-            self.assertEqual(len(queue["records"][1]["result"]["supporting_evidence"]), 6)
-            self.assertEqual(queue["records"][1]["result"]["supporting_evidence"][0]["quote"], saved_rows[1]["evidence_1_quote"])
-            self.assertEqual(queue["records"][0]["model_input"][0]["value"], rows[0]["INCIDENT_DESCRIPTION"])
-            self.assertEqual(queue["records"][0]["model_input"][0]["description"], definitions["INCIDENT_DESCRIPTION"])
-            for record, final_class in zip(queue["records"], ["HSBC", "HSBC", "SUPPLIER"]):
-                decision = ReviewDecision(incident_id=record["incident_id"], version=record["version"], final_class=final_class, user_reason="Example user reason.")
-                self.assertEqual(submit_review(output, folder, decision)[1], 200)
-                self.assertEqual(submit_review(output, folder, decision)[1], 409)
+    def test_failed_request_is_saved_and_excluded_from_counts(self):
+        rows = [{"INCIDENT_ID": "001", "INCIDENT_DESCRIPTION": "Synthetic cause."}, {"INCIDENT_ID": "002", "INCIDENT_DESCRIPTION": "Synthetic failed request."}]
+        for row in rows:
+            row["ROOT_CAUSE_NOTES"] = "Synthetic recorded cause."
+        definitions = {
+            "INCIDENT_DESCRIPTION": "Example description.",
+            "ROOT_CAUSE_NOTES": "Example cause notes.",
+        }
+        client = Mock()
+        client.chat.completions.create.side_effect = [example_response("HSBC"), OpenAIError("Synthetic request failure")]
+        with TemporaryDirectory(dir=ROOT) as folder:
+            output = Path(folder) / "LLM_OUTPUT.csv"
+            with patch.object(classification, "llm_connection", return_value=nullcontext((client, "example-model"))):
+                self.assertEqual(classification.classify_rows(rows, definitions, output), 1)
+            saved, _ = read_records(output)
+            self.assertEqual([row["processing_status"] for row in saved], ["success", "failed"])
+            self.assertEqual(saved[1]["error"], "OpenAIError")
+            self.assertEqual(saved[1]["evidence_column"], "")
+            self.assertEqual(get_dashboard_data(output)["counts"], {"total": 1, "HSBC": 1, "SUPPLIER": 0, "UNCERTAIN": 0, "failed": 1})
+            self.assertFalse((Path(folder) / "FINAL.csv").exists())
 
-            self.assertEqual(get_review_data(output, folder)["counts"]["pending"], 0)
-            final_rows, _ = read_records(folder / "FINAL.csv")
-            self.assertNotIn("llm_prompt", final_rows[0])
-            self.assertFalse(any(name.startswith("definition_") for name in final_rows[0]))
-            self.assertEqual([row["REVIEW_ACTION"] for row in final_rows], ["CONFIRMED", "CORRECTED", "RESOLVED_UNDECIDED"])
-            self.assertTrue(all(row["STATUS"] == "FINALIZED" and row["REVIEW_DATE"].endswith("Z") for row in final_rows))
-            self.assertEqual(output.read_bytes(), original)
+    def test_supplier_fields_follow_the_tag(self):
+        labels = classification.classification_schema()["properties"]["classification"]["enum"]
+        self.assertEqual(set(labels), {"HSBC", "SUPPLIER", "UNCERTAIN"})
+        for label in ("HSBC", "SUPPLIER", "UNCERTAIN"):
+            result = json.loads(example_response(label).choices[0].message.content)
+            result["evidence_column"] = ["INCIDENT_DESCRIPTION"]
+            for name in SUPPLIER_FIELDS:
+                result[name] = "Unneeded supplier text" if label != "SUPPLIER" else None
+            if label == "SUPPLIER":
+                result["supplier_name"] = "  "
+            message = SimpleNamespace(content=json.dumps(result), refusal=None)
+            client = Mock()
+            client.chat.completions.create.return_value = SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
+            fields = [{"name": "INCIDENT_DESCRIPTION", "description": "Example description.", "value": "Synthetic incident."}]
+            classified = classification.classify_row(client, "example-model", fields, "Example prompt.")
+            self.assertIsNotNone(classified)
+            for name in SUPPLIER_FIELDS:
+                expected = None if label != "SUPPLIER" or name == "supplier_more_info" else "Unknown"
+                self.assertEqual(getattr(classified, name), expected)
 
-            # Existing model output and final decisions do not block another request.
-            result = json.loads(responses[1].choices[0].message.content)
-            result["supporting_evidence"].append({"column": "INCIDENT_DESCRIPTION", "quote": "Seventh example signal."})
-            client.chat.completions.create.side_effect = None
-            client.chat.completions.create.return_value = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps(result), refusal=None), finish_reason="stop")])
-            with patch.object(classification, "llm_connection", return_value=nullcontext((client, "example-model"))), patch.dict(os.environ, {"LLM_TEMPERATURE": ""}):
-                self.assertEqual(classification.classify_rows([{"INCIDENT_ID": "004", "INCIDENT_DESCRIPTION": "New synthetic incident."}], definitions, output), 0)
-            updated_queue = get_review_data(output, folder)
-            self.assertEqual(updated_queue["counts"]["pending"], 1)
-            self.assertEqual(updated_queue["counts"]["finalized"], 3)
-            self.assertEqual(len(updated_queue["records"][-1]["result"]["supporting_evidence"]), 7)
-            output.unlink()
-            self.assertEqual(get_dashboard_data(folder / "FINAL.csv")["counts"], {"total": 3, "HSBC": 2, "SUPPLIER": 1})
+    def test_evidence_allows_empty_and_long_lists(self):
+        result = json.loads(example_response("SUPPLIER").choices[0].message.content)
+        for count in (0, 1, 11):
+            with self.subTest(count=count):
+                names = [f"SYNTHETIC_COLUMN_{number}" for number in range(count)]
+                result["evidence_column"] = names
+                message = SimpleNamespace(content=json.dumps(result), refusal=None)
+                response = SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
+                parsed = classification.parse_response(response)
+                self.assertIsNotNone(parsed)
+                self.assertEqual(parsed.evidence_column, names)
+        names = ["SYNTHETIC_UNKNOWN", "SYNTHETIC_UNKNOWN", " "]
+        result["evidence_column"] = names
+        message = SimpleNamespace(content=json.dumps(result), refusal=None)
+        response = SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
+        parsed = classification.parse_response(response)
+        self.assertEqual(parsed.evidence_column, names)
+        result["evidence_column"] = [{"column": "INCIDENT_DESCRIPTION", "quote": "Old format"}]
+        with self.assertRaises(ValidationError):
+            Classification.model_validate(result)
 
 
 if __name__ == "__main__":

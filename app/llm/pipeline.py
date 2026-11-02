@@ -9,6 +9,7 @@ from app.llm.classification import classify_rows
 ROOT = Path(__file__).resolve().parents[2]
 INPUT_FILE = ROOT / "data/run/CLEAN.csv"
 OUTPUT_FILE = ROOT / "data/run/LLM_OUTPUT.csv"
+DEFINITIONS_FILE = ROOT / "fields/definitions.yml"
 
 
 def run_llm_pipeline():
@@ -16,7 +17,8 @@ def run_llm_pipeline():
     if error:
         print(error)
         return 1
-    definitions = yaml.safe_load((ROOT / "fields/definitions.yml").read_text(encoding="utf-8"))
+    definitions_text = DEFINITIONS_FILE.read_text(encoding="utf-8")
+    definitions = yaml.safe_load(definitions_text)
     return classify_rows(rows, definitions, OUTPUT_FILE)
 
 

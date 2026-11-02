@@ -7,10 +7,27 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 ROOT = Path(__file__).resolve().parents[2]
-FINAL_FILE = ROOT / "data/run/FINAL.csv"
-app = FastAPI(title="HSBC Final Dashboard", docs_url=None, redoc_url=None, openapi_url=None)
-app.state.final_file = FINAL_FILE
+RESULTS_FILE = ROOT / "data/run/LLM_OUTPUT.csv"
+app = FastAPI(title="HSBC Incident Dashboard", docs_url=None, redoc_url=None, openapi_url=None)
+app.state.results_file = RESULTS_FILE
 app.state.demo = False
+
+
+def read_evidence_columns(row):
+    names = []
+    for column in ("evidence_column", "supporting_evidence"):
+        if column in row:
+            for value in (row[column] or "").split(","):
+                name = value.strip()
+                if name:
+                    names.append(name)
+            return names
+
+    # Read older numbered columns without rewriting the saved file.
+    for column, value in row.items():
+        if column.startswith("evidence_") and column.endswith("_column") and value:
+            names.append(value)
+    return names
 
 
 def get_dashboard_data(path):
@@ -20,23 +37,35 @@ def get_dashboard_data(path):
             with path.open(encoding="utf-8-sig", newline="") as file:
                 rows = list(csv.DictReader(file))
 
-        counts = {"total": 0, "HSBC": 0, "SUPPLIER": 0}
+        counts = {"total": 0, "HSBC": 0, "SUPPLIER": 0, "UNCERTAIN": 0, "failed": 0}
         records = []
         for row in rows:
-            final_class = row["FINAL_CLASS"]
-            if final_class not in ("HSBC", "SUPPLIER"):
-                return {"error": "FINAL_CLASS must be HSBC or SUPPLIER."}
-            records.append({
+            if row["processing_status"] == "failed":
+                counts["failed"] += 1
+                continue
+            if row["processing_status"] != "success":
+                return {"error": "LLM_OUTPUT.csv contains an invalid processing status."}
+            classification = row["classification"]
+            if classification not in ("HSBC", "SUPPLIER", "UNCERTAIN"):
+                return {"error": "Classification must be HSBC, SUPPLIER, or UNCERTAIN."}
+            record = {
                 "incident_id": row["INCIDENT_ID"],
                 "summary": row.get("INCIDENT_SHORT_DESCRIPTION", ""),
-                "final_class": final_class,
-                "user_reason": row["USER_REASON"],
-            })
-            counts[final_class] += 1
+                "classification": classification,
+                "processing_status": row["processing_status"],
+                "input": {name: value for name, value in row.items() if name.isupper()},
+                "evidence_column": read_evidence_columns(row),
+            }
+            for name in ("key_root_cause", "decision_rationale", "attribution_evidence_strength", "supplier_name",
+                         "supplier_product_or_service", "supplier_action_or_failure",
+                         "supplier_causal_explanation", "supplier_accountability_reason", "supplier_more_info"):
+                record[name] = row.get(name, "")
+            records.append(record)
+            counts[classification] += 1
         counts["total"] = len(records)
         return {"records": records, "counts": counts}
     except (OSError, UnicodeError, csv.Error, KeyError, TypeError):
-        return {"error": "Could not read FINAL.csv. Check its columns and UTF-8 encoding."}
+        return {"error": "Could not read LLM_OUTPUT.csv. Check its columns and UTF-8 encoding, or generate a new batch with supplier details."}
 
 
 @app.middleware("http")
@@ -57,7 +86,7 @@ def dashboard_page():
 
 @app.get("/api/dashboard")
 def dashboard_data():
-    data = get_dashboard_data(app.state.final_file)
+    data = get_dashboard_data(app.state.results_file)
     data["demo"] = app.state.demo
     status = 400 if "error" in data else 200
     return JSONResponse(data, status_code=status)

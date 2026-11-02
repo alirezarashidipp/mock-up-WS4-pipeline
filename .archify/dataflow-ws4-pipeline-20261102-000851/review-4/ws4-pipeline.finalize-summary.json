@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "dataflow",
+  "quality": "showcase",
+  "specification": {
+    "path": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\candidate.json",
+    "sha256": "fca639438e12665a852ccb51be8deb117848afa6799b831fed44d7f068ad5c93",
+    "bytes": 12815
+  },
+  "artifact": {
+    "path": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\ws4-pipeline.html",
+    "sha256": "1cededa167ff0f7ff8eed6811e55601f7d2fea90ed1931d54e2d2aae26c8cc51",
+    "bytes": 857414
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\review-4\\ws4-pipeline.finalize.json",
+    "summaryReceipt": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\review-4\\ws4-pipeline.finalize-summary.json",
+    "browserCheckReceipt": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\review-4\\ws4-pipeline.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-02T00:10:34.299Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 5161,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  },
+  "visualReviewRecommendation": {
+    "action": "inspect-route-readability",
+    "signals": {
+      "routesOverSuggestedBends": 1,
+      "routesOverSuggestedStretch": 1
+    },
+    "reason": "Automated gates passed, but crossings or detours still need perceptual review before claiming visual quality.",
+    "affectedRoutes": {
+      "crossings": [],
+      "detours": [
+        {
+          "relationship": {
+            "id": "existing-review-input",
+            "from": "review-csv",
+            "to": "prepare-review",
+            "label": "Existing reviews",
+            "collectionIndex": 13,
+            "artifactIndex": 14
+          },
+          "bends": 2,
+          "stretch": 1.79
+        },
+        {
+          "relationship": {
+            "id": "catalog-inventory",
+            "from": "catalog",
+            "to": "review-dashboard",
+            "label": "Full catalog",
+            "collectionIndex": 16,
+            "artifactIndex": 17
+          },
+          "bends": 3,
+          "stretch": 1.171,
+          "directCorridorBlockers": [
+            {
+              "id": "shortlist",
+              "label": "Prepare shortlist",
+              "box": [
+                259,
+                584,
+                112,
+                58
+              ]
+            },
+            {
+              "id": "select",
+              "label": "Select + validate",
+              "box": [
+                474,
+                584,
+                112,
+                58
+              ]
+            },
+            {
+              "id": "review-csv",
+              "label": "HUMAN_REVIEW.csv",
+              "box": [
+                688.5,
+                584,
+                113,
+                58
+              ]
+            }
+          ]
+        }
+      ],
+      "truncated": false
+    },
+    "repair": "Advisory only: this mode places or routes these relationships itself. Report them; do not remove relationships or meaning to reduce crossings."
+  }
+}

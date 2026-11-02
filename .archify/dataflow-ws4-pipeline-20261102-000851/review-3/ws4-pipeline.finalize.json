@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "dataflow",
+  "quality": "showcase",
+  "startedAt": "2026-11-02T00:13:20.717Z",
+  "specification": {
+    "path": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\candidate.json",
+    "sha256": "536013e2d5e424bbdd8222bdfc6db15e2453fe6adac133838b09cedf641c51ff",
+    "bytes": 12818
+  },
+  "artifact": {
+    "path": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\ws4-pipeline.html",
+    "sha256": "c3c09afe41184f36d3d6a67f41b13f367ef6e4684ffadc6dd8d2cd90a03db581",
+    "bytes": 857390
+  },
+  "stages": {
+    "validate": {
+      "status": "fail",
+      "exitCode": 1,
+      "durationMs": null,
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "C:\\Users\\ali reza\\.codex\\skills\\archify\\bin\\archify.mjs",
+        "deliver",
+        "dataflow",
+        "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\candidate.json",
+        "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\ws4-pipeline.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\source-snapshot",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": false,
+        "command": "deliver",
+        "receiptId": "a9d59606-ea4e-4ee9-a858-a44fbe2e640e",
+        "stage": "render",
+        "type": "dataflow",
+        "input": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\candidate.json",
+        "output": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\ws4-pipeline.html",
+        "error": "Data-flow layout validation failed:\n- [clean-flow/endpoint-side-direction] dataflow flows[16] id \"catalog-inventory\" \"catalog\" -> \"review-dashboard\" final segment 2 [1021, 706] -> [1021, 613] does not honor toSide \"right\" — it must run horizontal leftward from the right; keep automatic routing, or choose fromSide/toSide and via points whose first and final segments cross node borders perpendicularly.",
+        "diagnostics": [
+          {
+            "code": "clean-flow/endpoint-side-direction",
+            "severity": "error",
+            "message": "[clean-flow/endpoint-side-direction] dataflow flows[16] id \"catalog-inventory\" \"catalog\" -> \"review-dashboard\" final segment 2 [1021, 706] -> [1021, 613] does not honor toSide \"right\" — it must run horizontal leftward from the right; keep automatic routing, or choose fromSide/toSide and via points whose first and final segments cross node borders perpendicularly.",
+            "subject": {
+              "diagramType": "dataflow",
+              "collection": "flows",
+              "index": 16,
+              "id": "catalog-inventory",
+              "from": "catalog",
+              "to": "review-dashboard"
+            },
+            "evidence": {
+              "endpoint": "target",
+              "authoredField": "toSide",
+              "sideOrigin": "authored",
+              "side": "right",
+              "segmentIndex": 2,
+              "from": [
+                1021,
+                706
+              ],
+              "to": [
+                1021,
+                613
+              ],
+              "expectedAxis": "horizontal",
+              "expectedDirection": "leftward from the right"
+            },
+            "supportedFixes": [
+              "keep automatic routing, or choose fromSide/toSide and via points whose first and final segments cross node borders perpendicularly"
+            ]
+          }
+        ],
+        "provenance": "failed",
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      },
+      "execution": "embedded-in-deliver"
+    },
+    "deliver": {
+      "status": "not-run",
+      "execution": "blocked-by-validate"
+    }
+  },
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  },
+  "diagnostics": [
+    {
+      "code": "clean-flow/endpoint-side-direction",
+      "severity": "error",
+      "message": "[clean-flow/endpoint-side-direction] dataflow flows[16] id \"catalog-inventory\" \"catalog\" -> \"review-dashboard\" final segment 2 [1021, 706] -> [1021, 613] does not honor toSide \"right\" — it must run horizontal leftward from the right; keep automatic routing, or choose fromSide/toSide and via points whose first and final segments cross node borders perpendicularly.",
+      "subject": {
+        "diagramType": "dataflow",
+        "collection": "flows",
+        "index": 16,
+        "id": "catalog-inventory",
+        "from": "catalog",
+        "to": "review-dashboard"
+      },
+      "evidence": {
+        "endpoint": "target",
+        "authoredField": "toSide",
+        "sideOrigin": "authored",
+        "side": "right",
+        "segmentIndex": 2,
+        "from": [
+          1021,
+          706
+        ],
+        "to": [
+          1021,
+          613
+        ],
+        "expectedAxis": "horizontal",
+        "expectedDirection": "leftward from the right"
+      },
+      "supportedFixes": [
+        "keep automatic routing, or choose fromSide/toSide and via points whose first and final segments cross node borders perpendicularly"
+      ]
+    }
+  ],
+  "evidence": {
+    "receipt": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\review-3\\ws4-pipeline.finalize.json",
+    "summaryReceipt": "C:\\Users\\ali reza\\Documents\\mock-up-WS4-pipeline\\.archify\\dataflow-ws4-pipeline-20261102-000851\\review-3\\ws4-pipeline.finalize-summary.json"
+  },
+  "visualReview": "not-requested",
+  "failedStage": "validate",
+  "finishedAt": "2026-11-02T00:13:21.604Z",
+  "durationMs": 886,
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-02T00:10:34.299Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  }
+}
