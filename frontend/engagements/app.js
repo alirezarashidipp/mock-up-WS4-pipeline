@@ -9,6 +9,18 @@ const groupLabels = {
   other: "Uncertain / failed / skipped / other",
 };
 
+function acceptedClassification(incident) {
+  if ("classification_review_status" in incident) {
+    return ["approved", "corrected"].includes(incident.classification_review_status) ? incident.reviewed_classification : "";
+  }
+  return incident.processing_status === "success" ? incident.classification : "";
+}
+
+function acceptedSupplier(incident) {
+  if ("classification_review_status" in incident) return incident.reviewed_supplier_name || "";
+  return incident.supplier_name || "";
+}
+
 function textElement(tag, text, className = "") {
   const element = document.createElement(tag);
   element.textContent = text;
@@ -155,8 +167,8 @@ function addReviewPanel(container, incident, target) {
   const label = isClassification ? "Classification" : "Engagement link";
   const status = isClassification ? incident.hitl_classification : incident.hitl_link;
   const reason = isClassification ? incident.hitl_classifivation_reasninb : incident.hitl_link_reasoning;
-  const classificationAvailable = incident.processing_status === "success" && ["HSBC", "SUPPLIER", "UNCERTAIN"].includes(incident.classification);
-  const hasProposal = classificationAvailable && incident.classification === "SUPPLIER" && incident.link_status === "MATCHED" && Boolean(incident.linked_engagement_id);
+  const classificationAvailable = ["HSBC", "SUPPLIER", "UNCERTAIN"].includes(acceptedClassification(incident));
+  const hasProposal = classificationAvailable && acceptedClassification(incident) === "SUPPLIER" && incident.link_status === "MATCHED" && Boolean(incident.linked_engagement_id);
   const available = isClassification ? classificationAvailable : hasProposal && incident.hitl_classification === "confirmed";
   const panel = textElement("section", "", "review-panel");
   if (status === "confirmed" || status === "rejected" || status === "invalidated") panel.classList.add("review-state-" + status);
@@ -164,7 +176,7 @@ function addReviewPanel(container, incident, target) {
   if (reason) panel.append(textElement("p", reason, "record-text"));
   let explanation;
   if (isClassification) {
-    explanation = classificationAvailable ? "Is the model classification correct? No requires a reason and invalidates the engagement link." : "No successful classification is available to review.";
+    explanation = classificationAvailable ? "Is the accepted classification correct? No requires a reason and invalidates the engagement link." : "No successful classification is available to review.";
   } else if (!hasProposal) {
     explanation = "No proposed engagement link is available to review. HSBC and UNCERTAIN do not enter linking.";
   } else if (incident.hitl_classification !== "confirmed") {
@@ -298,7 +310,7 @@ function showAllIncidents(classification) {
     const classified = incident.processing_status === "success" && ["HSBC", "SUPPLIER", "UNCERTAIN"].includes(incident.classification);
     if (classification === "failed" && classified) continue;
     if (classification !== "all" && classification !== "failed" && (!classified || incident.classification !== classification)) continue;
-    const searchable = [incident.INCIDENT_ID, incident.INCIDENT_SHORT_DESCRIPTION, incident.INCIDENT_DESCRIPTION, incident.supplier_name, incident.classification, incident.linked_engagement_id, incident.ENG_ENGAGEMENT_NAME, incident.link_reason].join(" ").toLowerCase();
+    const searchable = [incident.INCIDENT_ID, incident.INCIDENT_SHORT_DESCRIPTION, incident.INCIDENT_DESCRIPTION, incident.supplier_name, incident.reviewed_supplier_name, incident.classification, incident.reviewed_classification, incident.linked_engagement_id, incident.ENG_ENGAGEMENT_NAME, incident.link_reason].join(" ").toLowerCase();
     if (!searchable.includes(query)) continue;
     const link = navigationLink("", incidentRoute(incident.INCIDENT_ID, classification));
     link.className = "eng-incident-link";
@@ -331,14 +343,14 @@ function showUnlinked(group) {
     if (group !== "all" && category !== group) continue;
     total += incidents.length;
     for (const incident of incidents) {
-      const searchable = [incident.INCIDENT_ID, incident.INCIDENT_SHORT_DESCRIPTION, incident.supplier_name, incident.link_reason, incident.classification, incident.link_status].join(" ").toLowerCase();
+      const searchable = [incident.INCIDENT_ID, incident.INCIDENT_SHORT_DESCRIPTION, incident.supplier_name, incident.reviewed_supplier_name, incident.link_reason, incident.classification, incident.link_status].join(" ").toLowerCase();
       if (!searchable.includes(query)) continue;
       const link = navigationLink("", unlinkedRoute(category, incident.INCIDENT_ID));
       link.className = "eng-incident-link";
       link.append(textElement("p", groupLabels[category], "eng-company"));
       link.append(textElement("p", incident.INCIDENT_ID || "Incident ID not recorded", "eng-identifier"));
       link.append(textElement("h2", incident.INCIDENT_SHORT_DESCRIPTION || "Incident details"));
-      if (incident.classification === "SUPPLIER") link.append(textElement("p", "Supplier: " + (incident.supplier_name || "Unknown"), "eng-preview"));
+      if (acceptedClassification(incident) === "SUPPLIER") link.append(textElement("p", "Supplier: " + (acceptedSupplier(incident) || "Unknown"), "eng-preview"));
       link.append(textElement("p", incident.link_reason || "No link explanation recorded.", "eng-preview"));
       link.append(textElement("span", (dashboard.human_review ? "Model link status: " : "Link status: ") + incident.link_status, "eng-count"));
       addReviewBadges(link, incident);
@@ -367,8 +379,8 @@ function showIncident(engagement, incident, group) {
     addField(card, "Why this engagement was selected", incident.link_reason);
   } else {
     let engagementLink = groupLabels[group] || "No model engagement selected";
-    if (dashboard.human_review && incident.processing_status === "success" && ["HSBC", "UNCERTAIN"].includes(incident.classification)) {
-      engagementLink = "Not applicable for " + incident.classification;
+    if (dashboard.human_review && ["HSBC", "UNCERTAIN"].includes(acceptedClassification(incident))) {
+      engagementLink = "Not applicable for " + acceptedClassification(incident);
     }
     addField(card, "Engagement link", engagementLink);
     addField(card, "Link status", incident.link_status);
@@ -377,7 +389,7 @@ function showIncident(engagement, incident, group) {
     if (incident.error) addField(card, "Classification processing error", incident.error);
   }
   const decisions = textElement("div", "", "eng-decision-grid");
-  addField(decisions, dashboard.human_review ? "Model classification" : "Classification", incident.classification);
+  addField(decisions, "Original model classification", incident.classification);
   addField(decisions, "Attribution evidence strength", evidenceStrength(incident.attribution_evidence_strength));
   addField(decisions, "Link evidence strength", linkEvidenceStrength(incident));
   card.append(decisions, textElement("p", "Attribution evidence strength rates support for assigning responsibility to HSBC or Supplier. Link evidence strength separately rates support for one engagement match among the supplied candidates. Neither score is a probability or measured accuracy. For UNCERTAIN classification, 0-2 describes limited attribution evidence, not confidence in uncertainty.", "field-note"));
@@ -398,6 +410,14 @@ function showIncident(engagement, incident, group) {
     "Reading the score": "Selected links use 1-4; undecided model responses use 0-2. A score of 4 does not mean 100% accuracy. Without a model score, this field shows Not recorded. Older scores are labelled Legacy confidence and are not converted.",
   });
   addField(card, "Incident description", incident.INCIDENT_DESCRIPTION);
+  if ("classification_review_status" in incident) {
+    addField(card, "Human-reviewed classification", acceptedClassification(incident) || "Pending review");
+    addField(card, "Classification review reason", incident.classification_review_reason || "Model result approved.");
+    if (acceptedClassification(incident) === "SUPPLIER") {
+      addField(card, "Human-reviewed supplier", acceptedSupplier(incident) || "Pending review");
+      if (incident.supplier_review_reason) addField(card, "Supplier review reason", incident.supplier_review_reason);
+    }
+  }
   addField(card, "Key root cause", incident.key_root_cause);
   addField(card, "Classification rationale", incident.decision_rationale);
   if (incident.classification === "SUPPLIER") {
@@ -540,11 +560,11 @@ function applyDashboardMode(humanReview) {
   $("brand-caption").textContent = humanReview ? "WS4 / HUMAN REVIEW" : "WS4 / ENGAGEMENTS";
   $("footer-title").textContent = humanReview ? "HSBC · Human review / WS4" : "HSBC · Engagement explorer / WS4";
   $("source-file").textContent = humanReview ? "Reviews: HUMAN_REVIEW.csv · Engagement catalog: ENG_ALL.csv" : "Source: " + source;
-  $("source-note").textContent = "Counts cover saved rows in " + source + ". A partial run may contain only part of the input.";
+  $("source-note").textContent = "Counts cover saved rows in " + source + ". Classification counts describe original model results. Pending classification reviews are not included in new linking outputs.";
   $("linked-count-label").textContent = humanReview ? "Active proposed links" : "Linked incidents";
   $("engagements-count-label").textContent = humanReview ? "Active engagements" : "Engagements";
   $("companies-count-label").textContent = humanReview ? "Active companies" : "Companies";
-  $("linking-note").textContent = humanReview ? "Active proposals include pending and confirmed reviews. Engagement lists retain every original model proposal, including rejected or invalidated links. A human-confirmed link requires both decisions to be confirmed." : "Successful SUPPLIER incidents are eligible for matching. A confirmed link is not guaranteed. HSBC and UNCERTAIN do not enter matching.";
+  $("linking-note").textContent = humanReview ? "Active proposals include pending and confirmed reviews. Engagement lists retain every original model proposal, including rejected or invalidated links. A human-confirmed link requires both decisions to be confirmed." : "New matches require human-approved Supplier classification and supplier name. Classification counts retain original model results; eligibility uses the saved human decision. Older files retain their original eligibility rules.";
   groupLabels.other = humanReview ? "Rejected / invalidated / uncertain / other" : "Uncertain / failed / skipped / other";
 }
 

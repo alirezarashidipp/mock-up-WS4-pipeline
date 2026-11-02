@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from threading import Lock
 
+from app.classification_review import effective_classification
 from app.csv_files import write_records
 
 
@@ -21,11 +22,11 @@ REVIEW_LOCK = Lock()
 
 
 def classification_is_reviewable(row):
-    return row["processing_status"] == "success" and row["classification"] in ("HSBC", "SUPPLIER", "UNCERTAIN")
+    return effective_classification(row) in ("HSBC", "SUPPLIER", "UNCERTAIN")
 
 
 def has_link_proposal(row):
-    return classification_is_reviewable(row) and row["classification"] == "SUPPLIER" and row["link_status"] == "MATCHED"
+    return effective_classification(row) == "SUPPLIER" and row["link_status"] == "MATCHED"
 
 
 def read_rows(path, reviewed=False):
@@ -160,7 +161,7 @@ def apply_review(row, target, decision, reason):
             result["hitl_linked_engagement_id"] = ""
     else:
         if row["hitl_classification"] != "confirmed" or not has_link_proposal(row):
-            raise ValueError("Confirm a successful Supplier classification with a matched engagement before reviewing its link.")
+            raise ValueError("Confirm the accepted Supplier classification with a matched engagement before reviewing its link.")
         result["hitl_link"] = decision
         result["hitl_link_reasoning"] = reason if decision == "rejected" else ""
         result["hitl_linked_engagement_id"] = row["linked_engagement_id"] if decision == "confirmed" else ""

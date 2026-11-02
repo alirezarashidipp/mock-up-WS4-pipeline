@@ -1,10 +1,11 @@
 # Classification, linking, and human review: short description
 
-Classification returns 11 model fields. Engagement linking returns five model fields. Human review adds five local review fields without calling an LLM.
+Classification returns 11 model fields. Human classification review adds six local fields before linking. Engagement linking returns five model fields. The later review of proposed links adds five separate `hitl_` fields. Neither human-review dashboard calls an LLM.
 
 ```text
 CLEAN.csv -> Classification -> LLM_OUTPUT.csv
-LLM_OUTPUT.csv + ENG_ALL.csv -> Engagement linking -> INC_LINKED.csv
+LLM_OUTPUT.csv + SUPPLIER_NAME.csv -> Human classification review -> CLASSIFICATION_REVIEW.csv
+LLM_OUTPUT.csv + CLASSIFICATION_REVIEW.csv + ENG_ALL.csv -> Approved incidents -> Engagement linking -> INC_LINKED.csv
 INC_LINKED.csv -> Human review preparation -> HUMAN_REVIEW.csv
 HUMAN_REVIEW.csv -> Human decisions -> Save HUMAN_REVIEW.csv
 ```
@@ -21,7 +22,7 @@ The archived diagram in `.archify/dataflow-ws4-pipeline-20261102-000851/` and it
 
 | Dashboard | Port | CSV | Main view |
 | --- | --- | --- | --- |
-| Classification | 8766 | LLM_OUTPUT.csv | HSBC, SUPPLIER, and UNCERTAIN results; read-only. |
+| Classification | 8766 | LLM_OUTPUT.csv; SUPPLIER_NAME.csv; CLASSIFICATION_REVIEW.csv | Model results, classification approval/correction, then supplier-name approval/correction. Saves separate human decisions. |
 | Engagements | 8767 | INC_LINKED.csv | Engagements -> incidents -> details; read-only. |
 | Human review | 8768 | HUMAN_REVIEW.csv; ENG_ALL.csv read-only catalog | Engagement first or Incident first -> shared details and Yes/No review; saves human decisions. |
 
@@ -62,18 +63,33 @@ The six supplier fields are:
 
 See [LLM classification and supplier extraction](llm.md) for the full rules and output order.
 
+## Human classification review
+
+The first dashboard keeps the model result and saves the human decision separately in CLASSIFICATION_REVIEW.csv:
+
+1. Approve a model HSBC/SUPPLIER classification, or choose No and supply a reason plus the corrected class. A reviewer can also resolve UNCERTAIN or a processing failure with a manual HSBC/SUPPLIER decision and reason.
+2. If the reviewed class is Supplier, separately approve the model supplier name, or choose No, explain why, and select the correct name from SUPPLIER_NAME.csv. Missing/Unknown names also require a catalog choice. Changing classification resets the supplier decision.
+3. If the facts or correct supplier are unavailable, leave the decision Needs review. Status becomes green only after a successful save. Original model labels, supplier details, and scores are preserved.
+
+The six added fields are `classification_review_status`, `reviewed_classification`, `classification_review_reason`, `supplier_review_status`, `reviewed_supplier_name`, and `supplier_review_reason`. Approved and corrected are completed human decisions; pending and Needs review are not. Supplier status is not applicable for HSBC. Source changes invalidate earlier approval until reviewed again.
+
+Place the UTF-8 supplier list at `data/mockup/SUPPLIER_NAME.csv`, one name per row with an optional `SUPPLIER_NAME` header. A missing or invalid catalog shows a warning and supplies no invented names. See [classification dashboard](dashboard_app.md) for the full contract.
+
 ## Which incidents enter linking?
 
-Only incidents with `processing_status=success` and `classification=SUPPLIER` enter engagement matching.
+Saving review does not call an LLM. The next `python -m app.linking.pipeline` run applies these rules:
 
-- If a successful classification is `HSBC`, skip candidate search and the second LLM call. Set `link_status=NOT_APPLICABLE`.
-- If a successful classification is `UNCERTAIN`, skip candidate search and the second LLM call. Set `link_status=SKIPPED`.
+- Approved/corrected Supplier classification plus approved/corrected supplier name enters matching with the reviewed name.
+- Approved/corrected HSBC is saved as NOT_APPLICABLE, with no candidate search or linking call.
+- Pending, Needs review, incomplete supplier decisions, and stale reviews stay out of INC_LINKED.csv until resolved. Original UNCERTAIN or failed results can enter only after an explicit human decision.
 
-These incidents are still saved in INC_LINKED.csv with their original incident data and classification results. Engagement columns and `link_confidence` remain empty. Processing continues with the next incident.
+The output preserves original incident/model values and the six review fields. Identical already-saved reviewed rows are skipped on rerun. Changing a saved incident's source or human decision requires a fresh output batch.
+
+**Synthetic correction example:** the model says Supplier/Google. The reviewer approves Supplier but rejects Google, records a reason, and selects Microsoft from the catalog. Candidate search uses Microsoft; the original Google proposal stays available for comparison.
 
 ## Engagement linking example
 
-**Synthetic example:** an incident has `processing_status=success`, `classification=SUPPLIER`, and `supplier_name=Google`. Its recorded cause concerns a managed cloud backup service. The engagement IDs and service details below are invented for illustration.
+**Synthetic example:** an incident has `processing_status=success`, `classification=SUPPLIER`, and `supplier_name=Google`. The reviewer approves both Supplier attribution and the Google name. Its recorded cause concerns a managed cloud backup service. The engagement IDs and service details below are invented for illustration.
 
 1. Python checks each ENG_ALL row in CSV order. It checks `THIRD_PARTY_NAME` first, then `THIRD_PARTY_NORMALISED_NAME` if the first name does not match.
 2. Names are normalized for matching: lowercase, ASCII folding, and single spaces between words. For example, `  GOOGLE   UK  ` becomes `google uk`. Source values stay unchanged.
@@ -106,27 +122,27 @@ Python validates the selection and saves the result to **`data/run/INC_LINKED.cs
 
 - A valid selection becomes `link_status=MATCHED`. Preserve the original incident columns, copy the selected engagement's actual values into `ENG_` columns, and add the link decision fields.
 - No candidates or an ambiguous selection becomes `link_status=UNDECIDED`; engagement columns remain empty.
-- HSBC is `NOT_APPLICABLE`; UNCERTAIN or failed classification is `SKIPPED`. These rows are saved without candidate search or a linking LLM call.
+- Human-approved HSBC is `NOT_APPLICABLE`, with no candidate search or linking call. Unresolved reviews are not saved to this output; they can enter a later run after review.
 - A linking request or response failure becomes `FAILED` and stops the batch after saving where possible.
 
 Python accepts the returned source-name strings in `link_incident_columns` and `link_engagement_columns` without checking them against input headers. List types and nonempty lists for a selected engagement are still checked.
 
-Python adds `link_status`, `link_error`, `link_candidate_count`, and `link_confidence_scale=0-4`; these are not LLM output fields. The candidate count is the shortlist size after the cap: zero for no candidates and blank when search is skipped. It remains saved after a failed request or response and does not prove delivery to the provider. When no linking call occurs, the score stays blank. Old files without the scale marker keep their legacy 0-100 values, even if a value is only 3; they are not converted to the new rubric. Preserve older files and use fresh linking and human-review outputs for the new schema, including files that already have the scale marker but lack `link_candidate_count`. Update the pipeline and dashboard paths for the new batch.
+Python adds `link_status`, `link_error`, `link_candidate_count`, and `link_confidence_scale=0-4`; these are not LLM output fields. The candidate count is the shortlist size after the cap: zero for no candidates and blank when search is skipped. It remains saved after a failed request or response and does not prove delivery to the provider. When no linking call occurs, the score stays blank. Old files without the scale marker keep their legacy 0-100 values, even if a value is only 3; they are not converted to the new rubric. Preserve older files and use fresh linking and human-review outputs for the new schema, including files that lack the six classification-review fields or `link_candidate_count` even if they already have the scale marker. Update the pipeline and dashboard paths for the new batch.
 
 The input CSVs remain unchanged. The engagement dashboard reads INC_LINKED.csv. See [Incident-to-engagement linking](linking.md) for all output columns and validation rules.
 
 ## Engagement dashboard overview
 
 - Show the total saved incidents, successfully classified total, and separate HSBC, SUPPLIER, and UNCERTAIN counts. Show unclassified/failed rows separately; UNCERTAIN belongs in the successful total.
-- Only successful SUPPLIER classifications are eligible for linking. Count them as eligible even if the supplier is Unknown, no candidates are found, or linking fails.
+- For new reviewed rows, linking eligibility uses approved/corrected Supplier attribution and name. Original model class counts remain separate; a corrected original HSBC, UNCERTAIN, or failed result can be eligible. Legacy rows retain their successful-Supplier interpretation.
 - Show linked incidents, undecided Supplier incidents, link failures, engagements, and companies separately. The Unlinked incidents tab keeps its HSBC, Supplier, and Other groups for inspecting saved rows.
 - All counts describe the saved INC_LINKED.csv snapshot. A partial linking run may contain fewer rows than the original input. The dashboard only reads this file; it does not call an LLM or write results.
 
 See [Engagement dashboard](engagement_dashboard.md) for exact count definitions.
 
-## Human review
+## Review after linking
 
-Prepare `HUMAN_REVIEW.csv` from `INC_LINKED.csv`, preserving all source columns. Rerunning preparation keeps previous decisions and adds new incidents. Changed source values for an existing incident require a separate review output. Stop the review server before rerunning preparation.
+This later review is separate from classification approval on port 8766. Prepare `HUMAN_REVIEW.csv` from `INC_LINKED.csv`, preserving all source columns, including the six earlier review fields. Rerunning preparation keeps previous decisions and adds new incidents. Changed source values for an existing incident require a separate review output. Stop the review server before rerunning preparation.
 
 The five additional CSV columns are:
 
@@ -141,7 +157,7 @@ The five additional CSV columns are:
 - Classification Yes saves `confirmed` and clears its rejection reason. Classification No requires a reason, saves `rejected`, and invalidates any proposed link.
 - Link review requires confirmed classification and an existing matched SUPPLIER proposal. Link Yes saves `confirmed`; Link No requires a reason and saves `rejected`. Neither action changes classification.
 - Confirmations turn green only after saving successfully. If classification is confirmed again after rejection, its invalidated link becomes `pending` and needs a fresh link decision.
-- Successful HSBC and UNCERTAIN classifications can be reviewed, but their link review is `not_applicable`. Failed or unrecognized classifications count as `not_applicable` for classification review. Missing link proposals count as `not_applicable` for link review.
+- For new rows, use the saved human-reviewed class and supplier eligibility for review and link availability; original model values stay visible. Legacy rows without these fields retain successful-model review rules: HSBC/UNCERTAIN have no link review, and failed/unrecognized classifications are not applicable. Missing link proposals are not applicable for link review.
 - In dashboard 3, rejected or invalidated links appear in Other unlinked incidents and remain visible under their original engagement with the review status. They no longer count as active links. Original model labels, scores, `linked_engagement_id`, and `ENG_` fields remain unchanged; use `hitl_linked_engagement_id` for the human-accepted link.
 - Engagement first opens an engagement, its proposed incidents, then shared review controls. Incident first opens any saved incident directly, including unmatched, HSBC, UNCERTAIN, failed, and rejected rows. A save stays in the selected mode; rejecting a proposal does not remove access to that incident from its original engagement.
 
@@ -151,7 +167,7 @@ The five additional CSV columns are:
 
 The progress panel stays visible in both review modes, on lists and incident details. It counts **all saved HUMAN_REVIEW.csv rows**, regardless of search, classification filter, or selected engagement. Successful saves and Refresh update the counts. These totals are separate from model classification counts and add no CSV columns.
 
-The model overview shows total incidents, successful classifications and each class, then successful Supplier incidents with and without an original model match. These two Supplier counts sum to the successful Supplier total. Human-confirmed links are separate: rejecting a link changes its review result, not the saved model match.
+The overview shows total incidents and original successful model classifications by class, then eligible Supplier incidents with and without an original model match. For new rows this Supplier cohort follows the human-reviewed class and name; legacy rows use the model result. The two Supplier counts sum to the eligible total, which can differ from the original model-Supplier total. Human-confirmed links are separate: rejecting a link changes its review result, not the saved model match.
 
 **Synthetic example: eight saved incidents. These are illustrative counts, not actual project results.**
 
@@ -163,6 +179,6 @@ The model overview shows total incidents, successful classifications and each cl
 | Invalidated | Link cancelled because classification was rejected. | Not used | 1 |
 | Not applicable | No successful classification or matched link is available to review. | 1 | 4 |
 
-Each review column totals eight incidents. Do not add the two columns together: they describe two decisions for the same incidents. HSBC and UNCERTAIN links count as Not applicable, never Pending.
+Each review column totals eight incidents. Do not add the two columns together: they describe two decisions for the same incidents. Reviewed HSBC and legacy UNCERTAIN links count as Not applicable, never Pending.
 
 See [Human review](human_review.md) for the CSV fields, state transitions, and run commands.

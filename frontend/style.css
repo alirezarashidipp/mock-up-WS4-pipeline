@@ -116,3 +116,25 @@ footer { margin-top:25px; display:flex; justify-content:space-between; gap:15px;
 .human-review-app .review-rejection textarea { display:block; width:100%; min-height:90px; padding:10px; margin-bottom:10px; border:1px solid #a0a0a0; border-radius:2px; resize:vertical; font:inherit; color:var(--ink); background:white; }
 @media(max-width:1000px) { .engagement-app .eng-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .engagement-app .eng-summary .stats { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 @media(max-width:700px) { .engagement-app .eng-grid,.engagement-app .eng-decision-grid,.human-review-app .review-grid { grid-template-columns:1fr; } .engagement-app .eng-summary .stats,.human-review-app #supplier-funnel .stats { grid-template-columns:repeat(2,minmax(0,1fr)); } .engagement-app .eng-card,.engagement-app .eng-incident-link { padding:20px; } }
+
+.classification-app .classification-review-overview { padding:18px; margin-bottom:24px; border:1px solid var(--line); background:white; }
+.classification-app .classification-review-overview .stats { margin:12px 0 0; padding-bottom:0; border-bottom:0; align-items:flex-start; }
+.classification-app .classification-review-overview .stat { flex-direction:column; gap:2px; }
+.classification-app .classification-catalog-note { margin:16px 0 0; padding:10px 12px; border-left:3px solid #b78114; background:#fff8e7; font-size:12px; overflow-wrap:anywhere; }
+.classification-app .classification-review-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.classification-app .classification-review-panel { min-width:0; padding:18px; border:1px solid var(--line); background:var(--canvas); }
+.classification-app .classification-review-panel > h3 { font-size:15px; }
+.classification-app .classification-review-panel > section { margin-top:12px; }
+.classification-app .classification-review-panel.review-approved,.classification-app .classification-review-panel.review-corrected { border-color:#9bc9ab; background:#f3faf5; }
+.classification-app .classification-review-panel.review-needs_review { border-color:#e0c57d; }
+.classification-app .classification-review-badge { display:inline-block; padding:3px 8px; background:#e9e9ed; border-radius:2px; font-size:12px; font-weight:600; }
+.classification-app .review-approved .classification-review-badge,.classification-app .review-corrected .classification-review-badge { color:#176038; background:#e3f4e9; }
+.classification-app .review-pending .classification-review-badge,.classification-app .review-needs_review .classification-review-badge { color:#805307; background:#fff6db; }
+.classification-app .classification-review-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
+.classification-app .classification-review-form { margin-top:16px; }
+.classification-app .classification-review-form label { display:block; font-size:12px; font-weight:600; margin-top:12px; }
+.classification-app .classification-review-form select,.classification-app .classification-review-form textarea { display:block; width:100%; min-width:0; min-height:44px; margin-top:6px; padding:9px 10px; border:1px solid #a0a0a0; border-radius:2px; font:inherit; background:white; color:var(--ink); }
+.classification-app .classification-review-form textarea { resize:vertical; }
+.classification-app .classification-review-error { margin:12px 0 0; color:#9b1420; font-size:12px; overflow-wrap:anywhere; }
+.classification-app .classification-review-readiness { margin:12px 0 0; font-size:12px; font-weight:600; }
+@media(max-width:700px) { .classification-app .classification-review-grid { grid-template-columns:1fr; } .classification-app .classification-review-panel { padding:14px; } .classification-app .incident-decision { grid-template-columns:1fr; } }

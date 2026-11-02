@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/assets/style.css">
   <script src="/assets/dashboard/app.js" defer></script>
 </head>
-<body>
+<body class="classification-app">
   <header class="topbar">
     <a class="brand" href="/" aria-label="HSBC incident classification dashboard">
       <!-- Artwork from pictures/HSBC_logo_(2018) (1).svg. -->
@@ -33,7 +33,7 @@
     <span class="mode" id="mode">Connecting…</span>
   </header>
 <main>
-  <section class="page-heading"><div><p class="eyebrow">INCIDENT ACCOUNTABILITY / WS4</p><h1>Incident classification</h1><p class="subtitle">LLM tags, supplier details, and supporting evidence from LLM_OUTPUT.csv.</p></div><button id="reload" type="button" class="button">Refresh</button></section>
+  <section class="page-heading"><div><p class="eyebrow">INCIDENT ACCOUNTABILITY / WS4</p><h1>Incident classification</h1><p class="subtitle">Review model classifications and supplier names. Approved Supplier decisions become eligible for linking.</p></div><button id="reload" type="button" class="button">Refresh</button></section>
   <p id="demo-note" class="demo-note" hidden>Demo: synthetic incidents and example model results.</p>
   <div id="message" class="message" role="status" aria-live="polite" hidden></div>
   <section class="stats" aria-label="Classification counts">
@@ -42,6 +42,17 @@
     <button type="button" class="stat stat-filter" data-filter="SUPPLIER" aria-pressed="false" aria-controls="incident-list" disabled><strong id="SUPPLIER-count">—</strong><span>SUPPLIER</span></button>
     <button type="button" class="stat stat-filter" data-filter="UNCERTAIN" aria-pressed="false" aria-controls="incident-list" disabled><strong id="UNCERTAIN-count">—</strong><span>UNCERTAIN</span></button>
     <button type="button" class="stat stat-filter" data-filter="failed" aria-pressed="false" aria-controls="incident-list" disabled><strong id="failed-count">—</strong><span>Processing failures</span></button>
+  </section>
+  <section class="classification-review-overview" aria-labelledby="review-overview-heading">
+    <h2 id="review-overview-heading">Human review progress</h2>
+    <p class="field-note">Counts cover all saved incidents. Model counts above stay unchanged when a reviewer corrects a result.</p>
+    <div class="stats">
+      <div class="stat"><strong id="review-classification_approved-count">—</strong><span>Classification approved / corrected</span></div>
+      <div class="stat"><strong id="review-classification_pending-count">—</strong><span>Classification awaiting decision</span></div>
+      <div class="stat"><strong id="review-supplier_pending-count">—</strong><span>Supplier name awaiting decision</span></div>
+      <div class="stat"><strong id="review-ready_for_linking-count">—</strong><span>Ready for linking</span></div>
+    </div>
+    <p id="supplier-catalog-note" class="classification-catalog-note" role="status" hidden></p>
   </section>
   <section aria-labelledby="results-heading">
     <h2 id="results-heading">Classified incidents</h2>
@@ -61,7 +72,7 @@
     <p id="dashboard-empty" class="field-note">No incidents match this filter.</p>
     <div id="incident-list" class="incident-list"></div>
   </section>
-  <footer><span>HSBC · Incident classification / WS4</span><span>Source: LLM_OUTPUT.csv</span></footer>
+  <footer><span>HSBC · Incident classification / WS4</span><span>Model results: LLM_OUTPUT.csv · Human decisions saved separately</span></footer>
 </main>
 </body>
 </html>

@@ -6,6 +6,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.classification_review import effective_classification, ready_for_linking
+
 
 ROOT = Path(__file__).resolve().parents[2]
 RESULTS_FILE = ROOT / "data/run/INC_LINKED.csv"
@@ -17,10 +19,15 @@ app.state.demo = False
 def count_incidents(rows):
     classifications = {"HSBC": 0, "SUPPLIER": 0, "UNCERTAIN": 0}
     link_failures = 0
+    eligible = 0
     for row in rows:
         classification = row.get("classification")
         if row.get("processing_status") == "success" and classification in classifications:
             classifications[classification] += 1
+        if "classification_review_status" in row:
+            eligible += ready_for_linking(row)
+        elif effective_classification(row) == "SUPPLIER":
+            eligible += 1
         if row.get("link_status") == "FAILED":
             link_failures += 1
 
@@ -32,7 +39,7 @@ def count_incidents(rows):
         "classified_supplier": classifications["SUPPLIER"],
         "classified_uncertain": classifications["UNCERTAIN"],
         "unclassified_incidents": len(rows) - classified,
-        "eligible_incidents": classifications["SUPPLIER"],
+        "eligible_incidents": eligible,
         "link_failed_incidents": link_failures,
     }
 
@@ -53,9 +60,9 @@ def group_engagements(rows, excluded_ids=()):
             continue
         status = row["link_status"]
         if status in ("UNDECIDED", "NOT_APPLICABLE", "SKIPPED", "FAILED"):
-            if status == "NOT_APPLICABLE" and row.get("classification") == "HSBC":
+            if status == "NOT_APPLICABLE" and effective_classification(row) == "HSBC":
                 unlinked_groups["hsbc"].append(row)
-            elif status == "UNDECIDED" and row.get("classification") == "SUPPLIER":
+            elif status == "UNDECIDED" and effective_classification(row) == "SUPPLIER":
                 unlinked_groups["supplier"].append(row)
             else:
                 unlinked_groups["other"].append(row)

@@ -1,6 +1,6 @@
 # Human review
 
-Human review is a separate local stage after engagement linking. It reuses the engagement dashboard layout and adds Yes/No decisions for classification and the proposed engagement link.
+This human-review stage runs after engagement linking. It reuses the engagement dashboard layout and adds Yes/No decisions for classification and the proposed engagement link. It is separate from the earlier [classification review](dashboard_app.md) on port 8766: CLASSIFICATION_REVIEW.csv controls which incidents can reach linking; HUMAN_REVIEW.csv reviews the resulting proposals.
 
 ```text
 INC_LINKED.csv -> read -> preserve previous reviews -> add new incidents -> HUMAN_REVIEW.csv
@@ -37,7 +37,7 @@ Preparation reads `data/run/INC_LINKED.csv` and writes `data/run/HUMAN_REVIEW.cs
 
 ## CSV fields
 
-All original model and engagement columns remain unchanged, including Python's `link_candidate_count` when present. Preserve its blank/zero/count values and show it in the link details dropdown. An older review file without that source column cannot be merged with the new linking schema; preserve it and use a fresh review output for the new batch. Five additional columns store the current human decisions:
+All original model and engagement columns remain unchanged, including the six classification-review fields and Python's `link_candidate_count` when present. Preserve its blank/zero/count values and show it in the link details dropdown. An older review file without those source columns cannot be merged with the new linking schema; preserve it and use a fresh review output for the new batch. Five additional columns store the current human decisions:
 
 | Column | Values or purpose |
 | --- | --- |
@@ -51,9 +51,9 @@ The original `linked_engagement_id`, `link_status=MATCHED`, and `ENG_` columns d
 
 ## Decisions
 
-Classification can be reviewed only when `processing_status=success` and the result is HSBC, SUPPLIER, or UNCERTAIN. Confirming UNCERTAIN accepts the model's inability to attribute responsibility; it does not create a Supplier result. Failed classifications have no successful decision to approve.
+For new rows, classification review uses the approved/corrected `reviewed_classification`. This includes original UNCERTAIN or failed model rows resolved by a human before linking. The original model classification and processing status remain unchanged and visible. For legacy rows without classification-review fields, require `processing_status=success` and a recognized HSBC/SUPPLIER/UNCERTAIN model result; confirming legacy UNCERTAIN does not create a Supplier attribution.
 
-Link review is available only for a successful SUPPLIER classification that has been confirmed and has an existing valid matched engagement proposal. No controls create a new classification or choose a different engagement. HSBC, UNCERTAIN, and rows without a matched proposal have no link to approve.
+Link review requires an eligible reviewed Supplier incident, a confirmed post-link classification review, and an existing valid matched engagement proposal. Legacy rows retain the successful model-SUPPLIER rule. No controls create a new classification or choose a different engagement. Reviewed HSBC, legacy UNCERTAIN, and rows without a matched proposal have no link to approve.
 
 | Action | Classification result | Link result |
 | --- | --- | --- |
@@ -70,16 +70,16 @@ Classification rejection replaces the link's current review result with `invalid
 
 - Human review progress stays visible in both modes, on lists and incident details. It counts every saved row in HUMAN_REVIEW.csv, regardless of search, classification/group filter, or selected incident. Refresh and a successfully saved decision update these totals.
 - Classification review has separate Confirmed, Pending, Rejected, and Not applicable counts. Link review has Confirmed, Pending, Rejected, Invalidated, and Not applicable counts. Each group's counts sum to the total number of saved incidents. These are two decisions per incident, so do not add the two groups together.
-- Successful HSBC and UNCERTAIN classifications can be pending, confirmed, or rejected; their link review is always not applicable. Failed classification is not applicable. A row without a matched engagement proposal is not applicable for link review. A pending link can be waiting for classification confirmation before its controls become available.
+- Reviewed HSBC has no link review. Reviewed Supplier can have a proposed link even if the original model was UNCERTAIN or failed. Legacy successful HSBC/UNCERTAIN can be pending, confirmed, or rejected without link review; legacy failed classification remains not applicable. A row without a matched engagement proposal is not applicable for link review. A pending link can be waiting for classification confirmation before its controls become available.
 - Invalidated links were cancelled because classification was rejected. Keep them separate from directly rejected links, which leave classification confirmed.
-- The overview shows total saved incidents, successful model classifications split by HSBC/SUPPLIER/UNCERTAIN, and failed/unclassified rows. Successful Supplier incidents are split into those with an original model match and those without one. These two Supplier counts sum to successful Supplier classifications. Human-confirmed links are counted separately.
+- The overview shows total saved incidents, successful model classifications split by HSBC/SUPPLIER/UNCERTAIN, and failed/unclassified rows. Eligible Supplier incidents are split into those with an original model match and those without one. For new rows this cohort uses the saved classification-review decision; legacy rows use the successful model class. These counts can differ from the original model-Supplier total. Human-confirmed links are counted separately.
 - Rejecting a classification does not rewrite the model's label, evidence score, or original match. Original model matches, current active proposals, and human-confirmed links are different counts. A rejected or invalidated link remains a model match but no longer counts as an active or human-confirmed link.
 - Engagement first keeps all original matched proposals available for inspection, with their pending, confirmed, rejected, or invalidated status. Rejected and invalidated links also appear in Other unlinked incidents. No view treats a pending proposal as human confirmation.
 - The review app reads and updates HUMAN_REVIEW.csv and reads ENG_ALL.csv for the engagement catalog. It never writes the catalog. `app.state.catalog_file` defaults to `data/mockup/ENG_ALL.csv`. GET requests do not create files or save decisions. A missing review file prompts running the preparation command.
 - `POST /api/review` accepts the incident ID, decision target, confirmation or rejection, reason, and current `review_version`. Reasons for rejection must be nonblank and at most 2,000 characters. Unknown fields, invalid targets, unavailable decisions, and stale versions are rejected without saving. Refresh before retrying a stale decision.
 - `review_version` is computed from the saved row and returned by the API; it is not an extra CSV column. The server serializes updates within its single local process and uses the existing atomic CSV writer. Run one review server process for a given output file.
 - CSV text is rendered as text, including rejection reasons. The loopback server checks local request hosts and origins for writes. This is a local demo with current-state decisions, not a multi-user approval or audit service.
-- There are no LLM calls, reclassification requests, or automatic relinking. Source CSVs remain unchanged. The read-only classification dashboard on port 8766 and engagement dashboard on port 8767 remain independent. No FINAL.csv is created.
+- There are no LLM calls, reclassification requests, or automatic relinking. Source CSVs remain unchanged. The classification-review dashboard on port 8766 and read-only engagement dashboard on port 8767 remain independent. No FINAL.csv is created.
 
 ### Review count fields
 
@@ -99,4 +99,4 @@ These counts are calculated from the existing `hitl_classification` and `hitl_li
 
 The review API includes `all_incidents` for the complete saved incident list, `all_engagements` for Engagement first, and `engagement_scope_note` explaining the available catalog scope. The existing active `engagements` and `unlinked_groups` remain separate from that browsing list. Review decisions are shared across all views.
 
-Additional overview counts are `total_engagements`, `supplier_model_linked_incidents`, and `supplier_without_model_link_incidents`. Total engagements follows the catalog scope above; incident counts cover the saved HUMAN_REVIEW.csv snapshot. The two Supplier counts use successful model classifications and the original `link_status=MATCHED`, independently of human decisions. `review_link_confirmed` counts accepted human links. Search and filters do not change these global totals.
+Additional overview counts are `total_engagements`, `supplier_model_linked_incidents`, and `supplier_without_model_link_incidents`. Total engagements follows the catalog scope above; incident counts cover the saved HUMAN_REVIEW.csv snapshot. The two Supplier counts describe the effective Supplier cohort and its original `link_status=MATCHED`, independently of later `hitl_` decisions. New rows use their approved/corrected classification review; legacy rows use successful model classification. Original model-class totals remain separate. `review_link_confirmed` counts accepted human links. Search and filters do not change these global totals.

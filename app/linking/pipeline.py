@@ -4,6 +4,7 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 
+from app.classification_review import REVIEW_FILE, load_reviewed_rows
 from app.csv_files import read_records
 from app.linking.linking import link_incidents
 
@@ -25,10 +26,14 @@ def run_linking_pipeline():
         print("LINK_MAX_CANDIDATES must be a positive integer.")
         return 1
 
-    incidents, error = read_records(INCIDENT_FILE)
-    if error:
-        print(error)
+    try:
+        incidents = load_reviewed_rows(INCIDENT_FILE, REVIEW_FILE)
+    except (OSError, UnicodeError, ValueError) as error:
+        print(f"Classification review could not be loaded: {type(error).__name__}. Check the input and review CSV files.")
         return 1
+    for incident in incidents:
+        incident.pop("review_version", None)
+        incident.pop("review_stale", None)
     engagements, error = read_records(ENGAGEMENT_FILE)
     if error:
         print(f"Place ENG_ALL.csv at {ENGAGEMENT_FILE}.")

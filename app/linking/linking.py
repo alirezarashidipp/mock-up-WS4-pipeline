@@ -1,6 +1,8 @@
 from openai import OpenAIError
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from app.classification_review import classification_is_approved, ready_for_linking
+from app.csv_files import read_records
 from app.llm.llm_connection import llm_connection
 from app.linking.candidates import find_candidates
 from app.linking.save_csv import save_linked
@@ -76,20 +78,16 @@ def link_incident(incident, engagements, prompt, max_candidates=70):
         "link_confidence": "", "link_incident_columns": [], "link_engagement_columns": [],
         "link_error": "", "link_candidate_count": "",
     }
-    if incident.get("processing_status") != "success":
-        link.update(link_status="SKIPPED", link_reason="Incident classification did not succeed.")
+    if not classification_is_approved(incident):
+        link.update(link_status="SKIPPED", link_reason="Classification awaits human approval.")
         return link, {}
-    classification = incident.get("classification")
-    if classification == "HSBC":
-        link.update(link_status="NOT_APPLICABLE", link_reason="HSBC incident; supplier engagement linking is not applicable.")
+    if incident["reviewed_classification"] == "HSBC":
+        link.update(link_status="NOT_APPLICABLE", link_reason="Human-reviewed HSBC incident; no supplier engagement link is required.")
         return link, {}
-    if classification == "UNCERTAIN":
-        link.update(link_status="SKIPPED", link_reason="Classification is uncertain; supplier accountability is not established, so engagement matching was skipped.")
+    if not ready_for_linking(incident):
+        link.update(link_status="SKIPPED", link_reason="Supplier name awaits human approval.")
         return link, {}
-    if classification != "SUPPLIER":
-        link.update(link_status="FAILED", link_reason="Expected HSBC, SUPPLIER, or UNCERTAIN classification.", link_error="InvalidClassification")
-        return link, {}
-    candidates = find_candidates(incident.get("supplier_name", ""), engagements, max_candidates)
+    candidates = find_candidates(incident["reviewed_supplier_name"], engagements, max_candidates)
     link["link_candidate_count"] = len(candidates)
     if not candidates:
         link["link_reason"] = "Supplier name is missing or no similar supplier name was found in ENG_ALL.csv."
@@ -111,11 +109,47 @@ def link_incident(incident, engagements, prompt, max_candidates=70):
     return link, selected
 
 
+def pending_linking_incidents(incidents, output_file, engagement_columns):
+    saved_rows, _ = read_records(output_file, optional=True)
+    if saved_rows and incidents:
+        expected_columns = set(incidents[0])
+        expected_columns.update(f"ENG_{name}" for name in engagement_columns)
+        expected_columns.update((
+            "linked_engagement_id", "link_status", "link_reason", "link_confidence",
+            "link_incident_columns", "link_engagement_columns", "link_error",
+            "link_candidate_count", "link_confidence_scale",
+        ))
+        if set(saved_rows[0]) != expected_columns:
+            raise ValueError("INC_LINKED.csv uses a different schema. Preserve it and use a new batch output.")
+    saved_by_id = {row["INCIDENT_ID"]: row for row in saved_rows}
+    pending = []
+    for incident in incidents:
+        saved = saved_by_id.get(incident["INCIDENT_ID"])
+        if saved is not None:
+            if any(name not in saved or saved[name] != str(value) for name, value in incident.items()):
+                raise ValueError("Saved linking input or human review has changed. Preserve INC_LINKED.csv and use a new batch output.")
+            if saved.get("link_status") == "FAILED":
+                raise ValueError("A saved linking request failed. Preserve it and use a new output file to retry.")
+            continue
+        if ready_for_linking(incident) or (classification_is_approved(incident) and incident["reviewed_classification"] == "HSBC"):
+            pending.append(incident)
+
+    return pending
+
+
 def link_incidents(incidents, engagements, prompt, output_file, max_candidates=70):
+    columns = engagements[0].keys() if engagements else ()
+    try:
+        incidents = pending_linking_incidents(incidents, output_file, columns)
+    except ValueError as error:
+        print(error)
+        return 1
+    if not incidents:
+        print("No new approved incidents. Complete classification and supplier-name review in the classification dashboard.")
+        return 0
     if not incidents or not engagements:
         print("LLM_OUTPUT.csv and ENG_ALL.csv must contain rows.")
         return 1
-    columns = engagements[0].keys()
     if "ENGAGEMENT_ID" not in columns or not {"THIRD_PARTY_NAME", "THIRD_PARTY_NORMALISED_NAME"}.intersection(columns):
         print("ENG_ALL.csv needs ENGAGEMENT_ID and THIRD_PARTY_NAME or THIRD_PARTY_NORMALISED_NAME.")
         return 1
