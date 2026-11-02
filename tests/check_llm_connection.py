@@ -29,7 +29,7 @@ class LLMConnectionTest(unittest.TestCase):
             # Provider and validation errors may contain credentials or input values.
             raise AssertionError(
                 f"LLM connection check failed: {type(error).__name__}. "
-                "Check .env, connectivity, prompt files, token limits, and structured-output support."
+                "Check .env, connectivity, prompt files, and structured-output support."
             ) from None
 
         self.assertIsNotNone(

@@ -17,11 +17,9 @@ LINK_MAX_CANDIDATES=70
 
 The pipeline loads this setting before candidate search. It must be a positive integer and defaults to 70 when omitted. Keep the first matching rows in ENG_ALL.csv order and stop when the limit is reached. This is a row-count cap, not a relevance ranking or token limit; a relevant engagement later in the file can be excluded.
 
-## Token limits
+## Request defaults
 
-Linking shares `LLM_MAX_INPUT_TOKENS=32000` and `LLM_MAX_OUTPUT_TOKENS=2000` with classification, configured in `.env`. Both must be positive integers; these defaults apply only when settings are omitted. The local input estimate includes the prompt, incident data, all shortlisted engagement rows, and response schema. An over-budget request fails before the completion call, saves `FAILED` where possible, and stops the batch without truncating data or reducing the shortlist automatically. The candidate-count cap does not guarantee the request fits the token budget.
-
-The output setting is sent as `max_completion_tokens`, including reasoning tokens where applicable. Incomplete output still fails existing validation. See [token limits](llm.md#token-limits) for tokenizer selection, estimate limitations, and first-use caching.
+Linking uses provider defaults for temperature and output length, with no local token-counting step or tokenizer download. Requests preserve the complete shortlisted rows; the provider's model limits still apply. `LINK_MAX_CANDIDATES` remains a row-count cap, not a token budget. Incomplete or invalid output still fails validation. See [request defaults](llm.md#request-defaults).
 
 ## Per incident
 

@@ -27,8 +27,7 @@ py -3.11 -m venv .venv
 ```
 
 - Put a UTF-8 source CSV at `data/mockup/RAW.csv`.
-- Create `.env` using [.env.example](.env.example) if absent. Select `LLM_PROVIDER=openai` or `azure` and fill that provider's settings. `LLM_TEMPERATURE` is optional.
-- Set `LLM_MAX_INPUT_TOKENS=32000` and `LLM_MAX_OUTPUT_TOKENS=2000` in `.env` for both classification and linking. Both must be positive integers; these defaults apply when omitted. The input limit checks a local token estimate before sending; the output limit is sent as `max_completion_tokens`. See [token limits](docs/llm.md#token-limits) for counting and failure behavior.
+- Create `.env` using [.env.example](.env.example) if absent. Select `LLM_PROVIDER=openai` or `azure` and fill that provider's settings.
 - Set `LINK_MAX_CANDIDATES=70` in `.env` to cap engagement candidates per incident. It must be a positive integer; the default is 70 when omitted.
 - Configure [column names](fields/columns.yaml), [short definitions](fields/definitions.yml), and [classification instructions](prompts/classification.yml).
 
@@ -114,4 +113,4 @@ These tests run offline with temporary CSVs and simulated LLM replies. Frontend 
 .\.venv\Scripts\python.exe -B -m unittest discover -s tests -p check_llm_connection.py -v
 ```
 
-It classifies one visibly synthetic incident using the current YAML prompt, field definitions, Pydantic schema, and `classify_row`. It uses the selected OpenAI/Azure connection, configured temperature and input/output token limits, and `store=False`. Empty, refused, incomplete, or invalid structured responses fail. It prints only a fixed success message or a sanitized error; no CSV files are read or written. This checks connectivity and the classification response contract, not model accuracy or the linking schema. Ordinary test discovery skips this live API call.
+It classifies one visibly synthetic incident using the current YAML prompt, field definitions, Pydantic schema, and `classify_row`. It uses the selected OpenAI/Azure connection, provider defaults for temperature and output length, and `store=False`. No local tokenizer or input-token precheck runs. Empty, refused, incomplete, or invalid structured responses fail. It prints only a fixed success message or a sanitized error; no CSV files are read or written. This checks connectivity and the classification response contract, not model accuracy or the linking schema. Ordinary test discovery skips this live API call.

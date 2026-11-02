@@ -1,7 +1,7 @@
 from openai import OpenAIError
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from app.llm.llm_connection import llm_connection, request_options
+from app.llm.llm_connection import llm_connection
 from app.linking.candidates import find_candidates
 from app.linking.save_csv import save_linked
 
@@ -43,13 +43,11 @@ def select_engagement(client, model, incident, candidates, prompt):
         "type": "json_schema",
         "json_schema": {"name": "EngagementLink", "strict": True, "schema": schema},
     }
-    options = request_options(model, messages, response_format)
     response = client.chat.completions.create(
         model=model,
         messages=messages,
         response_format=response_format,
         store=False,
-        **options,
     )
     if not response.choices:
         return None

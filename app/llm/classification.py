@@ -6,7 +6,7 @@ from openai import OpenAI, OpenAIError
 from pydantic import ValidationError
 
 from app.llm.prepare_fields import prepare_fields
-from app.llm.llm_connection import llm_connection, request_options
+from app.llm.llm_connection import llm_connection
 from app.models import Classification, SUPPLIER_FIELDS
 from app.llm.save_csv import save_result
 
@@ -66,13 +66,11 @@ def classify_row(client: OpenAI, model: str, fields: list[dict], prompt: str) ->
         "type": "json_schema",
         "json_schema": {"name": "Classification", "strict": True, "schema": schema},
     }
-    options = request_options(model, messages, response_format)
     response = client.chat.completions.create(
         model=model,
         messages=messages,
         response_format=response_format,
         store=False,
-        **options,
     )
     result = parse_response(response, fields)
     if result is None:

@@ -9,11 +9,13 @@ INC_LINKED.csv -> Human review preparation -> HUMAN_REVIEW.csv
 HUMAN_REVIEW.csv -> Human decisions -> Save HUMAN_REVIEW.csv
 ```
 
-## LLM token limits
+## LLM request defaults
 
-- Both LLM calls use `.env`: `LLM_MAX_INPUT_TOKENS=32000` and `LLM_MAX_OUTPUT_TOKENS=2000`. Values must be positive integers; omitted settings use these defaults, while blank or invalid settings fail.
-- Input tokens are estimated locally with `tiktoken`, including the prompt, data, definitions, shortlisted engagements, and response schema. This is not an exact provider token count. If the estimate exceeds the limit, do not send or truncate the request; save the failed row where possible and stop, preserving earlier results.
-- Output uses `max_completion_tokens`, including reasoning tokens where applicable. Incomplete model output remains invalid. `LINK_MAX_CANDIDATES` is a separate row-count limit. See [token limits](llm.md#token-limits) for details.
+- Both LLM calls use provider defaults for temperature and output length. These values are not configured by the application.
+- No local tokenizer, tokenizer download, or input-token precheck runs. Input is not truncated; the provider's model limits still apply.
+- Structured output and incomplete-response validation remain active. `LINK_MAX_CANDIDATES=70` still caps engagement candidates. See [request defaults](llm.md#request-defaults).
+
+The archived diagram in `.archify/dataflow-ws4-pipeline-20261102-000851/` predates removal of the request settings. Its shared-budget description and frozen source snapshot are historical; the request defaults above describe the current code.
 
 ## Three dashboards
 

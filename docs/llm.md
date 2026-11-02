@@ -23,22 +23,11 @@ CLEAN.csv -> one row per request -> validate response -> save LLM_OUTPUT.csv -> 
 
 UNCERTAIN is a valid classification with `processing_status=success`; it does not stop the batch. A provider failure or invalid response has `processing_status=failed`. Failed evidence-name or score/classification checks use this same failure path: save the failed row where possible, stop the batch, and preserve earlier results. Python does not repair the names or change the classification. A missing supplier name alone does not require UNCERTAIN when Supplier accountability is otherwise supported. A documented technical cause may remain available even when the accountable party is uncertain.
 
-## Token limits
+## Request defaults
 
-Both classification and linking read these settings from the project `.env`:
+Classification and linking use the selected provider's defaults for temperature and output length. Requests omit `temperature`, `max_tokens`, and `max_completion_tokens`. There is no local token-counting step, tokenizer download, or input-token precheck. The provider's model limits still apply; input is not truncated.
 
-```dotenv
-LLM_MAX_INPUT_TOKENS=32000
-LLM_MAX_OUTPUT_TOKENS=2000
-```
-
-Both values must be positive integers. Omitted settings use the defaults above; blank, zero, negative, or noninteger values are rejected.
-
-Before each completion request, the shared connection module estimates input tokens with `tiktoken` over the serialized messages and response-format schema. This includes the system prompt, field names, definitions, values, and, for linking, every shortlisted candidate row. It uses the model's encoding when recognized and falls back to `o200k_base` for unknown model or Azure deployment names. Provider framing and schema processing can differ, so this is a local estimate, not an exact billed count or a guarantee that the model's context window will accept the request. Tokenizer data may be downloaded and cached on first use; counting itself sends no incident data and makes no LLM call.
-
-An estimate above `LLM_MAX_INPUT_TOKENS` raises `ValueError` before the completion call. No prompt, source value, definition, or candidate row is truncated. Invalid limits and over-budget requests follow the existing failed-row/save-and-stop path, preserving earlier results. The input budget is separate from the linking candidate-count cap.
-
-`LLM_MAX_OUTPUT_TOKENS` is forwarded as Chat Completions `max_completion_tokens`. It caps generated completion tokens, including reasoning tokens where applicable; it does not promise that many visible JSON tokens. Existing finish-reason checks still reject incomplete output. Both limits must also suit the selected model's provider limits.
+Strict JSON schema, Pydantic validation, refusal checks, and incomplete-response checks remain active. The shared connection keeps its 60-second SDK timeout and one SDK retry. `LINK_MAX_CANDIDATES` independently limits shortlisted rows.
 
 ## Input and output order
 
@@ -92,7 +81,7 @@ The model returns only the integer; dashboards derive its label. The provider sc
 - Each source value and scalar result has its own CSV column. Join source names with comma and space in exactly one `evidence_column` cell, for example `INCIDENT_DESCRIPTION, ROOT_CAUSE_NOTES`. The CSV writer quotes that cell automatically so its commas do not create additional columns. New outputs contain neither `supporting_evidence`, numbered evidence columns, nor evidence quotation columns. The model uses a JSON list for validation; the saved CSV cell is plain text, not a JSON blob.
 - Keep prompt and definitions in YAML. Store no JSON blobs, definition columns, or prompt text in CSV; arrays are reconstructed only for display/API responses.
 - Process sequentially. Successful HSBC, SUPPLIER, and UNCERTAIN rows have `processing_status=success`; failed responses are saved as failed where possible and stop the batch, preserving earlier results.
-- Every non-ID column needs a definition. Nonblank temperature is converted to a number and passed to the provider without a local range check. Connection settings use `.env` via `app/llm/llm_connection.py`.
+- Every non-ID column needs a definition. Connection settings use `.env` via `app/llm/llm_connection.py`.
 - Existing output files do not block starting requests. The shared CSV writer still requires nonempty IDs, compatible source/result columns, and no conflicting result for an existing ID.
 - Older outputs with `llm_confidence`, `supporting_evidence`, numbered evidence columns, human-review fields, UNDECIDED tags, or the previous model schema are not silently migrated. A 0-100 confidence value cannot be converted into this evidence rubric. Use a separate output folder for the new schema; update dashboard and linking input/output paths accordingly. The writer rejects appending the new schema to an older output. Dashboards show Not recorded when the evidence score is absent and read legacy evidence columns without rewriting them. Existing CSVs, including earlier FINAL.csv files, remain untouched.
 
@@ -106,6 +95,6 @@ Run from the project root:
 .\.venv\Scripts\python.exe -B -m unittest discover -s tests -p check_llm_connection.py -v
 ```
 
-`tests/check_llm_connection.py` prepares one visibly synthetic incident with the existing field definitions and classification YAML prompt. It reuses `llm_connection` and `classify_row`, so the selected OpenAI/Azure provider, configured temperature, estimated input budget, output cap, `store=False`, strict JSON schema, and existing response validation all apply. Success requires a valid structured classification, not a particular label or exact evidence score. Empty, refused, incomplete, malformed, or semantically inconsistent responses fail.
+`tests/check_llm_connection.py` prepares one visibly synthetic incident with the existing field definitions and classification YAML prompt. It reuses `llm_connection` and `classify_row`, so the selected OpenAI/Azure provider, provider defaults for temperature and output length, `store=False`, strict JSON schema, and existing response validation all apply. No local tokenizer runs before the request. Success requires a valid structured classification, not a particular label or exact evidence score. Empty, refused, incomplete, malformed, or semantically inconsistent responses fail.
 
-The check makes one logical completion request when its configuration and input budget are valid; the shared SDK retry setting still applies. It reads no incident CSV and writes no CSV output. Console output contains a fixed success message or a sanitized exception type, not raw provider messages or generated text. Ordinary `test_*.py` discovery skips this live check. Passing it verifies that request's connectivity and classification contract; it does not establish classification accuracy or validate the linking schema.
+The check makes one logical completion request when its connection settings are valid; the shared SDK retry setting still applies. It reads no incident CSV and writes no CSV output. Console output contains a fixed success message or a sanitized exception type, not raw provider messages or generated text. Ordinary `test_*.py` discovery skips this live check. Passing it verifies that request's connectivity and classification contract; it does not establish classification accuracy or validate the linking schema.

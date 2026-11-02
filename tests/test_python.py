@@ -1,7 +1,6 @@
 """Small checks using temporary CSVs and simulated LLM responses."""
 
 import json
-import os
 import unittest
 from contextlib import nullcontext
 from pathlib import Path
@@ -102,7 +101,7 @@ class PythonTests(unittest.TestCase):
                 return responses[index]
 
             client.chat.completions.create.side_effect = respond
-            with patch.object(classification, "llm_connection", return_value=nullcontext((client, "example-model"))), patch.dict(os.environ, {"LLM_TEMPERATURE": "3"}):
+            with patch.object(classification, "llm_connection", return_value=nullcontext((client, "example-model"))):
                 self.assertEqual(classification.classify_rows(rows, definitions, output), 0)
             self.assertEqual(client.chat.completions.create.call_count, 3)
             for index, call in enumerate(client.chat.completions.create.call_args_list):
@@ -115,7 +114,9 @@ class PythonTests(unittest.TestCase):
                     name = field["name"]
                     self.assertEqual(field["description"], definitions[name])
                     self.assertEqual(field["value"], rows[index][name])
-                self.assertEqual(call.kwargs["temperature"], 3.0)
+                self.assertNotIn("temperature", call.kwargs)
+                self.assertNotIn("max_completion_tokens", call.kwargs)
+                self.assertNotIn("max_tokens", call.kwargs)
             saved, error = read_records(output)
             self.assertEqual(error, "")
             self.assertEqual([row["classification"] for row in saved], ["HSBC", "SUPPLIER", "UNCERTAIN"])
@@ -170,7 +171,7 @@ class PythonTests(unittest.TestCase):
         client.chat.completions.create.side_effect = [example_response("HSBC"), OpenAIError("Synthetic request failure")]
         with TemporaryDirectory(dir=ROOT) as folder:
             output = Path(folder) / "LLM_OUTPUT.csv"
-            with patch.object(classification, "llm_connection", return_value=nullcontext((client, "example-model"))), patch.dict(os.environ, {"LLM_TEMPERATURE": ""}):
+            with patch.object(classification, "llm_connection", return_value=nullcontext((client, "example-model"))):
                 self.assertEqual(classification.classify_rows(rows, definitions, output), 1)
             saved, _ = read_records(output)
             self.assertEqual([row["processing_status"] for row in saved], ["success", "failed"])
@@ -193,8 +194,7 @@ class PythonTests(unittest.TestCase):
             client = Mock()
             client.chat.completions.create.return_value = SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
             fields = [{"name": "INCIDENT_DESCRIPTION", "description": "Example description.", "value": "Synthetic incident."}]
-            with patch.dict(os.environ, {"LLM_TEMPERATURE": ""}):
-                classified = classification.classify_row(client, "example-model", fields, "Example prompt.")
+            classified = classification.classify_row(client, "example-model", fields, "Example prompt.")
             self.assertIsNotNone(classified)
             for name in SUPPLIER_FIELDS:
                 expected = None if label != "SUPPLIER" or name == "supplier_more_info" else "Unknown"
