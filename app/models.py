@@ -32,7 +32,10 @@ class Classification(BaseModel):
         min_length=1, description="The documented root cause in one sentence, or null if unknown."
     )
     evidence_column: list[str] = Field(
-        description="Standardized source column names that informed the decision; names only, without quotes. An empty list is allowed; no fixed maximum count."
+        description="Standardized source column names that informed the decision; names only, without source excerpts. An empty list is allowed; no fixed maximum count."
+    )
+    citations: list[str] = Field(
+        description="Short excerpts from supplied source values, labeled with their source column. An empty list is allowed."
     )
     decision_rationale: str = Field(
         min_length=1, description="A short evidence-based explanation of the accountability decision."
@@ -65,3 +68,12 @@ class Classification(BaseModel):
     supplier_more_info: str | None = Field(
         description="For SUPPLIER, additional recorded facts not covered by the other fields; null for other classifications or when nothing else is recorded."
     )
+
+
+def format_citations(citations, stage):
+    """Label every line so one CSV cell can keep the two model stages separate."""
+    lines = []
+    for citation in citations:
+        for line in citation.splitlines():
+            lines.append(f"{stage}: {line}")
+    return "\n".join(lines)

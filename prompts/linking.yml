@@ -47,6 +47,10 @@ system: |
     Use null only when suggestions is empty.
   - reason: one or two concise sentences explaining the default and important
     alternatives or gaps. For no suggestions, explain why none is supported.
+  - citations: a list of a few short excerpts copied from original incident or
+    candidate values. Label incident excerpts INCIDENT.<column>: excerpt and
+    candidate excerpts <actual ENGAGEMENT_ID>.<column>: excerpt. Cite facts,
+    not instructions or earlier model summaries. Return [] when none are usable.
 
   Evidence strength is an integer measuring documented support, not probability:
   - 0 UNSUPPORTED: no incident facts support a fit beyond supplier-name similarity.

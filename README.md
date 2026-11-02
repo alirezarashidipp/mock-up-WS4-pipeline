@@ -58,9 +58,11 @@ Configure [column names](fields/columns.yaml), [field definitions](fields/defini
 
 Open [http://127.0.0.1:8766](http://127.0.0.1:8766). Refresh rereads saved results; stop processes with Ctrl+C.
 
-The new output is **data/run/INCIDENTS.csv**. It contains original incident values, model classification, engagement proposals/counts, selected engagement values, and separate human decisions. Existing LLM_OUTPUT.csv, CLASSIFICATION_REVIEW.csv, INC_LINKED.csv, and HUMAN_REVIEW.csv remain untouched archives; the new workflow does not import their approvals or read them as its output. No FINAL.csv is created. The separate linking/review CLI commands and port-8767/8768 dashboards have been removed.
+The new output is **data/run/INCIDENTS.csv**. It contains original incident values, model classification, engagement proposals/counts, selected engagement values, separate human decisions, and one shared citations column. Citations are source-labeled model excerpts and are not checked for exact matches. Existing LLM_OUTPUT.csv, CLASSIFICATION_REVIEW.csv, INC_LINKED.csv, and HUMAN_REVIEW.csv remain untouched archives; the new workflow does not import their approvals or read them as its output. No FINAL.csv is created. The separate linking/review CLI commands and port-8767/8768 dashboards have been removed.
 
 Initialization saves all source incidents as pending. Each classification and link result is saved before the next incident. A failed request saves its failure and stops the batch. Rerunning retries unfinished/failed model work that has no human classification decision, preserves completed results, and adds new IDs. Changed source values, output columns, or engagement columns require a fresh output; preserve earlier batches. Output/catalog paths live in `app/incidents.py`; CLEAN input and definitions live in `app/llm/pipeline.py`. Restart the dashboard after changing paths.
+
+Existing unified INCIDENTS.csv files without citations remain readable with blank excerpts; the next normal save adds that column without rerunning completed model work.
 
 The CSV stores current decisions, not an audit-history log. File locking, atomic saves, and per-row versions protect concurrent pipeline/dashboard updates; stale model results or browser decisions cannot replace newer human changes.
 

@@ -117,6 +117,11 @@ def read_incidents(path=RESULTS_FILE):
         reader = csv.DictReader(file, strict=True)
         columns = reader.fieldnames or []
         rows = list(reader)
+    # Older unified outputs have no citations; reads remain non-mutating.
+    if "citations" not in columns:
+        columns.append("citations")
+        for row in rows:
+            row["citations"] = ""
     validate_rows(rows, columns)
     return rows
 
@@ -173,6 +178,19 @@ def save_incident(path, row, expected_version):
             write_records(path, rows)
             return row
     raise ValueError("This incident no longer exists. Refresh the dashboard.")
+
+
+def apply_link_result(row, proposal):
+    """Replace link citations while retaining the original classification excerpts."""
+    classification_lines = []
+    for line in row.get("citations", "").splitlines():
+        if line.startswith("Classification: "):
+            classification_lines.append(line)
+    row.update(proposal)
+    link_citations = proposal.get("citations", "")
+    if link_citations:
+        classification_lines.append(link_citations)
+    row["citations"] = "\n".join(classification_lines)
 
 
 def engagement_values(row, engagements, selected_id):
@@ -265,10 +283,10 @@ def apply_classification_review(row, decision):
     updated["reviewed_classification"] = selected
     updated["classification_review_reason"] = decision.reason.strip() if decision.decision == "disagree" else ""
     if selected == "SUPPLIER" and row["link_status"] == "RUNNING":
-        updated.update(empty_link(status="PENDING", reason="Review changed while suggestions were running."))
+        apply_link_result(updated, empty_link(status="PENDING", reason="Review changed while suggestions were running."))
     if selected != "SUPPLIER":
         status = "NOT_APPLICABLE" if selected == "HSBC" else "SKIPPED"
-        updated.update(empty_link(status=status, reason="Human classification does not permit engagement linking."))
+        apply_link_result(updated, empty_link(status=status, reason="Human classification does not permit engagement linking."))
         updated.update({name: "" for name in row if name.startswith("ENG_")})
         updated["supplier_review_status"] = "not_applicable"
         updated["engagement_review_status"] = "not_applicable"

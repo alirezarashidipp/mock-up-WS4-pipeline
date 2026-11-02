@@ -36,10 +36,11 @@
 - Names belong in fields/columns.yaml, standardized definitions in fields/definitions.yml, and instructions in prompts/classification.yml.
 - Use Pydantic inputs/responses and strict Structured Outputs. Keep INCIDENT_ID local. Order inputs: narrative, causes, closure/resolution, investigation history, supplier/product context, remaining metadata. Preserve every non-ID source value.
 - Classify HSBC, SUPPLIER, or UNCERTAIN. UNCERTAIN is a successful result when attribution is unsupported or conflicting; explain limitations in decision_rationale.
-- Output order: root cause, evidence_column, rationale, classification, evidence strength, six supplier fields.
+- Output order: root cause, evidence_column, citations, rationale, classification, evidence strength, six supplier fields.
 - Supplier fields are null for HSBC/UNCERTAIN. For SUPPLIER, extract recorded facts; missing core details become Unknown, absent extra facts become null. supplier_name is the documented base name; retain useful full-entity/country details in supplier_more_info without inventing a parent company.
 - attribution_evidence_strength is a strict integer 0-4, not probability. Reject UNCERTAIN above 2 and HSBC/SUPPLIER at 0; preserve valid 1-4 definite classifications. Do not repair inconsistent labels/scores.
-- evidence_column is a list of strings, including an empty list, with no fixed maximum. Python does not validate individual names, duplicates, or blanks. Preserve order and join with comma and space in one cell; no evidence quotes or numbered evidence columns.
+- evidence_column is a list of strings, including an empty list, with no fixed maximum. Python does not validate individual names, duplicates, or blanks. Preserve order and join with comma and space in one cell; no source excerpts in evidence_column or numbered evidence columns.
+- Both responses include citations as a list of strings; [] is valid. Check structure only, not exact quotes, source labels, duplicates, blanks, or length. Save one shared citations cell with Classification: and Engagement: line prefixes. Replacing or clearing a model link result replaces only its citation lines. Exclude saved citations from subsequent linking inputs.
 - Preserve completion/refusal/schema validation, including Azure-compatible schema restrictions. Reuse the current OpenAI/Azure connection and provider defaults; do not reintroduce temperature or token-limit controls removed at the user's request.
 - Save classification before linking, and save linking before processing the next incident. Save a failed row and stop. Reruns retry unfinished/failed work without overwriting human decisions or completed results.
 
@@ -65,6 +66,7 @@
 - linked_engagement_id is the current model default; reviewed_engagement_id is the explicit human choice. ENG_ values follow the current selection. These are current-state records, not an audit history.
 - Keep source values immutable, validate IDs/schema in the unified processing stage, and reject changed-source batches. Do not add such checks to Cleaning.
 - Serialize writes with the existing atomic CSV writer and a short interprocess file lock. Increment the persisted row_revision on every save and include it in per-row versions; stale browser saves and old model responses must not overwrite newer decisions. Release locks during provider calls.
+- Existing unified INCIDENTS.csv files missing only citations read with that field blank in memory. Do not write on GET or rerun models for missing excerpts. The next normal save adds the column while retaining other rows and decisions; historical output formats remain untouched.
 - Catalogs are read-only. Check candidate membership and catalog freshness before engagement approval. Changed catalog columns require a fresh output batch.
 - Render CSV values as text, show missing/invalid catalog messages, keep original model counts separate from human review progress, and preserve list filters/open incident after save.
 - No LLM calls or file writes on GET. Human supplier correction/retry may call the LLM on POST. Green confirmation appears only after a successful save.

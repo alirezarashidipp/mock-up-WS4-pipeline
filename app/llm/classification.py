@@ -4,7 +4,7 @@ from pathlib import Path
 from openai import OpenAI
 from pydantic import ValidationError
 
-from app.models import Classification, SUPPLIER_FIELDS
+from app.models import Classification, SUPPLIER_FIELDS, format_citations
 
 
 PROMPT_FILE = Path(__file__).resolve().parents[2] / "prompts/classification.yml"
@@ -17,6 +17,7 @@ def classification_values(result, error=""):
     if result is not None:
         values.update(result.model_dump())
         values["evidence_column"] = ", ".join(result.evidence_column)
+        values["citations"] = format_citations(result.citations, "Classification")
         values["processing_status"] = "success"
         values["error"] = ""
     return values

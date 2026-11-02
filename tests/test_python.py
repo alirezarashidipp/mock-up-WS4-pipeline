@@ -27,6 +27,7 @@ def example_response(label):
         "key_root_cause": "Synthetic configuration error.",
         "decision_rationale": "Synthetic example explanation.",
         "evidence_column": ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"],
+        "citations": ["ROOT_CAUSE_NOTES: Synthetic recorded cause."],
         "attribution_evidence_strength": 3,
     }
     for name in SUPPLIER_FIELDS:

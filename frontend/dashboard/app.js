@@ -403,6 +403,7 @@ function modelDetails(row) {
   addField(fields, "Key root cause", row.key_root_cause);
   const evidence = row.evidence_column.join(", ");
   addField(fields, "Evidence columns", evidence);
+  addField(fields, "Model citations (not verified)", row.citations);
   if (row.classification === "SUPPLIER") {
     for (const [label, value] of [["Supplier base name", row.supplier_name], ["Product or service", row.supplier_product_or_service], ["Supplier action or failure", row.supplier_action_or_failure], ["Causal explanation", row.supplier_causal_explanation], ["Accountability reason", row.supplier_accountability_reason], ["Additional supplier information", row.supplier_more_info]]) addField(fields, label, value);
   }

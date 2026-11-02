@@ -38,17 +38,18 @@ Synthetic example: base name AXA can retrieve both AXA Insurance and AXA Com. Th
 
 ## Linking request and response
 
-`prompts/linking.yml` supplies the instructions. A Pydantic `LinkInput` contains the current `supplier_name`, incident context, and complete capped engagement rows. It is serialized inside `<link_request>` tags; the prompt treats all contents as data. `INCIDENT_ID`, previous linking fields, and human-review bookkeeping stay out of the model payload.
+`prompts/linking.yml` supplies the instructions. A Pydantic `LinkInput` contains the current `supplier_name`, incident context, and complete capped engagement rows. It is serialized inside `<link_request>` tags; the prompt treats all contents as data. `INCIDENT_ID`, previous linking fields, the shared `citations` value, and human-review bookkeeping stay out of the model payload.
 
 The explicit current supplier name overrides a conflicting earlier model supplier name. Original incident facts remain the basis for matching; descriptions of a rejected supplier are not assumed applicable. The prompt defines engagement fields, warns against supplier-name-only matches, distinguishes beneficiary geography from incident geography, and asks for concise supported reasons.
 
-The strict structured response has three top-level fields:
+The strict structured response has four top-level fields:
 
 | Field | Contract |
 | --- | --- |
 | `suggestions` | Zero to five items, each containing `engagement_id`, `reason`, and `evidence_strength`. |
 | `selected_engagement_id` | The strongest suggestion's exact ID, or null when suggestions is empty. |
 | `reason` | Concise explanation of the default, alternatives, or why no candidate is supported. |
+| `citations` | List of short excerpts labeled `INCIDENT.<column>` or `<ENGAGEMENT_ID>.<column>`; [] when none are available. |
 
 Each suggestion must identify a distinct supplied candidate and contain a nonblank reason. Suggestions use strict integer scores 1-4: weak, moderate, strong, very strong. Unsupported candidates have conceptual score 0 and are omitted. An empty list is valid when none fits.
 
@@ -56,11 +57,13 @@ The default must belong to the suggestions and have the highest evidence score. 
 
 Pydantic rejects additional fields, incorrect types, more than five suggestions, and out-of-range scores. Python also rejects duplicate or out-of-shortlist IDs, whitespace-only reasons, missing/default mismatches, and a weaker default. Responses need a completed non-refused choice. Azure-unsupported min/max schema keywords are removed recursively from the provider schema; Python still enforces these limits.
 
+Citation strings refer to original incident or candidate values, not earlier model summaries. Python checks only the list/string structure; it does not verify exact quotation, source labels, duplicates, blank entries, or length.
+
 Provider settings, `store=False`, timeout, retry, and omitted temperature/token parameters are shared with [classification](llm.md#provider-defaults). No input token counter or tokenizer download is added.
 
 ## Saved linking fields
 
-The service returns 25 fixed columns:
+The service returns 25 linking fields plus `citations`, shared with classification in the final CSV:
 
 | Fields | Meaning |
 | --- | --- |
@@ -72,6 +75,8 @@ The service returns 25 fixed columns:
 | `link_error` | Exception type only on failure. |
 | `link_catalog_hash` | SHA-256 of the complete catalog rows, including order, for stale-proposal detection. |
 | `link_1_engagement_id`, `link_1_reason`, `link_1_evidence_strength` through slot 5 | Five fixed suggestion slots; unused slots are blank. |
+
+The caller combines model excerpts into exactly one `citations` cell, with `Classification:` and `Engagement:` line prefixes. A new lookup replaces the Engagement part; proposal resets and failed/no-call lookups clear it while keeping classification excerpts. The dashboard marks these excerpts as unverified.
 
 `link_confidence` is the selected suggestion's 1-4 evidence score. A model response with no suggestions saves 0; no linking call leaves it blank. It is not a probability. Classification evidence and engagement evidence measure different claims.
 

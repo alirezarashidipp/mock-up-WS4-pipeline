@@ -8,7 +8,7 @@ The app reads and updates **data/run/INCIDENTS.csv**. It reads SUPPLIER_NAME.csv
 
 Every initialized incident appears, including pending and failed processing. Model class counts distinguish HSBC, SUPPLIER, and UNCERTAIN; processing failures remain separate. Search, clickable count cards, and review filters narrow the visible list. Global counts describe the whole saved batch and stay independent of these filters.
 
-Each incident opens a summary and three review panels in order, left to right on desktop. Source fields and supporting details use closed dropdowns. Model results and human decisions are labeled separately. CSV values render as text. Opening a detail or refreshing results does not call an LLM or save a decision.
+Each incident opens a summary and three review panels in order, left to right on desktop. Source fields and supporting details use closed dropdowns. Model results and human decisions are labeled separately. CSV values render as text. Opening a detail or refreshing results does not call an LLM or save a decision. The model-evidence dropdown shows the shared `citations` cell as **Model citations (not verified)**, with Classification and Engagement lines rendered as text.
 
 ## Decisions
 
@@ -68,5 +68,7 @@ Engagement approval reads the catalog once, checks its saved fingerprint, finds 
 The frontend uses the current API arrays for source fields, evidence names, matches, and suggestions directly. Saved engagement details and candidate details share one renderer; all three disagreement forms share the nonblank-reason check.
 
 Writes require the current version, valid choices, and nonblank disagreement reasons. The loopback server checks request host/origin and JSON content type. Atomic CSV replacement and a short file lock serialize pipeline/dashboard writes; the lock is released during provider calls. Run one local dashboard process. The input source values and identifiers are immutable after initialization; changed sources require a fresh batch.
+
+Older unified `INCIDENTS.csv` files without `citations` display a blank value. GET requests do not rewrite them; the next normal save adds this column and preserves other values and decisions.
 
 Paths are defined in app/incidents.py and imported by the pipeline/dashboard. The old separate review files are preserved as archives; their decisions are not imported into INCIDENTS.csv.

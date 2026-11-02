@@ -23,12 +23,13 @@ Model input order is narrative, recorded causes, closure/resolution, investigati
 
 ## Classification response
 
-The model returns these 11 fields in this order:
+The model returns these 12 fields in this order:
 
 | Field | Meaning |
 | --- | --- |
 | `key_root_cause` | Documented root cause in one sentence, or null when unknown. |
 | `evidence_column` | List of source-column names that informed the result. |
+| `citations` | List of short source-labeled excerpts; return [] when none are available. |
 | `decision_rationale` | Short evidence-based explanation of attribution and any material gaps. |
 | `classification` | HSBC, SUPPLIER, or UNCERTAIN. |
 | `attribution_evidence_strength` | Strict integer 0-4 describing recorded attribution evidence. |
@@ -50,15 +51,18 @@ All six supplier fields become null for HSBC and UNCERTAIN. Blank core Supplier 
 | Check | Behavior |
 | --- | --- |
 | Completion | Require a choice, `finish_reason=stop`, nonempty content, and no refusal. |
-| Structure | Require the 11 schema fields and their types; reject additional JSON fields. |
+| Structure | Require the 12 schema fields and their types; reject additional JSON fields. |
 | Class and score | HSBC/SUPPLIER allow 1-4; UNCERTAIN allows 0-2. Reject inconsistent results without changing class or score. |
 | Score type | Reject strings, booleans, floats, and integers outside 0-4. |
 | Root cause and rationale | Root cause is a nonempty string or null; rationale is a nonempty string. |
 | Evidence list | Require a list of strings. Empty lists are accepted; there is no maximum count. |
 | Evidence names | Do not check source-name membership, spelling, uniqueness, or blank individual strings. Do not trim, correct, or deduplicate entries. |
+| Citations | Require a list of strings; [] is valid. Do not check exact quote matching, source labels, duplicates, blank strings, or length. |
 | Supplier fields | Require strings or null and apply the class-specific normalization above. |
 
-The prompt asks for relevant evidence-column names. Python preserves the returned order and joins them with comma and space in one CSV cell. An empty list saves a blank cell. Source values remain in their own columns. No evidence quotes, numbered evidence columns, definitions, prompt text, or JSON blobs are written to the CSV.
+The prompt asks for relevant evidence-column names. Python preserves the returned order and joins them with comma and space in one CSV cell. An empty list saves a blank cell. Source values remain in their own columns. Source excerpts go only in the shared `citations` cell. No numbered evidence columns, definitions, prompt text, or JSON blobs are written to the CSV.
+
+Both LLM responses return `citations`. Python labels each line `Classification:` or `Engagement:` and saves them together in one plain-text CSV cell. These are model-provided excerpts, not independently verified evidence. Linking refreshes replace only the Engagement part, preserving classification excerpts; proposal resets and failed/no-call lookups clear stale engagement citations. Earlier citations are excluded from subsequent linking inputs.
 
 | Score | Label | Attribution evidence |
 | --- | --- | --- |
@@ -80,13 +84,15 @@ Requests omit `temperature`, `max_tokens`, and `max_completion_tokens`. There is
 
 `app/llm/pipeline.py` starts with `run_llm_pipeline`: read source rows, read definitions, read engagements, load the candidate limit, then process incidents. Its per-row coordinator calls `classify_and_save` for the classification request and immediate save, then `link_incident` for reusable `find_engagements` and proposal saving. These functions stay together in the existing pipeline module. Before requests begin, all current CLEAN rows are saved as pending incidents so the dashboard can show the complete batch. Each incident then progresses through classification and, for SUPPLIER, engagement suggestions before the next row starts.
 
-`INCIDENTS.csv` contains all source columns, the 11 classification fields, `processing_status` and `error`, 25 flat linking fields, nine human-review fields, and a Python-managed row_revision. It also contains an `ENG_`-prefixed column for each ENG_ALL field. These cells copy the actual selected engagement row: initially the model default, then the accepted human choice when changed. No selection leaves them blank. Model proposal IDs, reasons, and scores remain separate from human decisions. The dashboard also reads the current catalog when browsing alternatives.
+`INCIDENTS.csv` contains all source columns, the 12 classification fields (including the shared `citations` column), `processing_status` and `error`, 25 flat linking fields, nine human-review fields, and a Python-managed row_revision. It also contains an `ENG_`-prefixed column for each ENG_ALL field. These cells copy the actual selected engagement row: initially the model default, then the accepted human choice when changed. No selection leaves them blank. Model proposal IDs, reasons, and scores remain separate from human decisions. The dashboard also reads the current catalog when browsing alternatives.
 
 Classification processing is `pending`, `success`, or `failed`. Classification and linking failures are saved where possible and stop the batch; earlier results remain saved. Rerunning retries unfinished or failed work without repeating a successful classification unnecessarily. Rows with a recorded human classification decision are skipped, preventing a model rerun from replacing human work.
 
 Pydantic classification failures record only recognized response field names and error types, such as `ValidationError: key_root_cause: string_too_short`. Unknown field names become `response`. Other failures record exception types. Raw responses, source values, and credentials are not logged.
 
 The incident store checks schema, nonblank unique IDs, and unchanged source values. Changed source rows or columns require a fresh batch output. This processing-stage validation does not change the cleaning pipeline. Writes use an operating-system lock, atomic replacement, and a current row-version check that includes the incrementing revision so dashboard and CLI saves cannot silently overwrite each other.
+
+An existing unified `INCIDENTS.csv` without `citations` reads with a blank in-memory value. Reading does not write the file or rerun models. The next normal save adds the column while preserving other rows and decisions. Other incompatible schema changes still require a fresh output.
 
 Older `LLM_OUTPUT.csv`, `INC_LINKED.csv`, `CLASSIFICATION_REVIEW.csv`, `HUMAN_REVIEW.csv`, and other historical CSVs remain untouched and are not automatically imported. Use the new `INCIDENTS.csv` workflow; old confidence values are not converted to the new evidence scales.
 

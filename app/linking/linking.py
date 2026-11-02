@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.llm.llm_connection import llm_connection
 from app.linking.candidates import find_candidates
+from app.models import format_citations
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -46,6 +47,9 @@ class EngagementSuggestions(BaseModel):
     suggestions: list[EngagementSuggestion] = Field(max_length=5)
     selected_engagement_id: str | None
     reason: str = Field(min_length=1)
+    citations: list[str] = Field(
+        description="Short source excerpts labeled INCIDENT.column or ENGAGEMENT_ID.column, from original values rather than earlier model summaries. An empty list is allowed."
+    )
 
 
 def load_max_candidates():
@@ -71,6 +75,7 @@ def empty_link(supplier_name="", status="PENDING", reason=""):
         "link_suggestion_count": "",
         "link_error": "",
         "link_catalog_hash": "",
+        "citations": "",
     }
     for number in range(1, 6):
         result[f"link_{number}_engagement_id"] = ""
@@ -138,7 +143,7 @@ def remove_schema_limits(value):
 def incident_context(incident):
     fields = {}
     for name, value in incident.items():
-        if name in ("INCIDENT_ID", "linked_engagement_id", "processing_status", "error", "row_revision"):
+        if name in ("INCIDENT_ID", "linked_engagement_id", "processing_status", "error", "row_revision", "citations"):
             continue
         if name.startswith(("link_", "hitl_", "review_", "reviewed_", "classification_review_", "supplier_review_", "engagement_review_", "workflow_", "ENG_")):
             continue
@@ -224,6 +229,7 @@ def find_engagements(incident, engagements, supplier_name, max_candidates=70):
         return link
 
     link["link_reason"] = result.reason
+    link["citations"] = format_citations(result.citations, "Engagement")
     link["link_suggestion_count"] = len(result.suggestions)
     link["link_status"] = "READY" if result.suggestions else "NO_MATCH"
     link["linked_engagement_id"] = result.selected_engagement_id or ""

@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.incidents import (
     ENGAGEMENT_FILE, RESULTS_FILE, SUPPLIERS_FILE,
-    apply_classification_review, apply_supplier_review, classification_complete,
+    apply_classification_review, apply_supplier_review, apply_link_result, classification_complete,
     effective_classification, effective_supplier_name, engagement_values, read_incidents,
     review_complete, row_version, save_incident, source_fields,
     supplier_complete, supplier_options,
@@ -165,7 +165,7 @@ def refresh_engagements(row):
         raise ValueError("Complete classification and supplier-name reviews before refreshing engagements.")
     updated = dict(row)
     name = row["reviewed_supplier_name"]
-    updated.update(empty_link(name, status="RUNNING", reason="Finding engagement suggestions."))
+    apply_link_result(updated, empty_link(name, status="RUNNING", reason="Finding engagement suggestions."))
     updated.update({key: "" for key in row if key.startswith("ENG_")})
     updated["engagement_review_status"] = "pending"
     updated["reviewed_engagement_id"] = ""
@@ -181,7 +181,7 @@ def refresh_engagements(row):
         proposal = empty_link(name, status="FAILED", reason="Could not prepare engagement suggestions. Check the catalog and settings, then retry.")
         proposal["link_error"] = type(error).__name__
     updated = dict(running)
-    updated.update(proposal)
+    apply_link_result(updated, proposal)
     return save_incident(app.state.results_file, updated, row_version(running))
 
 

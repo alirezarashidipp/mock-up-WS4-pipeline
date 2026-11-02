@@ -6,7 +6,7 @@ from pydantic import ValidationError
 from app.csv_files import read_records
 from app.incidents import (
     RESULTS_FILE, ENGAGEMENT_FILE, engagement_values, initialize_incidents,
-    read_incidents, row_version, save_incident,
+    read_incidents, row_version, save_incident, apply_link_result,
 )
 from app.llm.classification import PROMPT_FILE, classify_row, classification_values, validation_error_summary
 from app.llm.llm_connection import llm_connection
@@ -81,20 +81,20 @@ def classify_and_save(client, model, fields, prompt, row, output_file):
     version = row_version(row)
     row.update(classification_values(result, error))
     if result and result.classification == "HSBC":
-        row.update(empty_link(status="NOT_APPLICABLE", reason="HSBC has no supplier engagement."))
+        apply_link_result(row, empty_link(status="NOT_APPLICABLE", reason="HSBC has no supplier engagement."))
     elif result and result.classification == "UNCERTAIN":
-        row.update(empty_link(status="SKIPPED", reason="Resolve classification before supplier review."))
+        apply_link_result(row, empty_link(status="SKIPPED", reason="Resolve classification before supplier review."))
     return save_incident(output_file, row, version)
 
 
 def link_incident(row, engagements, output_file, max_candidates):
     version = row_version(row)
-    row.update(empty_link(row["supplier_name"], "RUNNING"))
+    apply_link_result(row, empty_link(row["supplier_name"], "RUNNING"))
     row.update(engagement_values(row, engagements, ""))
     row = save_incident(output_file, row, version)
     version = row_version(row)
     proposal = find_engagements(row, engagements, row["supplier_name"], max_candidates)
-    row.update(proposal)
+    apply_link_result(row, proposal)
     row.update(engagement_values(row, engagements, row["linked_engagement_id"]))
     return save_incident(output_file, row, version)
 

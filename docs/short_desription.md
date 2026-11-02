@@ -16,6 +16,7 @@ Dashboard: 1. Classification -> 2. Supplier name -> 3. Engagement
 - UNCERTAIN is a successful model result, not a processing failure.
 - Evidence strength is an integer from 0 to 4, not a probability. UNCERTAIN uses 0-2; HSBC/SUPPLIER use 1-4.
 - evidence_column contains source names joined with comma and space in one CSV cell. Empty lists are accepted.
+- Both LLM responses include citations: short source-labeled excerpts, or []. Python does not check exact matches against source text.
 - Human corrections never rewrite the original model classification or its evidence score.
 
 ## Automatic linking
@@ -53,7 +54,9 @@ SUPPLIER_NAME.csv contains the base name **AXA**. ENG_ALL.csv contains records n
 
 ## Saved output
 
-**INCIDENTS.csv** contains original incident values, 11 classification fields, processing status/error, 25 link fields, nine human-review fields, the Python row_revision, and actual selected engagement columns prefixed ENG_.
+**INCIDENTS.csv** contains original incident values, 12 classification fields (including citations), processing status/error, 25 link fields, nine human-review fields, the Python row_revision, and actual selected engagement columns prefixed ENG_.
+
+The single citations cell contains lines labeled Classification: and Engagement:. A new linking lookup replaces only Engagement citations; proposal resets or failed/no-call lookups clear stale Engagement excerpts. The dashboard labels them as unverified. Existing unified outputs without the column read it as blank and gain it on the next normal save, without rerunning completed model work.
 
 linked_engagement_id is the current model default. reviewed_engagement_id is populated only by an explicit human engagement selection. ENG_ cells describe the current selected engagement: initially the default, then the human choice; they clear when no engagement is selected. A completed None-of-these review is not a human-confirmed link.
 
@@ -68,4 +71,4 @@ The diagrams cite the implementation at a pinned source revision. They describe 
 
 ## Simple code flow
 
-The entry point reads inputs, then the loop processes one incident at a time: `classify_and_save` -> `link_incident` -> next incident. The dashboard reuses `find_engagements` after supplier corrections. CSV reading/writing stays in the shared module; current incident decisions stay in the incident store. The cleanup changes code organization only, not the saved schema or business decisions.
+The entry point reads inputs, then the loop processes one incident at a time: `classify_and_save` -> `link_incident` -> next incident. The dashboard reuses `find_engagements` after supplier corrections. CSV reading/writing stays in the shared module; current incident decisions stay in the incident store. Model decisions and human decisions remain separate.
