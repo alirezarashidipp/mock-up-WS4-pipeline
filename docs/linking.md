@@ -9,7 +9,7 @@ classify one incident -> save classification
     UNCERTAIN -> SKIPPED, wait for a definite human classification
 ```
 
-`app/linking/linking.py:find_engagements` serves both automatic processing and the [incident dashboard](dashboard_app.md). It accepts the incident, ENG_ALL rows, current base supplier name, and candidate cap; it returns flat result fields without saving files. The caller saves them in `data/run/INCIDENTS.csv`.
+`app/linking/linking.py:find_engagements` serves both automatic processing and the [incident dashboard](dashboard_app.md). It accepts the incident, ENG_ALL rows, current base supplier name, and candidate cap; it returns flat result fields without saving files. The batch pipeline or `app/review.py` saves them through `app/incidents.py` in `data/run/INCIDENTS.csv`.
 
 ## Three different counts
 
@@ -42,7 +42,7 @@ Synthetic example: base name AXA can retrieve both AXA Insurance and AXA Com. Th
 
 The explicit current supplier name overrides a conflicting earlier model supplier name. Original incident facts remain the basis for matching; descriptions of a rejected supplier are not assumed applicable. The prompt defines engagement fields, warns against supplier-name-only matches, distinguishes beneficiary geography from incident geography, and asks for concise supported reasons.
 
-The strict structured response has four top-level fields:
+The `LinkInput`, `EngagementSuggestion`, and `EngagementSuggestions` contracts live in `app/models.py`. The strict structured response has four top-level fields:
 
 | Field | Contract |
 | --- | --- |
@@ -55,7 +55,7 @@ Each suggestion must identify a distinct supplied candidate and contain a nonbla
 
 The default must belong to the suggestions and have the highest evidence score. When scores tie, the model selects its best factual fit and explains ambiguity. The default is a proposal awaiting human approval. The prompt asks for strongest-first order; Python validates the default's score and candidate membership without silently repairing an invalid response.
 
-Pydantic rejects additional fields, incorrect types, more than five suggestions, and out-of-range scores. Python also rejects duplicate or out-of-shortlist IDs, whitespace-only reasons, missing/default mismatches, and a weaker default. Responses need a completed non-refused choice. Azure-unsupported min/max schema keywords are removed recursively from the provider schema; Python still enforces these limits.
+Pydantic rejects additional fields, incorrect types, more than five suggestions, and out-of-range scores. Python also rejects duplicate or out-of-shortlist IDs, whitespace-only reasons, missing/default mismatches, and a weaker default. Responses need a completed non-refused choice. The shared `app.models.remove_schema_limits` helper removes Azure-unsupported min/max schema keywords recursively from the provider schema; Python still enforces these limits.
 
 Citation strings refer to original incident or candidate values, not earlier model summaries. Python checks only the list/string structure; it does not verify exact quotation, source labels, duplicates, blank entries, or length.
 
@@ -94,7 +94,7 @@ Suggestion IDs, scores, and reasons are flat CSV cells, without JSON blobs. The 
 
 ## Human decisions and immediate supplier changes
 
-The single dashboard shows all incidents. Review proceeds left to right:
+The single dashboard shows all incidents. `app/review.py` owns the human decision rules and immediate refresh flow, using explicit file paths supplied by the HTTP app. Review proceeds left to right:
 
 1. **Classification:** approve a model HSBC/SUPPLIER decision, or disagree with a reason and select a corrected class. UNCERTAIN remains blocked until the human chooses a definite HSBC or SUPPLIER result. Processing failures can be resolved manually with a reason.
 2. **Supplier name:** for a reviewed Supplier incident, approve the usable model base name or choose a replacement from `SUPPLIER_NAME.csv` and give a reason. The file contains base names and is read-only. A changed name immediately runs the same `find_engagements` function and replaces the current suggestions/default; engagement approval resets.

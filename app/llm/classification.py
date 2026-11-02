@@ -4,7 +4,7 @@ from pathlib import Path
 from openai import OpenAI
 from pydantic import ValidationError
 
-from app.models import Classification, SUPPLIER_FIELDS, format_citations
+from app.models import Classification, SUPPLIER_FIELDS, format_citations, remove_schema_limits
 
 
 PROMPT_FILE = Path(__file__).resolve().parents[2] / "prompts/classification.yml"
@@ -35,16 +35,8 @@ def validation_error_summary(error: ValidationError) -> str:
 
 def classification_schema() -> dict:
     schema = Classification.model_json_schema()
-    fields = list(schema["properties"].values())
-    # Azure's schema subset omits these limits; Pydantic still validates them locally.
-    for field in fields:
-        variants = [field]
-        variants.extend(field.get("anyOf", []))
-        for variant in variants:
-            for keyword in ("minLength", "minItems", "maxItems", "minimum", "maximum"):
-                variant.pop(keyword, None)
+    remove_schema_limits(schema)
     return schema
-
 
 def classify_row(client: OpenAI, model: str, fields: list[dict], prompt: str) -> Classification | None:
     payload = json.dumps(fields, ensure_ascii=False)

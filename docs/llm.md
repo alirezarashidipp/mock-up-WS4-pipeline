@@ -16,7 +16,7 @@ The single [incident dashboard](dashboard_app.md) reads `data/run/INCIDENTS.csv`
 
 1. Keep `INCIDENT_ID` locally. `app/llm/prepare_fields.py` sends every other source column as `{name, description, value}`, with descriptions from `fields/definitions.yml`. Values, including empty values, remain complete.
 2. Send the instructions from `prompts/classification.yml` and the prepared fields to `classify_row`. Each request is independent and includes the prompt and definitions again.
-3. Request strict JSON schema output and validate it with the Pydantic `Classification` model. Require a complete, non-refused response.
+3. Request strict JSON schema output and validate it with the Pydantic `Classification` model in `app/models.py`. Require a complete, non-refused response.
 4. Convert the result to flat fields with `classification_values`, then save the incident before starting its linking request or the next incident. This function only builds values; `app/incidents.py` owns persistence.
 
 Model input order is narrative, recorded causes, closure/resolution, investigation history, supplier/product context, then remaining metadata in source order. Every non-ID field needs a definition and appears once. Input ordering does not change source CSV columns or establish which evidence is authoritative.
@@ -76,7 +76,7 @@ These scores are model assessments of the recorded evidence, not probabilities o
 
 ## Provider defaults
 
-Classification and [linking](linking.md) reuse `app/llm/llm_connection.py` for OpenAI or Azure. Both use `store=False`, strict JSON schema, and local Pydantic validation. The provider schema omits unsupported validation limits while Python retains them.
+Classification and [linking](linking.md) reuse `app/llm/llm_connection.py` for OpenAI or Azure. Both use `store=False`, strict JSON schema, and local Pydantic validation. Both schemas use the shared `remove_schema_limits` helper in `app/models.py` to omit unsupported provider keywords while Pydantic retains local validation.
 
 Requests omit `temperature`, `max_tokens`, and `max_completion_tokens`. There is no local token counting, tokenizer download, or input truncation. Provider context limits still apply. The shared connection uses a 60-second SDK timeout and one SDK retry. `LINK_MAX_CANDIDATES` independently limits engagement rows prepared for the linking call.
 

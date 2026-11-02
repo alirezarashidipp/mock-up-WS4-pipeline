@@ -7,49 +7,18 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 from openai import OpenAIError
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import ValidationError
 
 from app.llm.llm_connection import llm_connection
 from app.linking.candidates import find_candidates
-from app.models import format_citations
+from app.models import (
+    LinkInput, EngagementSuggestions, empty_link, format_citations, remove_schema_limits,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
 PROMPT_FILE = ROOT / "prompts" / "linking.yml"
 NAME_COLUMNS = ("THIRD_PARTY_NAME", "THIRD_PARTY_NORMALISED_NAME")
-
-
-class LinkInput(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    supplier_name: str
-    incident: dict[str, str]
-    engagements: list[dict[str, str]]
-
-
-class EngagementSuggestion(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    engagement_id: str = Field(min_length=1)
-    reason: str = Field(min_length=1)
-    evidence_strength: int = Field(
-        ge=1,
-        le=4,
-        strict=True,
-        json_schema_extra={"enum": [1, 2, 3, 4]},
-        description="Recorded support: 1 weak, 2 moderate, 3 strong, 4 very strong. Not a probability.",
-    )
-
-
-class EngagementSuggestions(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    suggestions: list[EngagementSuggestion] = Field(max_length=5)
-    selected_engagement_id: str | None
-    reason: str = Field(min_length=1)
-    citations: list[str] = Field(
-        description="Short source excerpts labeled INCIDENT.column or ENGAGEMENT_ID.column, from original values rather than earlier model summaries. An empty list is allowed."
-    )
 
 
 def load_max_candidates():
@@ -61,27 +30,6 @@ def load_max_candidates():
     if limit < 1:
         raise ValueError("LINK_MAX_CANDIDATES must be a positive integer.")
     return limit
-
-
-def empty_link(supplier_name="", status="PENDING", reason=""):
-    result = {
-        "link_supplier_name": supplier_name,
-        "link_status": status,
-        "linked_engagement_id": "",
-        "link_reason": reason,
-        "link_confidence": "",
-        "link_match_count": "",
-        "link_candidate_count": "",
-        "link_suggestion_count": "",
-        "link_error": "",
-        "link_catalog_hash": "",
-        "citations": "",
-    }
-    for number in range(1, 6):
-        result[f"link_{number}_engagement_id"] = ""
-        result[f"link_{number}_reason"] = ""
-        result[f"link_{number}_evidence_strength"] = ""
-    return result
 
 
 def validate_engagements(engagements):
@@ -126,18 +74,6 @@ def response_schema():
     schema = EngagementSuggestions.model_json_schema()
     remove_schema_limits(schema)
     return schema
-
-
-def remove_schema_limits(value):
-    # Azure accepts the structure; Pydantic still enforces every limit locally.
-    if isinstance(value, dict):
-        for keyword in ("minLength", "maxLength", "minItems", "maxItems", "minimum", "maximum"):
-            value.pop(keyword, None)
-        for child in value.values():
-            remove_schema_limits(child)
-    elif isinstance(value, list):
-        for child in value:
-            remove_schema_limits(child)
 
 
 def incident_context(incident):

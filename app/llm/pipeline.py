@@ -11,7 +11,8 @@ from app.incidents import (
 from app.llm.classification import PROMPT_FILE, classify_row, classification_values, validation_error_summary
 from app.llm.llm_connection import llm_connection
 from app.llm.prepare_fields import prepare_fields
-from app.linking.linking import empty_link, find_engagements, load_max_candidates, read_engagements
+from app.linking.linking import find_engagements, load_max_candidates, read_engagements
+from app.models import empty_link
 
 
 ROOT = Path(__file__).resolve().parents[2]

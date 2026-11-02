@@ -19,8 +19,8 @@
 - Classification/LLM requests: docs/llm.md.
 - Engagement matching/suggestions: docs/linking.md.
 - Dashboard/human decisions: docs/dashboard_app.md.
-- Setup and commands: README.md. Compact business flow: docs/short_desription.md.
-- Update the relevant docs when behavior changes. README.md and docs/short_desription.md link the current source-backed .archify workflow diagrams; older diagram folders and frozen source documents remain historical.
+- Setup and commands: README.md. Compact business flow: docs/short_description.md.
+- Update the relevant docs when behavior changes. README.md and docs/short_description.md link the current source-backed .archify workflow diagrams; older diagram folders and frozen source documents remain historical.
 
 ## Keep the workflow simple
 
@@ -30,6 +30,9 @@
 - One dashboard: app/ui/dashboard_app.py on loopback port 8766, frontend/dashboard/, frontend/style.css, and existing logo in frontend/pictures/.
 - One current output: data/run/INCIDENTS.csv, containing immutable source values, model results, link proposals, selected ENG_ values, and separate human decisions. Preserve old CSVs without automatic migration; no FINAL.csv or duplicate dashboards/pipelines.
 - Keep the reusable find_engagements function in app/linking/linking.py independent of saving and human approval. Both the pipeline and real-time supplier corrections call it.
+- Keep shared classification/linking contracts, output defaults, citation formatting, and schema-limit conversion in app/models.py, without file or provider calls.
+- Keep incident storage, schema/version checks, and selected engagement snapshots in app/incidents.py. Keep human decision rules and refresh orchestration in app/review.py with explicit file-path arguments; it must not depend on FastAPI state.
+- Keep HTTP routing, request validation, and dashboard presentation in app/ui/dashboard_app.py. Reuse frontend/pictures/hsbc-logo.svg for the page and favicon instead of duplicating artwork.
 
 ## Classification
 

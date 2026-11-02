@@ -4,10 +4,8 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 
-def read_records(path, optional=False):
+def read_records(path):
     if not path.exists():
-        if optional:
-            return [], ""
         return [], f"{path.name} is missing. Run the classification pipeline first."
     with path.open(encoding="utf-8-sig", newline="") as file:
         rows = list(csv.DictReader(file))

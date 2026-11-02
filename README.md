@@ -66,11 +66,33 @@ Existing unified INCIDENTS.csv files without citations remain readable with blan
 
 The CSV stores current decisions, not an audit-history log. File locking, atomic saves, and per-row versions protect concurrent pipeline/dashboard updates; stale model results or browser decisions cannot replace newer human changes.
 
+## Project layout
+
+```text
+app/
+  data_preparation/     Existing read -> rename -> clean pipeline
+  llm/                  Classification requests and sequential batch entry point
+  linking/              Engagement search and suggestion requests
+  ui/dashboard_app.py   HTTP routes, dashboard data, and request validation
+  models.py             Shared LLM contracts, schema conversion, and output defaults
+  incidents.py          Incident CSV storage, versions, and selected engagement values
+  review.py             Human decision rules and engagement refresh orchestration
+  csv_files.py          Shared CSV reader and atomic writer
+frontend/
+  dashboard/            One HTML page and its JavaScript
+  style.css             Dashboard styles
+  pictures/hsbc-logo.svg Shared logo artwork
+fields/                 Source-column mapping and field definitions
+prompts/                Classification and linking YAML prompts
+docs/                   Stage documentation and short_description.md
+tests/                  Existing offline checks and explicit live connection check
+```
+
 ## Code flow
 
 The entry point reads the source, definitions, engagement catalog, and candidate limit. The per-incident loop calls `classify_and_save`, then `link_incident` when applicable. Both remain in `app/llm/pipeline.py`; request details do not obscure the batch order. The dashboard and pipeline reuse `find_engagements` for matching and suggestions.
 
-`app/incidents.py` owns current-state saves. `app/csv_files.py` contains the shared CSV reader and atomic writer; the unused legacy append writer has been removed. Cleaning still uses the same atomic writer. File names, output columns, model prompts, review decisions, and run commands are unchanged by this cleanup.
+`app/review.py` applies human decisions and runs engagement refreshes using explicit file paths. It does not depend on FastAPI state. The dashboard supplies those paths and formats HTTP responses; `app/incidents.py` owns current-state persistence and stale-version checks. Shared model contracts and output defaults stay in `app/models.py`, and both LLM requests reuse its schema-limit conversion. The structure keeps the existing run commands, CSV/API contracts, prompts, and review behavior.
 
 ## Checks and documentation
 
@@ -78,7 +100,7 @@ The entry point reads the source, definitions, engagement catalog, and candidate
 .\.venv\Scripts\python.exe -B -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-These existing checks use temporary CSVs and simulated responses. They do not establish provider connectivity or model accuracy. To make a real classification request using your configured provider:
+The existing `test_pipeline.py` and `test_frontend.py` checks use temporary CSVs and simulated responses. They do not establish provider connectivity or model accuracy. To make a real classification request using your configured provider:
 
 ```powershell
 .\.venv\Scripts\python.exe -B -m unittest discover -s tests -p check_llm_connection.py -v
@@ -86,7 +108,7 @@ These existing checks use temporary CSVs and simulated responses. They do not es
 
 The live check uses a visibly synthetic incident and current classification schema; it does not test the separate engagement-suggestion schema.
 
-- [Short description and AXA example](docs/short_desription.md)
+- [Short description and AXA example](docs/short_description.md)
 - [Data preparation](docs/data_preparation.md)
 - [Classification and sequential processing](docs/llm.md)
 - [Engagement search and suggestions](docs/linking.md)

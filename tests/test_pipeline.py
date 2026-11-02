@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 from openai import OpenAIError
 from pydantic import ValidationError
 
-from app.csv_files import read_records, write_records
+from app.csv_files import read_records
 from app.data_preparation import pipeline as preparation
 from app.llm import classification, pipeline
 from app.models import Classification, SUPPLIER_FIELDS

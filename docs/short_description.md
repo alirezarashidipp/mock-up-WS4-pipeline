@@ -71,4 +71,4 @@ The diagrams cite the implementation at a pinned source revision. They describe 
 
 ## Simple code flow
 
-The entry point reads inputs, then the loop processes one incident at a time: `classify_and_save` -> `link_incident` -> next incident. The dashboard reuses `find_engagements` after supplier corrections. CSV reading/writing stays in the shared module; current incident decisions stay in the incident store. Model decisions and human decisions remain separate.
+The entry point reads inputs, then processes one incident at a time: `classify_and_save` -> `link_incident` -> next incident. Shared LLM contracts and output defaults live in `app/models.py`. `app/incidents.py` stores the current snapshot; `app/review.py` applies human decisions and reuses `find_engagements` after supplier corrections. The dashboard handles HTTP and display. The business flow, saved columns, and run commands stay the same.

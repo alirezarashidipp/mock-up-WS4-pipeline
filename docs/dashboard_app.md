@@ -58,12 +58,16 @@ Use a UTF-8 one-column CSV with optional SUPPLIER_NAME header. Names are base na
 
 ## API and persistence
 
+`app/ui/dashboard_app.py` owns HTTP routes, request validation, and dashboard response data. It passes file paths to `app/review.py`, which owns human decisions, completion rules, supplier-name choices, and engagement refreshes. `app/incidents.py` owns reads, version checks, and atomic incident updates. These modules keep framework state out of the review rules.
+
 - GET /api/dashboard: all incidents, model/review counts, supplier options, and catalog notes.
 - GET /api/incidents/{id}/engagements: all matches, up to five suggestions, defaults/human choice, saved engagement details, and catalog freshness.
 - POST /api/review: save an ordered classification, supplier, or engagement decision.
 - POST /api/incidents/{id}/refresh-links: rerun suggestions after supplier review is complete.
 
 Engagement approval reads the catalog once, checks its saved fingerprint, finds the supplier matches, validates the selected ID, and copies values from that same catalog snapshot. It does not build a display response to validate a decision.
+
+The page and favicon reuse `frontend/pictures/hsbc-logo.svg`. HTML and JavaScript remain in `frontend/dashboard/`, with shared styling in `frontend/style.css`.
 
 The frontend uses the current API arrays for source fields, evidence names, matches, and suggestions directly. Saved engagement details and candidate details share one renderer; all three disagreement forms share the nonblank-reason check.
 
