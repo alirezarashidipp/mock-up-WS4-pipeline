@@ -40,19 +40,23 @@ def get_dashboard_data(path):
         counts = {"total": 0, "HSBC": 0, "SUPPLIER": 0, "UNCERTAIN": 0, "failed": 0}
         records = []
         for row in rows:
-            if row["processing_status"] == "failed":
-                counts["failed"] += 1
-                continue
-            if row["processing_status"] != "success":
+            status = row["processing_status"]
+            if status not in ("success", "failed"):
                 return {"error": "LLM_OUTPUT.csv contains an invalid processing status."}
-            classification = row["classification"]
-            if classification not in ("HSBC", "SUPPLIER", "UNCERTAIN"):
-                return {"error": "Classification must be HSBC, SUPPLIER, or UNCERTAIN."}
+            classification = row.get("classification", "")
+            if status == "success":
+                if classification not in ("HSBC", "SUPPLIER", "UNCERTAIN"):
+                    return {"error": "Classification must be HSBC, SUPPLIER, or UNCERTAIN."}
+                counts[classification] += 1
+                counts["total"] += 1
+            else:
+                counts["failed"] += 1
             record = {
                 "incident_id": row["INCIDENT_ID"],
                 "summary": row.get("INCIDENT_SHORT_DESCRIPTION", ""),
                 "classification": classification,
-                "processing_status": row["processing_status"],
+                "processing_status": status,
+                "error": row.get("error", ""),
                 "input": {name: value for name, value in row.items() if name.isupper()},
                 "evidence_column": read_evidence_columns(row),
             }
@@ -61,8 +65,6 @@ def get_dashboard_data(path):
                          "supplier_causal_explanation", "supplier_accountability_reason", "supplier_more_info"):
                 record[name] = row.get(name, "")
             records.append(record)
-            counts[classification] += 1
-        counts["total"] = len(records)
         return {"records": records, "counts": counts}
     except (OSError, UnicodeError, csv.Error, KeyError, TypeError):
         return {"error": "Could not read LLM_OUTPUT.csv. Check its columns and UTF-8 encoding, or generate a new batch with supplier details."}

@@ -26,6 +26,10 @@ h1 { font-size:30px; font-weight:500; letter-spacing:-.025em; margin:0; }
 .stat { display:flex; align-items:baseline; gap:10px; }
 .stat strong { font-size:24px; font-weight:500; }
 .stat span { color:var(--muted); font-size:12px; }
+.stat-filter { min-height:44px; padding:8px 10px; border:1px solid transparent; border-radius:2px; background:transparent; color:var(--ink); text-align:left; }
+.stat-filter:hover:not(:disabled) { background:white; border-color:var(--line); }
+.stat-filter[aria-pressed="true"] { background:#fff4f4; border-color:var(--red); }
+.stat-filter[aria-pressed="true"] span { color:var(--ink); }
 h2 { font-size:14px; font-weight:600; margin:0; }
 .record-text { font-size:13px; line-height:1.85; white-space:pre-wrap; color:#4d5054; margin:0; overflow-wrap:anywhere; }
 details { border-top:1px solid var(--line); }

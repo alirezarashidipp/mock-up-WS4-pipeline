@@ -37,14 +37,15 @@
   <p id="demo-note" class="demo-note" hidden>Demo: synthetic incidents and example model results.</p>
   <div id="message" class="message" role="status" aria-live="polite" hidden></div>
   <section class="stats" aria-label="Classification counts">
-    <div class="stat"><strong id="total-count">—</strong><span>Classified incidents</span></div>
-    <div class="stat"><strong id="HSBC-count">—</strong><span>HSBC</span></div>
-    <div class="stat"><strong id="SUPPLIER-count">—</strong><span>SUPPLIER</span></div>
-    <div class="stat"><strong id="UNCERTAIN-count">—</strong><span>UNCERTAIN</span></div>
-    <div class="stat"><strong id="failed-count">—</strong><span>Processing failures</span></div>
+    <button type="button" class="stat stat-filter" data-filter="total" aria-pressed="true" aria-controls="incident-list" disabled><strong id="total-count">—</strong><span>Classified incidents</span></button>
+    <button type="button" class="stat stat-filter" data-filter="HSBC" aria-pressed="false" aria-controls="incident-list" disabled><strong id="HSBC-count">—</strong><span>HSBC</span></button>
+    <button type="button" class="stat stat-filter" data-filter="SUPPLIER" aria-pressed="false" aria-controls="incident-list" disabled><strong id="SUPPLIER-count">—</strong><span>SUPPLIER</span></button>
+    <button type="button" class="stat stat-filter" data-filter="UNCERTAIN" aria-pressed="false" aria-controls="incident-list" disabled><strong id="UNCERTAIN-count">—</strong><span>UNCERTAIN</span></button>
+    <button type="button" class="stat stat-filter" data-filter="failed" aria-pressed="false" aria-controls="incident-list" disabled><strong id="failed-count">—</strong><span>Processing failures</span></button>
   </section>
   <section aria-labelledby="results-heading">
-    <h2 id="results-heading">Model results</h2>
+    <h2 id="results-heading">Classified incidents</h2>
+    <p id="filter-summary" class="field-note" role="status" aria-live="polite"></p>
     <p class="field-note">UNCERTAIN means the record does not support choosing HSBC or SUPPLIER; it is a valid model result, not a processing failure. Evidence strength rates support for attributing responsibility to a party, not the probability that the decision is correct. Older results without this score show Not recorded.</p>
     <details>
       <summary>Evidence strength scale · 0 to 4</summary>
@@ -57,7 +58,7 @@
       </ul>
       <p class="field-note">For UNCERTAIN, a score of 0-2 describes limited support for assigning responsibility to either party, not confidence in being uncertain. A score of 4 does not mean 100% accuracy. Repeated copies of one statement are not independent evidence. This score does not rate supplier-name extraction or engagement matching.</p>
     </details>
-    <p id="dashboard-empty" class="field-note">LLM_OUTPUT.csv has no successful results yet.</p>
+    <p id="dashboard-empty" class="field-note">No incidents match this filter.</p>
     <div id="incident-list" class="incident-list"></div>
   </section>
   <footer><span>HSBC · Incident classification / WS4</span><span>Source: LLM_OUTPUT.csv</span></footer>
