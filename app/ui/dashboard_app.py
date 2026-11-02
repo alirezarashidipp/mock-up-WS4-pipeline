@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.incidents import (
-    CLASSES, ENGAGEMENT_FILE, RESULTS_FILE, SUPPLIERS_FILE,
+    ENGAGEMENT_FILE, RESULTS_FILE, SUPPLIERS_FILE,
     apply_classification_review, apply_supplier_review, classification_complete,
     effective_classification, effective_supplier_name, engagement_values, read_incidents,
     review_complete, row_version, save_incident, source_fields,
@@ -141,19 +141,17 @@ def apply_engagement_review(row, decision):
         raise ValueError("Wait for engagement suggestions to finish before saving a decision.")
     if row["link_supplier_name"] != row["reviewed_supplier_name"]:
         raise ValueError("Refresh engagement suggestions for the current supplier before approving a link.")
-    data = engagement_data(row)
-    if data["link_stale"] or not row["link_catalog_hash"]:
+    engagements = read_engagements(app.state.engagements_file)
+    if row["link_catalog_hash"] != catalog_hash(engagements):
         raise ValueError("The engagement catalog changed. Refresh suggestions before saving a decision.")
     selected = decision.engagement_id
     if decision.decision == "approved":
         if not selected or selected != row["linked_engagement_id"]:
             raise ValueError("Approved must confirm the model default. Choose Disagree and give a reason to change it.")
-    if selected and selected not in {item["ENGAGEMENT_ID"] for item in data["matches"]}:
+    matches = find_candidates(row["link_supplier_name"], engagements, None)
+    if selected and selected not in {item["ENGAGEMENT_ID"] for item in matches}:
         raise ValueError("Choose an engagement from the current supplier's matching catalog rows.")
     updated = dict(row)
-    engagements = read_engagements(app.state.engagements_file)
-    if row["link_catalog_hash"] != catalog_hash(engagements):
-        raise ValueError("The engagement catalog changed. Refresh suggestions before saving a decision.")
     updated.update(engagement_values(row, engagements, selected))
     updated["engagement_review_status"] = decision.decision
     updated["reviewed_engagement_id"] = selected

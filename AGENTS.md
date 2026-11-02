@@ -5,6 +5,14 @@
 - Preserve source CSV files and identifiers. CSV files, data/, credentials, and .env stay out of Git; never print credentials or raw provider errors.
 - Mark synthetic examples visibly. Verify changes with a lightweight affected-code check; distinguish offline checks from live API results. Create test files only when the user asks.
 
+## Code style
+
+- Keep entry points and coordinators readable as a short recipe: read inputs, prepare, classify and save, then link and save. Put request/error-handling details in plainly named functions.
+- Prefer ordinary functions, clear variables, direct library calls, and separate readable statements. Preserve domain names such as INCIDENT_ID.
+- Reuse existing modules and dependencies. Remove code with no callers and repeated implementations; do not add generic workflow wrappers, new configuration systems, or many tiny files.
+- Implement the current CSV/API contract directly. Keep validation for invalid input, credentials, source preservation, and safe saves; remove only checks proven redundant.
+- Preserve behavior while refactoring. Add no speculative features or production infrastructure, and create no test files unless asked. Use a small affected-code check and report exactly what ran.
+
 ## Read relevant docs and implementation first
 
 - Preparation/cleaning: docs/data_preparation.md.

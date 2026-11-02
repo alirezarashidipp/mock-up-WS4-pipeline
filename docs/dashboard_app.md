@@ -63,6 +63,10 @@ Use a UTF-8 one-column CSV with optional SUPPLIER_NAME header. Names are base na
 - POST /api/review: save an ordered classification, supplier, or engagement decision.
 - POST /api/incidents/{id}/refresh-links: rerun suggestions after supplier review is complete.
 
+Engagement approval reads the catalog once, checks its saved fingerprint, finds the supplier matches, validates the selected ID, and copies values from that same catalog snapshot. It does not build a display response to validate a decision.
+
+The frontend uses the current API arrays for source fields, evidence names, matches, and suggestions directly. Saved engagement details and candidate details share one renderer; all three disagreement forms share the nonblank-reason check.
+
 Writes require the current version, valid choices, and nonblank disagreement reasons. The loopback server checks request host/origin and JSON content type. Atomic CSV replacement and a short file lock serialize pipeline/dashboard writes; the lock is released during provider calls. Run one local dashboard process. The input source values and identifiers are immutable after initialization; changed sources require a fresh batch.
 
 Paths are defined in app/incidents.py and imported by the pipeline/dashboard. The old separate review files are preserved as archives; their decisions are not imported into INCIDENTS.csv.

@@ -141,8 +141,6 @@ def initialize_incidents(path, sources, engagement_columns=()):
         saved_by_id = {row["INCIDENT_ID"]: row for row in rows}
         if rows and set(rows[0]) != set(pending[0]):
             raise ValueError("Incident or engagement columns changed. Preserve this output and start a fresh batch.")
-        if rows and set(source_fields(rows[0])) != columns:
-            raise ValueError("Source columns changed. Preserve INCIDENTS.csv and choose a fresh output.")
         changed = False
         for new_row in pending:
             saved = saved_by_id.get(new_row["INCIDENT_ID"])

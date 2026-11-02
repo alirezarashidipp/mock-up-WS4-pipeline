@@ -64,6 +64,12 @@ Initialization saves all source incidents as pending. Each classification and li
 
 The CSV stores current decisions, not an audit-history log. File locking, atomic saves, and per-row versions protect concurrent pipeline/dashboard updates; stale model results or browser decisions cannot replace newer human changes.
 
+## Code flow
+
+The entry point reads the source, definitions, engagement catalog, and candidate limit. The per-incident loop calls `classify_and_save`, then `link_incident` when applicable. Both remain in `app/llm/pipeline.py`; request details do not obscure the batch order. The dashboard and pipeline reuse `find_engagements` for matching and suggestions.
+
+`app/incidents.py` owns current-state saves. `app/csv_files.py` contains the shared CSV reader and atomic writer; the unused legacy append writer has been removed. Cleaning still uses the same atomic writer. File names, output columns, model prompts, review decisions, and run commands are unchanged by this cleanup.
+
 ## Checks and documentation
 
 ```powershell

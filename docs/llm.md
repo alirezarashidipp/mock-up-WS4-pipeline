@@ -78,7 +78,7 @@ Requests omit `temperature`, `max_tokens`, and `max_completion_tokens`. There is
 
 ## Saving, stopping, and resuming
 
-`app/llm/pipeline.py` coordinates `classify_row` and the reusable `find_engagements` function. Before requests begin, all current CLEAN rows are saved as pending incidents so the dashboard can show the complete batch. Each incident then progresses through classification and, for SUPPLIER, engagement suggestions before the next row starts.
+`app/llm/pipeline.py` starts with `run_llm_pipeline`: read source rows, read definitions, read engagements, load the candidate limit, then process incidents. Its per-row coordinator calls `classify_and_save` for the classification request and immediate save, then `link_incident` for reusable `find_engagements` and proposal saving. These functions stay together in the existing pipeline module. Before requests begin, all current CLEAN rows are saved as pending incidents so the dashboard can show the complete batch. Each incident then progresses through classification and, for SUPPLIER, engagement suggestions before the next row starts.
 
 `INCIDENTS.csv` contains all source columns, the 11 classification fields, `processing_status` and `error`, 25 flat linking fields, nine human-review fields, and a Python-managed row_revision. It also contains an `ENG_`-prefixed column for each ENG_ALL field. These cells copy the actual selected engagement row: initially the model default, then the accepted human choice when changed. No selection leaves them blank. Model proposal IDs, reasons, and scores remain separate from human decisions. The dashboard also reads the current catalog when browsing alternatives.
 

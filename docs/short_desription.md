@@ -58,3 +58,7 @@ SUPPLIER_NAME.csv contains the base name **AXA**. ENG_ALL.csv contains records n
 linked_engagement_id is the current model default. reviewed_engagement_id is populated only by an explicit human engagement selection. ENG_ cells describe the current selected engagement: initially the default, then the human choice; they clear when no engagement is selected. A completed None-of-these review is not a human-confirmed link.
 
 Old output CSV files are preserved and are not migrated automatically. The archived architecture diagram represents the earlier workflow.
+
+## Simple code flow
+
+The entry point reads inputs, then the loop processes one incident at a time: `classify_and_save` -> `link_incident` -> next incident. The dashboard reuses `find_engagements` after supplier corrections. CSV reading/writing stays in the shared module; current incident decisions stay in the incident store. The cleanup changes code organization only, not the saved schema or business decisions.

@@ -4,7 +4,7 @@ let supplierNames = [];
 let activeFilter = "total";
 let expandedId = readHash();
 let busy = false;
-let engagementCache = new Map();
+const engagementCache = new Map();
 
 function element(tag, className = "", text = "") {
   const node = document.createElement(tag);
@@ -73,13 +73,8 @@ function modelLabel(row) {
   return row.classification || "Not classified";
 }
 
-function sourceFields(row) {
-  if (Array.isArray(row.input_fields)) return row.input_fields;
-  return Object.entries(row.input_fields || {}).map(([name, value]) => ({name, value}));
-}
-
 function incidentTitle(row) {
-  const values = sourceFields(row);
+  const values = row.input_fields;
   for (const name of ["SHORT_DESCRIPTION", "INCIDENT_SHORT_DESCRIPTION", "INCIDENT_DESCRIPTION", "IT_PROBLEM_DESCRIPTION"]) {
     const field = values.find(item => item.name === name && item.value);
     if (field) return String(field.value);
@@ -176,9 +171,17 @@ function reasonField(form, value = "") {
   input.maxLength = 2000;
   input.required = true;
   input.value = value;
+  input.addEventListener("input", () => input.setCustomValidity(""));
   wrapper.append(input);
   form.append(wrapper);
   return input;
+}
+
+function requireReason(input) {
+  if (input.value.trim()) return true;
+  input.setCustomValidity("Enter a reason.");
+  input.reportValidity();
+  return false;
 }
 
 function classificationPanel(row) {
@@ -209,10 +212,9 @@ function classificationPanel(row) {
   form.append(submit);
   form.addEventListener("submit", event => {
     event.preventDefault();
-    if (!reason.value.trim()) { reason.setCustomValidity("Enter a reason."); reason.reportValidity(); return; }
+    if (!requireReason(reason)) return;
     saveReview(row, "classification", {decision: "disagree", classification: select.value, reason: reason.value}, panel, error);
   });
-  reason.addEventListener("input", () => reason.setCustomValidity(""));
   actions.append(approve, button("Disagree", () => { form.hidden = !form.hidden; if (!form.hidden) select.focus(); }));
   panel.append(actions, form, element("p", "field-note", "Saving another classification resets the later human decisions."));
   return panel;
@@ -245,10 +247,9 @@ function supplierPanel(row) {
   form.append(submit);
   form.addEventListener("submit", event => {
     event.preventDefault();
-    if (!reason.value.trim()) { reason.setCustomValidity("Enter a reason."); reason.reportValidity(); return; }
+    if (!requireReason(reason)) return;
     saveReview(row, "supplier", {decision: "disagree", supplier_name: select.value, reason: reason.value}, panel, error);
   });
-  reason.addEventListener("input", () => reason.setCustomValidity(""));
   actions.append(approve, button("Disagree", () => { form.hidden = !form.hidden; if (!form.hidden) select.focus(); }));
   panel.append(actions, form, element("p", "field-note", "A changed base name reruns engagement finding now and resets engagement approval."));
   if (!supplierNames.length) panel.append(element("p", "notice", "No supplier catalog options are available. An existing usable model name can still be approved."));
@@ -278,8 +279,7 @@ function engagementPanel(row) {
     if (key.startsWith("ENG_") && value !== "") saved[key.slice(4)] = value;
   }
   if (Object.keys(saved).length) {
-    const snapshot = engagementDetails(saved);
-    snapshot.querySelector("summary").textContent = "Saved selected engagement details";
+    const snapshot = engagementDetails(saved, "Saved selected engagement details");
     panel.append(snapshot);
   }
   if (!row.classification_complete || !row.supplier_complete) panel.append(element("p", "notice", "Proposals can be inspected now. Approve classification and supplier name before deciding on an engagement."));
@@ -313,10 +313,10 @@ function engagementName(item) {
   return item.ENGAGEMENT_NAME || item.ENGAGEMENT_DESCRIPTION || item.THIRD_PARTY_NAME || item.THIRD_PARTY_NORMALISED_NAME || "Engagement";
 }
 
-function engagementDetails(item) {
-  const details = disclosure("Engagement details");
+function engagementDetails(item, title = "Engagement details") {
+  const details = disclosure(title);
   const fields = element("div", "source-grid");
-  for (const [name, value] of Object.entries(item || {})) addField(fields, name, value);
+  for (const [name, value] of Object.entries(item)) addField(fields, name, value);
   details.append(fields);
   return details;
 }
@@ -325,8 +325,8 @@ function renderEngagements(row, data, panel, content) {
   content.replaceChildren();
   if (data.error) content.append(element("p", "notice", data.error));
   if (data.link_stale || data.review_version !== row.review_version) content.append(element("p", "notice", "The incident or catalog has changed. Refresh the page and find engagements again before approval."));
-  const matches = data.matches || [];
-  const suggestions = data.suggestions || [];
+  const matches = data.matches;
+  const suggestions = data.suggestions;
   const defaultId = data.selected_engagement_id || row.linked_engagement_id || "";
   addField(content, "Model default", defaultId || "No default selected");
   if (defaultId) {
@@ -337,12 +337,12 @@ function renderEngagements(row, data, panel, content) {
   choices.classList.add("suggestions");
   for (const suggestion of suggestions) {
     const item = element("article", "suggestion" + (suggestion.engagement_id === defaultId ? " default-suggestion" : ""));
-    const title = suggestion.engagement_id + " · " + engagementName(suggestion.engagement || {});
+    const title = suggestion.engagement_id + " · " + engagementName(suggestion.engagement);
     item.append(element("h4", "", title));
     if (suggestion.engagement_id === defaultId) item.append(element("span", "badge", "Model default"));
     item.append(element("p", "field-note", "Link evidence: " + evidenceStrength(suggestion.evidence_strength)));
     item.append(element("p", "record-text", suggestion.reason));
-    item.append(engagementDetails(suggestion.engagement || {}));
+    item.append(engagementDetails(suggestion.engagement));
     choices.append(item);
   }
   if (!suggestions.length) choices.append(element("p", "field-note", "No suitable engagement suggestion has been saved."));
@@ -350,10 +350,8 @@ function renderEngagements(row, data, panel, content) {
   const all = disclosure("Browse all " + matches.length + " normalized name matches");
   all.append(element("p", "field-note", "Source order. These name matches are not a relevance ranking. Only the capped candidates were prepared for the model."));
   for (const match of matches) {
-    const item = disclosure(match.ENGAGEMENT_ID + " · " + engagementName(match));
-    const fields = element("div", "source-grid");
-    for (const [name, value] of Object.entries(match)) addField(fields, name, value);
-    item.append(fields);
+    const title = match.ENGAGEMENT_ID + " · " + engagementName(match);
+    const item = engagementDetails(match, title);
     all.append(item);
   }
   if (!matches.length) all.append(element("p", "field-note", "No matching engagement rows found."));
@@ -388,10 +386,9 @@ function renderEngagements(row, data, panel, content) {
   form.append(actions, reasonArea);
   form.addEventListener("submit", event => {
     event.preventDefault();
-    if (!reason.value.trim()) { reason.setCustomValidity("Enter a reason."); reason.reportValidity(); return; }
+    if (!requireReason(reason)) return;
     saveReview(row, "engagement", {decision: "disagree", engagement_id: select.value, reason: reason.value}, panel, error);
   });
-  reason.addEventListener("input", () => reason.setCustomValidity(""));
   updateChoice();
   content.append(form);
   const retryLabel = row.link_status === "RUNNING" ? "Restart engagement finding" : "Find engagements again";
@@ -404,7 +401,7 @@ function modelDetails(row) {
   const fields = element("div", "source-grid");
   addField(fields, "Processing status", row.processing_status);
   addField(fields, "Key root cause", row.key_root_cause);
-  const evidence = Array.isArray(row.evidence_column) ? row.evidence_column.join(", ") : row.evidence_column;
+  const evidence = row.evidence_column.join(", ");
   addField(fields, "Evidence columns", evidence);
   if (row.classification === "SUPPLIER") {
     for (const [label, value] of [["Supplier base name", row.supplier_name], ["Product or service", row.supplier_product_or_service], ["Supplier action or failure", row.supplier_action_or_failure], ["Causal explanation", row.supplier_causal_explanation], ["Accountability reason", row.supplier_accountability_reason], ["Additional supplier information", row.supplier_more_info]]) addField(fields, label, value);
@@ -416,7 +413,7 @@ function modelDetails(row) {
 function inputDetails(row) {
   const details = disclosure("Original incident fields");
   const fields = element("div", "source-grid");
-  for (const item of sourceFields(row)) addField(fields, item.name, item.value);
+  for (const item of row.input_fields) addField(fields, item.name, item.value);
   details.append(fields);
   return details;
 }
