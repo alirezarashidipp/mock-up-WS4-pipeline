@@ -91,4 +91,9 @@ The live check uses a visibly synthetic incident and current classification sche
 - [Dashboard and human decisions](docs/dashboard_app.md)
 - [Project instructions](AGENTS.md)
 
-The diagrams and frozen documents under `.archify/` describe the historical workflow.
+Current source-backed diagrams:
+
+- [Automatic incident processing](.archify/workflow-ws4-current-20261102-190621/ws4-pipeline.html)
+- [Three ordered human decisions](.archify/workflow-ws4-current-20261102-190621/ws4-human-review.html)
+
+These diagrams describe the single LLM pipeline, automatic Supplier suggestions, and the incident dashboard. Earlier diagram folders and their frozen documents are historical snapshots.

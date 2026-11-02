@@ -20,7 +20,7 @@
 - Engagement matching/suggestions: docs/linking.md.
 - Dashboard/human decisions: docs/dashboard_app.md.
 - Setup and commands: README.md. Compact business flow: docs/short_desription.md.
-- Update the relevant docs when behavior changes. .archify diagrams and frozen source documents are historical.
+- Update the relevant docs when behavior changes. README.md and docs/short_desription.md link the current source-backed .archify workflow diagrams; older diagram folders and frozen source documents remain historical.
 
 ## Keep the workflow simple
 

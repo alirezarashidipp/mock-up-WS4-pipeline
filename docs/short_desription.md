@@ -57,7 +57,14 @@ SUPPLIER_NAME.csv contains the base name **AXA**. ENG_ALL.csv contains records n
 
 linked_engagement_id is the current model default. reviewed_engagement_id is populated only by an explicit human engagement selection. ENG_ cells describe the current selected engagement: initially the default, then the human choice; they clear when no engagement is selected. A completed None-of-these review is not a human-confirmed link.
 
-Old output CSV files are preserved and are not migrated automatically. The archived architecture diagram represents the earlier workflow.
+Old output CSV files are preserved and are not migrated automatically. Earlier architecture diagrams remain historical snapshots.
+
+## Current workflow diagrams
+
+- [Automatic incident processing](../.archify/workflow-ws4-current-20261102-190621/ws4-pipeline.html): unchanged Cleaning, sequential classification and automatic Supplier suggestions, per-incident saves, and retry behavior.
+- [Three ordered human decisions](../.archify/workflow-ws4-current-20261102-190621/ws4-human-review.html): classification, supplier name, engagement approval or correction, immediate name-based recomputation, and completion without a link.
+
+The diagrams cite the implementation at a pinned source revision. They describe code behavior, not a live provider run.
 
 ## Simple code flow
 
