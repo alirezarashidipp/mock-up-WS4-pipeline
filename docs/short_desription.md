@@ -48,7 +48,7 @@ The six supplier fields are:
 ## Other output fields
 
 - `key_root_cause`: the documented root cause in one sentence, or `null` if unknown.
-- `evidence_column`: a nonempty list of strings, with no fixed maximum count. The prompt requests relevant source column names, but Python does not check membership, spelling, duplicates, or blank individual names. Save entries in returned order without correction or deduplication.
+- `evidence_column`: a list of strings that may be empty, with no fixed maximum count. An empty list saves a blank evidence cell and does not fail classification. The prompt requests relevant source column names, but Python does not check membership, spelling, duplicates, or blank individual names. Save entries in returned order without correction or deduplication.
 - `decision_rationale`: a short, evidence-based explanation of the classification.
 - `classification`: exactly `HSBC`, `SUPPLIER`, or `UNCERTAIN`.
 - `attribution_evidence_strength`: an integer from 0 to 4: unsupported, weak, moderate, strong, or very strong. This measures attribution evidence, not probability. Valid scores are 0-2 for `UNCERTAIN` and 1-4 for `HSBC` or `SUPPLIER`. Python rejects other combinations without changing the classification or score.

@@ -200,9 +200,9 @@ class PythonTests(unittest.TestCase):
                 expected = None if label != "SUPPLIER" or name == "supplier_more_info" else "Unknown"
                 self.assertEqual(getattr(classified, name), expected)
 
-    def test_evidence_has_no_fixed_maximum(self):
+    def test_evidence_allows_empty_and_long_lists(self):
         result = json.loads(example_response("SUPPLIER").choices[0].message.content)
-        for count in (1, 11):
+        for count in (0, 1, 11):
             with self.subTest(count=count):
                 names = [f"SYNTHETIC_COLUMN_{number}" for number in range(count)]
                 result["evidence_column"] = names
@@ -217,9 +217,6 @@ class PythonTests(unittest.TestCase):
         response = SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
         parsed = classification.parse_response(response)
         self.assertEqual(parsed.evidence_column, names)
-        result["evidence_column"] = []
-        with self.assertRaises(ValidationError):
-            Classification.model_validate(result)
         result["evidence_column"] = [{"column": "INCIDENT_DESCRIPTION", "quote": "Old format"}]
         with self.assertRaises(ValidationError):
             Classification.model_validate(result)

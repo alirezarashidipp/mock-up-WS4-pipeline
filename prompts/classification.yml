@@ -48,11 +48,11 @@ system: |
 
   Return exactly the fields in the response schema, in this order:
   - key_root_cause: one sentence describing the recorded cause; null if unknown.
-  - evidence_column: a list of one or more standardized source column names
+  - evidence_column: a list of standardized source column names
     as strings, such as ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"]. Include only
     input columns that materially informed the decision, its limitations, or
     relevant counterevidence. Return names only, without quotes, values, or
-    objects. At least one source name is required; there is no fixed maximum.
+    objects. Return [] when no source columns are identified; there is no fixed maximum.
     The count may differ per incident. Use only existing input columns
     and do not invent or repeat names to fill the list; no ranking is required.
     For UNCERTAIN, include fields showing the ambiguity or missing causal facts.
