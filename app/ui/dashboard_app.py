@@ -15,7 +15,7 @@ from app.incidents import (
     ENGAGEMENT_FILE, RESULTS_FILE, SUPPLIERS_FILE,
     get_incident, read_incidents, row_version, source_fields,
 )
-from app.linking.candidates import find_candidates
+from app.linking.candidates import explain_candidate_match, find_candidates, normalize_name
 from app.linking.linking import catalog_hash, read_engagements
 from app.review import (
     classification_complete, effective_classification, effective_supplier_name,
@@ -53,6 +53,119 @@ def read_evidence_columns(row):
     return [name.strip() for name in row.get("evidence_column", "").split(",") if name.strip()]
 
 
+def next_action(row):
+    """Describe the first unfinished stage without changing review decisions."""
+    if row["processing_status"] == "pending":
+        stage = "processing"
+        title = "Await incident processing"
+        description = "Classification has not completed. Human review will unlock afterwards."
+    elif not classification_complete(row):
+        stage = "classification"
+        title = "Review classification"
+        description = "Approve the model class, or choose a corrected class and explain why."
+        if row["processing_status"] == "failed":
+            title = "Resolve classification"
+            description = "Processing failed. Choose HSBC or Supplier with a reason to resolve it manually."
+        elif effective_classification(row) == "UNCERTAIN":
+            title = "Resolve uncertain classification"
+            description = "Choose HSBC or Supplier with a reason. Later steps remain locked."
+    elif review_complete(row):
+        stage = "complete"
+        title = "Review complete"
+        if row["reviewed_classification"] == "HSBC":
+            description = "HSBC classification is reviewed. Supplier and engagement review are not applicable."
+        elif row["reviewed_engagement_id"]:
+            description = "Classification, supplier name and the selected engagement have been reviewed."
+        else:
+            description = "Review is complete without an accepted engagement."
+    elif not supplier_complete(row):
+        stage = "supplier"
+        title = "Review supplier name"
+        description = "Approve the usable model name, or choose a catalog base name with a reason."
+    else:
+        stage = "engagement"
+        title = "Review engagement"
+        description = "Explicitly approve a proposal, or choose another match or no link with a reason."
+        if row["link_status"] == "RUNNING":
+            title = "Await engagement suggestions"
+            description = "Engagement finding is running. Wait for it to finish before deciding."
+        elif row["link_status"] in ("PENDING", "FAILED"):
+            title = "Find engagements"
+            description = "Run or retry engagement finding. If a current lookup is available, you can also review its matches manually with a reason."
+    return {"stage": stage, "title": title, "description": description}
+
+
+def overview_text(counts):
+    return (
+        f"Saved incidents: {counts['total']}. "
+        f"Successfully classified: {counts['classified']}; "
+        f"awaiting processing: {counts['pending']}; "
+        f"processing failures: {counts['failed']}. "
+        f"Reviews remaining: {counts['review_pending']}. "
+        f"Human-confirmed links: {counts['human_linked']}."
+    )
+
+
+def describe_incident(row):
+    """Add the display fields needed for one incident card."""
+    incident = dict(row)
+    incident.update(
+        incident_id=row["INCIDENT_ID"],
+        summary=row.get("INCIDENT_SHORT_DESCRIPTION", ""),
+        review_version=row_version(row),
+        effective_classification=effective_classification(row),
+        effective_supplier_name=effective_supplier_name(row),
+        classification_complete=classification_complete(row),
+        supplier_complete=supplier_complete(row),
+        review_complete=review_complete(row),
+        next_action=next_action(row),
+        input_fields=[{"name": name, "value": value} for name, value in source_fields(row).items()],
+        evidence_column=read_evidence_columns(row),
+    )
+    return incident
+
+
+def count_incidents(incidents):
+    """Count original model results and the current review state separately."""
+    counts = {
+        "total": len(incidents),
+        "classified": 0,
+        "HSBC": 0,
+        "SUPPLIER": 0,
+        "UNCERTAIN": 0,
+        "failed": 0,
+        "pending": 0,
+        "review_pending": 0,
+        "review_complete": 0,
+        "human_linked": 0,
+    }
+    for target in ("classification", "supplier", "engagement"):
+        for status in ("approved", "disagree", "pending", "not_applicable"):
+            counts[f"{target}_{status}"] = 0
+    bottlenecks = {stage: 0 for stage in ("processing", "classification", "supplier", "engagement", "complete")}
+
+    for incident in incidents:
+        if incident["processing_status"] == "success":
+            counts["classified"] += 1
+            counts[incident["classification"]] += 1
+        else:
+            counts[incident["processing_status"]] += 1
+
+        if incident["review_complete"]:
+            counts["review_complete"] += 1
+            if incident["reviewed_engagement_id"]:
+                counts["human_linked"] += 1
+        else:
+            counts["review_pending"] += 1
+
+        for target in ("classification", "supplier", "engagement"):
+            status = incident[target + "_review_status"]
+            counts[f"{target}_{status}"] += 1
+        stage = incident["next_action"]["stage"]
+        bottlenecks[stage] += 1
+    return counts, bottlenecks
+
+
 def get_dashboard_data(path=RESULTS_FILE, suppliers_path=SUPPLIERS_FILE, engagements_path=ENGAGEMENT_FILE):
     rows = read_incidents(path)
     names, supplier_note = supplier_options(suppliers_path)
@@ -61,47 +174,32 @@ def get_dashboard_data(path=RESULTS_FILE, suppliers_path=SUPPLIERS_FILE, engagem
         read_engagements(engagements_path)
     except (OSError, UnicodeError, csv.Error, ValueError):
         engagement_note = "ENG_ALL.csv is missing or invalid. Engagement suggestions and approval require the catalog."
-    counts = {"total": len(rows), "classified": 0, "HSBC": 0, "SUPPLIER": 0, "UNCERTAIN": 0,
-              "failed": 0, "pending": 0, "review_pending": 0, "review_complete": 0, "human_linked": 0}
-    for target in ("classification", "supplier", "engagement"):
-        for status in ("approved", "disagree", "pending", "not_applicable"):
-            counts[f"{target}_{status}"] = 0
-    incidents = []
-    for row in rows:
-        if row["processing_status"] == "success":
-            counts["classified"] += 1
-            counts[row["classification"]] += 1
-        else:
-            counts[row["processing_status"]] += 1
-        complete = review_complete(row)
-        counts["review_complete" if complete else "review_pending"] += 1
-        if complete and row["reviewed_engagement_id"]:
-            counts["human_linked"] += 1
-        for target in ("classification", "supplier", "engagement"):
-            counts[f"{target}_{row[target + '_review_status']}"] += 1
-        incident = dict(row)
-        incident.update(
-            incident_id=row["INCIDENT_ID"],
-            summary=row.get("INCIDENT_SHORT_DESCRIPTION", ""),
-            review_version=row_version(row),
-            effective_classification=effective_classification(row),
-            effective_supplier_name=effective_supplier_name(row),
-            classification_complete=classification_complete(row),
-            supplier_complete=supplier_complete(row),
-            review_complete=complete,
-            input_fields=[{"name": name, "value": value} for name, value in source_fields(row).items()],
-            evidence_column=read_evidence_columns(row),
-        )
-        incidents.append(incident)
-    return {"incidents": incidents, "counts": counts, "supplier_names": names,
-            "supplier_catalog_note": supplier_note, "engagement_catalog_note": engagement_note,
-            "error": "", "demo": False}
+
+    incidents = [describe_incident(row) for row in rows]
+    counts, bottlenecks = count_incidents(incidents)
+    return {
+        "incidents": incidents,
+        "counts": counts,
+        "supplier_names": names,
+        "overview": overview_text(counts),
+        "bottlenecks": bottlenecks,
+        "supplier_catalog_note": supplier_note,
+        "engagement_catalog_note": engagement_note,
+        "error": "",
+        "demo": False,
+    }
 
 
 def engagement_data(row):
     engagements = read_engagements(app.state.engagements_file)
     name = row["link_supplier_name"] or effective_supplier_name(row)
     matches = find_candidates(name, engagements, None)
+    normalized_name = normalize_name(name)
+    explanations = []
+    for engagement in matches:
+        explanation = explain_candidate_match(normalized_name, engagement)
+        explanation["engagement_id"] = engagement["ENGAGEMENT_ID"]
+        explanations.append(explanation)
     by_id = {engagement["ENGAGEMENT_ID"]: engagement for engagement in matches}
     suggestions = []
     for number in range(1, 6):
@@ -120,6 +218,8 @@ def engagement_data(row):
             "reviewed_engagement_id": row["reviewed_engagement_id"], "link_stale": stale,
             "match_count": len(matches), "candidate_count": row["link_candidate_count"],
             "suggestion_count": len(suggestions), "supplier_name": name,
+            "matching_explanation": {"supplier_name": name, "normalized_supplier_name": normalized_name,
+                                     "matches": explanations},
             "saved_engagement": {key[4:]: value for key, value in row.items() if key.startswith("ENG_")}, "error": ""}
 
 

@@ -9,22 +9,38 @@ def normalize_name(name):
     return " ".join(re.findall(r"[a-z0-9]+", text))
 
 
-def names_match(supplier, candidate):
+def name_match_method(supplier, candidate):
     if not candidate:
-        return False
+        return ""
     supplier_words = set(supplier.split())
     candidate_words = set(candidate.split())
     if supplier_words <= candidate_words or candidate_words <= supplier_words:
-        return True
+        return "Whole-word containment"
     if min(len(supplier), len(candidate)) < 4:
-        return False
+        return ""
     if SequenceMatcher(None, supplier, candidate).ratio() >= 0.8:
-        return True
+        return "Whole-name fuzzy similarity (threshold 0.8)"
     if len(supplier_words) == 1:
         for word in candidate_words:
             if len(word) >= 4 and SequenceMatcher(None, supplier, word).ratio() >= 0.8:
-                return True
-    return False
+                return "Single-word fuzzy similarity (threshold 0.8)"
+    return ""
+
+
+def explain_candidate_match(normalized_supplier, engagement):
+    """Use the same ordered name checks for retrieval and its explanation."""
+    for column in ("THIRD_PARTY_NAME", "THIRD_PARTY_NORMALISED_NAME"):
+        source_name = engagement.get(column, "")
+        normalized_name = normalize_name(source_name)
+        method = name_match_method(normalized_supplier, normalized_name)
+        if method:
+            return {
+                "column": column,
+                "source_name": source_name,
+                "normalized_name": normalized_name,
+                "method": method,
+            }
+    return None
 
 
 def find_candidates(supplier_name, engagements, max_candidates=70):
@@ -36,11 +52,8 @@ def find_candidates(supplier_name, engagements, max_candidates=70):
     # Lexical matching can miss aliases such as EY versus Ernst & Young.
     candidates = []
     for engagement in engagements:
-        for column in ("THIRD_PARTY_NAME", "THIRD_PARTY_NORMALISED_NAME"):
-            name = normalize_name(engagement.get(column, ""))
-            if names_match(supplier, name):
-                candidates.append(engagement)
-                if max_candidates is not None and len(candidates) >= max_candidates:
-                    return candidates
-                break
+        if explain_candidate_match(supplier, engagement):
+            candidates.append(engagement)
+            if max_candidates is not None and len(candidates) >= max_candidates:
+                return candidates
     return candidates

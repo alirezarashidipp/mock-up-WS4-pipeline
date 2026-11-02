@@ -73,3 +73,15 @@
 - Catalogs are read-only. Check candidate membership and catalog freshness before engagement approval. Changed catalog columns require a fresh output batch.
 - Render CSV values as text, show missing/invalid catalog messages, keep original model counts separate from human review progress, and preserve list filters/open incident after save.
 - No LLM calls or file writes on GET. Human supplier correction/retry may call the LLM on POST. Green confirmation appears only after a successful save.
+
+## Dashboard review aids
+
+- Keep Classification and Supplier name side by side on desktop, with Engagement spanning the next row; stack panels on narrow screens.
+- Show suggestion cards with numeric evidence scores and consistent green shades by score. Distinguish evidence color, model default, pending selection, and saved human approval explicitly.
+- Keep the all-match search and native dropdown synchronized with suggestion selection. Retain the selected engagement during filtering. Search and local selection must not call a model or save a decision; preserve ordered review, reason, freshness, and save guards.
+
+- Keep At a glance, next actions, and disjoint processing/classification/supplier/engagement/complete bottleneck counts derived from existing saved state. Global counts stay independent of filters; completed no-link decisions are not human-confirmed links.
+- Keep the three-case walkthrough visibly synthetic, browser-only, outside real counts, and free of provider calls or saved decisions. Real review uses the existing ordered forms.
+- Compare original classification/supplier results and the current engagement default against human decisions with reasons. Label pending, not-applicable, and no-link outcomes accurately; do not imply a historical audit trail.
+- Evidence navigation may open an existing source field or mark its name unavailable; it must not introduce evidence-name validation or citation verification. Render source values as text.
+- Compare up to three current matching engagements using actual catalog fields; highlight differences without treating them as proof of correctness. Explain normalization and the matching column/method through the same Python logic used for retrieval, preserving column precedence and source order. These aids add no CSV columns, pipelines, or dashboards.

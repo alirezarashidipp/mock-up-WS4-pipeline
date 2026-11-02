@@ -40,6 +40,17 @@ HSBC needs only classification review. A human correction from HSBC/UNCERTAIN/fa
 
 Changing classification resets downstream human decisions. Changing supplier removes earlier engagement approval and refreshes suggestions. Rejecting engagement leaves classification and supplier decisions unchanged. Failed refreshes preserve the human correction and allow retry. A stale response cannot overwrite a newer decision.
 
+## Dashboard review aids
+
+Classification and Supplier name share the top row on desktop; Engagement spans the row underneath. Suggestions are visible cards, shaded from deep to pale green by evidence strength. The model-default badge and saved approval status remain separate. A search field and dropdown cover all matching engagements, preserve the current selection during filtering, and stay synchronized with the cards. An explicit approval or reasoned correction saves the decision.
+
+- **At a glance** summarizes the saved batch. The bottleneck map counts each incident once in processing, classification, supplier name, engagement, or complete; clicking a bucket opens its queue.
+- Each incident has a **next action**, an **AI proposal vs human decision** comparison with reasons, and evidence links that open the saved source field. Unavailable source names are labeled without rejecting the model output.
+- Compare up to three engagement candidates side by side. Highlight actual catalog differences and inspect how Python normalized and matched each name. Neither differences nor name similarity establish the correct engagement.
+- A clearly labeled **synthetic walkthrough** explains Supplier approval, supplier correction, and resolving Uncertain. It makes no model calls or saved decisions and is excluded from real counts.
+
+These are presentation aids in the existing dashboard. The CSV schema and ordered review rules are unchanged; the proposal comparison shows current state, not a full decision history.
+
 ## Synthetic AXA example
 
 SUPPLIER_NAME.csv contains the base name **AXA**. ENG_ALL.csv contains records named **AXA Insurance**, **AXA Com**, and other AXA entities.
@@ -63,6 +74,8 @@ linked_engagement_id is the current model default. reviewed_engagement_id is pop
 Old output CSV files are preserved and are not migrated automatically. Earlier architecture diagrams remain historical snapshots.
 
 ## Current workflow diagrams
+
+- [Six-stage workflow infographic](images/ws4-incident-workflow.png): a shareable overview of automatic proposals and ordered human review.
 
 - [Automatic incident processing](../.archify/workflow-ws4-current-20261102-190621/ws4-pipeline.html): unchanged Cleaning, sequential classification and automatic Supplier suggestions, per-incident saves, and retry behavior.
 - [Three ordered human decisions](../.archify/workflow-ws4-current-20261102-190621/ws4-human-review.html): classification, supplier name, engagement approval or correction, immediate name-based recomputation, and completion without a link.

@@ -24,6 +24,11 @@
     </section>
     <p id="demo-note" class="notice" hidden>Synthetic demonstration data and example model results.</p>
     <p id="message" class="message" role="status" aria-live="polite" hidden></p>
+    <section class="overview-card" aria-labelledby="overview-heading">
+      <p class="eyebrow">SAVED BATCH / CURRENT SNAPSHOT</p>
+      <h2 id="overview-heading">At a glance</h2>
+      <p id="overview-text" role="status" aria-live="polite">Loading the saved incident summary…</p>
+    </section>
     <section class="stats" aria-label="Filter by original model result">
       <button type="button" class="stat" data-filter="total" aria-pressed="true" aria-controls="incident-list"><strong id="total-count">—</strong><span>All incidents</span></button>
       <button type="button" class="stat" data-filter="HSBC" aria-pressed="false" aria-controls="incident-list"><strong id="HSBC-count">—</strong><span>HSBC</span></button>
@@ -37,11 +42,23 @@
       <p><strong id="review-complete-count">—</strong> complete <span aria-hidden="true">/</span> <strong id="review-pending-count">—</strong> pending <span class="linked-count"><strong id="human-linked-count">—</strong> human-confirmed links</span></p>
       <progress id="review-progress" value="0" max="1" aria-label="Completed incident reviews"></progress>
     </section>
+    <section class="bottleneck-overview" aria-labelledby="bottleneck-heading">
+      <h2 id="bottleneck-heading">Where review is waiting</h2>
+      <p class="field-note">Each incident appears once, at its first unfinished stage. Counts cover the whole saved snapshot.</p>
+      <div id="bottleneck-list" class="bottleneck-list"></div>
+    </section>
+    <details class="guided-demo">
+      <summary>Explore three review scenarios</summary>
+      <p class="notice">Synthetic walkthrough · no model calls or saved decisions.</p>
+      <div id="scenario-tabs" class="scenario-tabs" role="group" aria-label="Choose a synthetic scenario"></div>
+      <div id="scenario-content" class="scenario-content" role="region" aria-label="Synthetic scenario steps" aria-live="polite"></div>
+      <div id="scenario-controls" class="scenario-controls"></div>
+    </details>
     <p id="supplier-catalog-note" class="notice" hidden></p>
     <p id="engagement-catalog-note" class="notice" hidden></p>
     <div class="filters">
       <label>Find an incident<input id="search" type="search" placeholder="Incident ID, description, supplier…" autocomplete="off"></label>
-      <label>Human review<select id="review-filter"><option value="all">All review states</option><option value="pending">Pending review</option><option value="complete">Review complete</option></select></label>
+      <label>Human review<select id="review-filter"><option value="all">All review states</option><option value="pending">Pending review</option><option value="complete">Review complete</option><option value="processing">Awaiting processing</option><option value="classification">Classification next</option><option value="supplier">Supplier name next</option><option value="engagement">Engagement next</option></select></label>
     </div>
     <section aria-labelledby="results-heading">
       <div class="list-heading"><h2 id="results-heading">All incidents</h2><p id="filter-summary" class="field-note" role="status" aria-live="polite"></p></div>

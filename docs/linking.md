@@ -32,6 +32,8 @@ Counts are blank when search has not run. No lexical matches produce zeros and n
 3. For each row, check `THIRD_PARTY_NAME` first, then `THIRD_PARTY_NORMALISED_NAME`. Add the row once if either name matches by whole-word containment or fuzzy similarity at 0.8.
 4. Keep all matches in ENG_ALL order. `find_candidates(..., max_candidates=None)` returns them all; the service slices the list to the LLM cap separately.
 
+The dashboard explains each match using the same Python helper as retrieval: original and normalized names, the first matching column, and the containment or fuzzy rule. Explanations are read-only and add no saved columns.
+
 Blank and placeholder names such as Unknown produce no candidates. Lexical retrieval can miss aliases such as EY versus Ernst & Young. Name similarity supplies options, not proof of an incident relationship.
 
 Synthetic example: base name AXA can retrieve both AXA Insurance and AXA Com. The incident's insurance or communications facts determine which engagement is plausible. Supplier catalog names and engagement entity names do not need to be identical.
