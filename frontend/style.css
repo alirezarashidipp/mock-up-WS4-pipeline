@@ -156,7 +156,6 @@ footer { display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px; 
 /* Read the saved result, inspect its evidence, then make a human decision. */
 .overview-card { padding:20px 24px; margin-bottom:20px; background:#fff; border:1px solid var(--line); border-left:4px solid var(--red); }
 .overview-card h2 { font-size:20px; font-weight:500; }
-.overview-card > p:last-child { max-width:1100px; margin:7px 0 0; font-size:15px; line-height:1.8; overflow-wrap:anywhere; }
 .bottleneck-overview { margin-bottom:20px; }
 .bottleneck-list { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; margin-top:12px; }
 .bottleneck-button { display:flex; flex-direction:column; align-items:start; gap:3px; min-width:0; min-height:78px; padding:12px 14px; border:1px solid var(--line); background:white; text-align:left; }
@@ -164,21 +163,6 @@ footer { display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px; 
 .bottleneck-button span { font-size:12px; overflow-wrap:anywhere; }
 .bottleneck-button:hover { border-color:#858b92; }
 .bottleneck-button[aria-pressed="true"] { border-color:#547793; box-shadow:inset 0 -3px #547793; background:#f0f6fc; }
-.guided-demo { padding:0 20px; margin-bottom:20px; border:1px solid #c8d3dd; background:#fff; }
-.guided-demo > summary { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:15px 0; font-weight:600; }
-.guided-demo > summary::after { content:"+"; font-size:20px; font-weight:400; color:var(--muted); }
-.guided-demo[open] > summary::after { content:"−"; }
-.guided-demo > .notice { margin:0 0 16px; }
-.scenario-tabs { display:flex; flex-wrap:wrap; gap:8px; padding-bottom:16px; }
-.scenario-tabs .button { text-align:left; }
-.scenario-tabs .button[aria-pressed="true"] { background:var(--ink); color:white; border-color:var(--ink); }
-.scenario-content { padding:18px 20px; min-width:0; border:1px solid var(--line); background:#fafbfc; overflow-wrap:anywhere; }
-.scenario-step { margin:12px 0; padding-left:14px; border-left:3px solid #547793; }
-.scenario-step h3 { margin-bottom:5px; }
-.scenario-step p:last-child { margin-bottom:0; }
-.scenario-outcome { padding:12px 14px; margin:16px 0 0; border-left:3px solid var(--green); background:#edf8f1; }
-.scenario-controls { display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:16px 0; }
-.scenario-controls p { margin:0; font-size:12px; color:var(--muted); }
 .next-action { padding:14px 18px; margin-bottom:18px; border:1px solid #c8d3dd; border-left:3px solid #547793; background:#f5f9fc; overflow-wrap:anywhere; }
 .next-action h3 { margin:0 0 5px; }
 .next-action p { margin:0; }
@@ -215,13 +199,8 @@ footer { display:flex; justify-content:space-between; flex-wrap:wrap; gap:12px; 
 }
 @media(max-width:600px) {
   .overview-card { padding:16px; }
-  .overview-card > p:last-child { font-size:13px; }
   .bottleneck-list { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .bottleneck-button { padding:10px 12px; }
-  .guided-demo { padding:0 14px; }
-  .scenario-tabs { flex-direction:column; }
-  .scenario-tabs .button { width:100%; }
-  .scenario-content { padding:14px; }
   .next-action { padding:12px; }
   .comparison-controls { flex-direction:column; }
   .comparison-controls label { flex-basis:auto; }

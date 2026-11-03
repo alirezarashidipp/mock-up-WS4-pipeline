@@ -226,7 +226,7 @@ app/                              Python application
   csv_files.py                    Shared CSV reading and atomic writing
 frontend/
   dashboard/index.html            The single dashboard page
-  dashboard/app.js                Review controls, comparisons and synthetic walkthrough
+  dashboard/app.js                Review controls, counts and comparisons
   style.css                       Dashboard styling
   pictures/hsbc-logo.svg           Shared logo
 fields/

@@ -19,19 +19,13 @@ Citations remain unverified text in one shared CSV cell; the frontend separates 
 
 ## Review aids
 
-- **At a glance** summarizes the whole saved batch with deterministic counts: successful classifications, pending/failed processing, remaining reviews, and human-confirmed links. It makes no extra model request.
+- **At a glance** introduces the clickable incident-count cards. Classification and processing counts cover the whole saved batch; human-review counts appear separately under **Human review progress**. These counts make no extra model request.
 - **Where review is waiting** assigns every incident to exactly one bucket: processing, classification, supplier name, engagement, or complete. Counts stay global while search and filters change; a bucket opens its review queue. Pending processing waits for the pipeline; failed classification can proceed to manual review. Reviewed HSBC and completed no-link decisions belong to complete.
 - **Next action** identifies the first unfinished step for the open incident and explains what to do. It uses the existing review rules.
 - **AI proposal vs human decision** compares classification, supplier name, and engagement with saved reasons. Classification and supplier values are the original model results; the engagement proposal is the current model default, which may have been replaced after a supplier correction. Pending, not-applicable, and completed no-link decisions remain distinct. This is a current-state comparison, not an audit history.
 - **Evidence links** open and focus the corresponding saved source field. Unknown evidence names are visibly unavailable; empty source values remain inspectable. This navigation does not add model-output validation or verify citation excerpts.
 - **Engagement comparison** places up to three current Python matches side by side, including catalog fields, available suggestion reasons and evidence scores, and default/human-choice labels. Different catalog values are highlighted; a difference is not proof that either option is correct. Missing data remain explicit. Browsing and comparing candidates do not select or approve them.
 - **How Python matched this name** shows the lookup base name, normalized names, matching source column, and containment or fuzzy-match method. The explanation reuses the matching logic, checks THIRD_PARTY_NAME before THIRD_PARTY_NORMALISED_NAME, and retains source order. Fuzzy similarity at 0.8 is a retrieval rule, not a probability or relevance score.
-
-## Guided synthetic scenarios
-
-The collapsed walkthrough presents three illustrative cases: approve a Supplier result; correct a supplier name and explain the refreshed suggestions; resolve an Uncertain classification through a reasoned human decision. Previous/next controls explain the ordered steps.
-
-The walkthrough is visibly synthetic and runs only in the browser. Its example outcomes are illustrative, not live model results. It makes no provider calls, saves no decisions, and does not enter the incident counts. Real incident review continues through the existing forms and POST endpoints.
 
 These review aids reuse the single dashboard and existing saved data. They add no CSV columns, processing pipeline, or extra dashboard.
 

@@ -87,8 +87,7 @@
 - Show suggestion cards with numeric evidence scores and consistent green shades by score. Distinguish evidence color, model default, pending selection, and saved human approval explicitly.
 - Keep the all-match search and native dropdown synchronized with suggestion selection. Retain the selected engagement during filtering. Search and local selection must not call a model or save a decision; preserve ordered review, reason, freshness, and save guards.
 
-- Keep At a glance, next actions, and disjoint processing/classification/supplier/engagement/complete bottleneck counts derived from existing saved state. Global counts stay independent of filters; completed no-link decisions are not human-confirmed links.
-- Keep the three-case walkthrough visibly synthetic, browser-only, outside real counts, and free of provider calls or saved decisions. Real review uses the existing ordered forms.
+- Keep the incident-count cards below At a glance, next actions, and disjoint processing/classification/supplier/engagement/complete bottleneck counts derived from existing saved state. Global counts stay independent of filters; completed no-link decisions are not human-confirmed links.
 - Compare original classification/supplier results and the current engagement default against human decisions with reasons. Label pending, not-applicable, and no-link outcomes accurately; do not imply a historical audit trail.
 - Evidence navigation may open an existing source field or mark its name unavailable; it must not introduce evidence-name validation or citation verification. Render source values as text.
 - Compare up to three current matching engagements using actual catalog fields; highlight differences without treating them as proof of correctness. Explain normalization and the matching column/method through the same Python logic used for retrieval, preserving column precedence and source order. These aids add no CSV columns, pipelines, or dashboards.

@@ -27,7 +27,6 @@
     <section class="overview-card" aria-labelledby="overview-heading">
       <p class="eyebrow">SAVED BATCH / CURRENT SNAPSHOT</p>
       <h2 id="overview-heading">At a glance</h2>
-      <p id="overview-text" role="status" aria-live="polite">Loading the saved incident summary…</p>
     </section>
     <section class="stats" aria-label="Filter by original model result">
       <button type="button" class="stat" data-filter="total" aria-pressed="true" aria-controls="incident-list"><strong id="total-count">—</strong><span>All incidents</span></button>
@@ -47,13 +46,6 @@
       <p class="field-note">Each incident appears once, at its first unfinished stage. Counts cover the whole saved snapshot.</p>
       <div id="bottleneck-list" class="bottleneck-list"></div>
     </section>
-    <details class="guided-demo">
-      <summary>Explore three review scenarios</summary>
-      <p class="notice">Synthetic walkthrough · no model calls or saved decisions.</p>
-      <div id="scenario-tabs" class="scenario-tabs" role="group" aria-label="Choose a synthetic scenario"></div>
-      <div id="scenario-content" class="scenario-content" role="region" aria-label="Synthetic scenario steps" aria-live="polite"></div>
-      <div id="scenario-controls" class="scenario-controls"></div>
-    </details>
     <p id="supplier-catalog-note" class="notice" hidden></p>
     <p id="engagement-catalog-note" class="notice" hidden></p>
     <div class="filters">

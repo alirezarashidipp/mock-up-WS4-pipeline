@@ -55,10 +55,9 @@ Separate **Classification evidence and supplier details** and **Linking evidence
 
 Classification and Supplier name share the top row on desktop; Engagement spans the row underneath. Suggestions are visible cards, shaded from deep to pale green by evidence strength. The model-default badge and saved approval status remain separate. A search field and dropdown cover all matching engagements, preserve the current selection during filtering, and stay synchronized with the cards. An explicit approval or reasoned correction saves the decision.
 
-- **At a glance** summarizes the saved batch. The bottleneck map counts each incident once in processing, classification, supplier name, engagement, or complete; clicking a bucket opens its queue.
+- **At a glance** introduces the clickable incident-count cards. The bottleneck map counts each incident once in processing, classification, supplier name, engagement, or complete; clicking a bucket opens its queue.
 - Each incident has a **next action**, an **AI proposal vs human decision** comparison with reasons, and evidence links that open the saved source field. Unavailable source names are labeled without rejecting the model output.
 - Compare up to three engagement candidates side by side. Highlight actual catalog differences and inspect how Python normalized and matched each name. Neither differences nor name similarity establish the correct engagement.
-- A clearly labeled **synthetic walkthrough** explains Supplier approval, supplier correction, and resolving Uncertain. It makes no model calls or saved decisions and is excluded from real counts.
 
 These are presentation aids in the existing dashboard. The CSV schema and ordered review rules are unchanged; the proposal comparison shows current state, not a full decision history.
 

@@ -991,87 +991,6 @@ function showBottlenecks(counts) {
   }
 }
 
-function setupScenarioGuide() {
-  // Illustrations only: these steps never call the API or modify incident records.
-  const scenarios = [
-    {
-      title: "1 · Supplier approval",
-      context: "Synthetic incident: Atlas Cloud's gateway change interrupts a service.",
-      steps: [
-        ["Automatic proposal", "The model classifies SUPPLIER, extracts Atlas Cloud and proposes DEMO-ENG-01.", "The proposal is saved; human approval is pending."],
-        ["Classification approved", "The reviewer confirms Supplier responsibility.", "Supplier-name review is now available."],
-        ["Supplier name approved", "The reviewer confirms the recorded Atlas Cloud base name.", "The reviewer can decide on an engagement."],
-        ["Engagement approved", "The reviewer explicitly accepts DEMO-ENG-01.", "Review complete with one human-confirmed link."]
-      ]
-    },
-    {
-      title: "2 · Supplier correction",
-      context: "Synthetic incident: Supplier responsibility is clear, but the extracted name is wrong.",
-      steps: [
-        ["Automatic proposal", "The model returns SUPPLIER with Delta Networks and proposes DEMO-ENG-10.", "The reviewer first approves Supplier classification."],
-        ["Name corrected", "The reviewer selects Nimbus Cloud from the supplier catalog and records: The incident notes name Nimbus Cloud as the provider.", "The corrected name is saved. Earlier engagement approval is reset."],
-        ["Finding runs again", "Illustrated outcome: Python finds Nimbus Cloud matches; the model suggests DEMO-ENG-22.", "In the live workflow this reruns matching and linking. This walkthrough makes no model call."],
-        ["New proposal reviewed", "The reviewer inspects the replacement suggestions and explicitly approves DEMO-ENG-22.", "The latest default and the human choice remain separately visible."]
-      ]
-    },
-    {
-      title: "3 · Uncertain resolved",
-      context: "Synthetic incident: The model cannot determine the accountable party.",
-      steps: [
-        ["Unresolved model result", "Classification is UNCERTAIN. Automatic engagement matching is skipped.", "The incident waits at classification; later reviews remain locked."],
-        ["Human resolves classification", "The reviewer checks the source notes, selects Disagree and chooses SUPPLIER with a recorded explanation.", "UNCERTAIN remains the original model result. The human decision is Supplier."],
-        ["Supplier selected", "The reviewer chooses Atlas Cloud from the supplier catalog and records the supporting reason.", "The live workflow finds engagements for that name; the guide illustrates this step only."],
-        ["Engagement reviewed", "After inspecting the options, the reviewer chooses None of these with a reason.", "Review complete without a human-confirmed link."]
-      ]
-    }
-  ];
-  let selectedScenario = 0;
-  let selectedStep = 0;
-  function renderScenario() {
-    const scenario = scenarios[selectedScenario];
-    $("scenario-tabs").replaceChildren();
-    for (let index = 0; index < scenarios.length; index++) {
-      const control = button(scenarios[index].title, () => {
-        selectedScenario = index;
-        selectedStep = 0;
-        renderScenario();
-        $("scenario-tabs").children[index].focus();
-      });
-      control.setAttribute("aria-pressed", String(index === selectedScenario));
-      $("scenario-tabs").append(control);
-    }
-    const [title, explanation, outcome] = scenario.steps[selectedStep];
-    const content = $("scenario-content");
-    content.replaceChildren(
-      element("p", "field-note", scenario.context),
-      element("p", "eyebrow", "Illustrated step " + (selectedStep + 1) + " of " + scenario.steps.length),
-      element("h3", "scenario-step", title),
-      element("p", "", explanation),
-      element("p", "scenario-outcome", outcome)
-    );
-    const previous = button("Previous step", () => {
-      selectedStep--;
-      renderScenario();
-      focusSection(content);
-    });
-    previous.disabled = selectedStep === 0;
-    const next = button("Next step", () => {
-      selectedStep++;
-      renderScenario();
-      focusSection(content);
-    }, "button primary");
-    next.disabled = selectedStep === scenario.steps.length - 1;
-    const restart = button("Restart scenario", () => {
-      selectedStep = 0;
-      renderScenario();
-      focusSection(content);
-    });
-    $("scenario-controls").replaceChildren(previous, next, restart);
-    content.tabIndex = -1;
-  }
-  renderScenario();
-}
-
 function renderRecords() {
   const query = $("search").value.trim().toLowerCase();
   const reviewFilter = $("review-filter").value;
@@ -1114,7 +1033,6 @@ function showDashboard(data) {
   $("human-linked-count").textContent = data.counts.human_linked ?? 0;
   $("review-progress").max = Math.max(1, data.counts.total || 0);
   $("review-progress").value = data.counts.review_complete || 0;
-  $("overview-text").textContent = data.overview;
   showBottlenecks(data.bottlenecks);
   for (const [id, value] of [["supplier-catalog-note", data.supplier_catalog_note], ["engagement-catalog-note", data.engagement_catalog_note]]) {
     $(id).textContent = value || "";
@@ -1202,5 +1120,4 @@ $("search").addEventListener("input", renderRecords);
 $("review-filter").addEventListener("change", renderRecords);
 $("reload").addEventListener("click", loadDashboard);
 window.addEventListener("hashchange", () => { expandedId = readHash(); renderRecords(); });
-setupScenarioGuide();
 loadDashboard();
