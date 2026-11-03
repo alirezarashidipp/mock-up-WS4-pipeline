@@ -134,9 +134,6 @@ summary::-webkit-details-marker { display:none; }
 .decision-actions .button { min-width:120px; border-radius:4px; }
 .reason-area { padding-top:14px; }
 .reason-area textarea { min-height:90px; border-radius:4px; }
-.engagement-meta { margin:4px 0 12px; }
-.engagement-meta > summary { padding:10px 0; }
-.engagement-meta .field { margin-top:10px; }
 .detail-section { border-top:1px solid var(--line); margin-top:12px; }
 .detail-section > summary,.rubrics > summary { display:flex; justify-content:space-between; gap:14px; padding:13px 0; font-size:12px; font-weight:600; overflow-wrap:anywhere; }
 .detail-section > summary::after,.rubrics > summary::after { content:"+"; flex-shrink:0; font-size:17px; font-weight:400; color:var(--muted); }

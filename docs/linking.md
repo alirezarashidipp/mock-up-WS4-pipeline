@@ -78,7 +78,7 @@ The service returns 25 linking fields plus `citations`, shared with classificati
 | `link_catalog_hash` | SHA-256 of the complete catalog rows, including order, for stale-proposal detection. |
 | `link_1_engagement_id`, `link_1_reason`, `link_1_evidence_strength` through slot 5 | Five fixed suggestion slots; unused slots are blank. |
 
-The caller combines model excerpts into exactly one `citations` cell, with `Classification:` and `Engagement:` line prefixes. A new lookup replaces the Engagement part; proposal resets and failed/no-call lookups clear it while keeping classification excerpts. The dashboard marks these excerpts as unverified.
+The caller combines model excerpts into exactly one `citations` cell, with `Classification:` and `Engagement:` line prefixes. A new lookup replaces the Engagement part; proposal resets and failed/no-call lookups clear it while keeping classification excerpts. The dashboard shows `Engagement:` excerpts in **Linking evidence and engagement details**, alongside link status, the lookup supplier, default proposal, reasons, evidence scores, and counts. Classification excerpts have their own dropdown. Both remain unverified; unprefixed legacy excerpts are explicitly unassigned rather than guessed to belong to a stage. CSV storage and model requests are unchanged by this display separation.
 
 `link_confidence` is the selected suggestion's 1-4 evidence score. A model response with no suggestions saves 0; no linking call leaves it blank. It is not a probability. Classification evidence and engagement evidence measure different claims.
 

@@ -77,6 +77,8 @@
 
 ## Dashboard review aids
 
+- Preserve the existing Original incident fields content, layout, and behavior unless explicitly requested otherwise.
+- Keep separate Classification evidence and supplier details and Linking evidence and engagement details dropdowns. Display citations only under their saved Classification:/Engagement: stage; keep unprefixed legacy text explicitly unassigned, never guessed. Preserve the shared CSV cell, unverified labels, evidence-source navigation, and no-call/empty states.
 - Keep Classification and Supplier name side by side on desktop, with Engagement spanning the next row; stack panels on narrow screens.
 - Show original model country/actor context separately from human decisions. Do not imply a corrected supplier inherits the previous model supplier's country or role.
 - Accept supplier catalogs as legacy one-column base names (optional header) or headered SUPPLIER_NAME,COUNTRY in either order with case-insensitive headers. COUNTRY is optional per row; aggregate repeated exact base names and their countries without writing the catalog or guessing metadata.

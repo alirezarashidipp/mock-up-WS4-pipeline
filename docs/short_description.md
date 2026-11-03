@@ -51,6 +51,8 @@ The dashboard shows country and actor fields as original model extracts, separat
 
 ## Dashboard review aids
 
+Separate **Classification evidence and supplier details** and **Linking evidence and engagement details** dropdowns keep each stage's results and citations together. Citation stage prefixes are used only for display; unprefixed legacy citations remain explicitly unassigned. **Original incident fields** remains unchanged.
+
 Classification and Supplier name share the top row on desktop; Engagement spans the row underneath. Suggestions are visible cards, shaded from deep to pale green by evidence strength. The model-default badge and saved approval status remain separate. A search field and dropdown cover all matching engagements, preserve the current selection during filtering, and stay synchronized with the cards. An explicit approval or reasoned correction saves the decision.
 
 - **At a glance** summarizes the saved batch. The bottleneck map counts each incident once in processing, classification, supplier name, engagement, or complete; clicking a bucket opens its queue.

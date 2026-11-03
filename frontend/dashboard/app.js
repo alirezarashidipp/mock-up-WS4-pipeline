@@ -180,8 +180,10 @@ function recordCard(row) {
     const steps = element("div", "review-steps");
     const insights = element("div", "engagement-insights");
     const sources = inputDetails(row);
+    const citations = splitCitations(row.citations);
     steps.append(classificationPanel(row), supplierPanel(row), engagementPanel(row, insights));
-    body.append(nextActionCard(row, steps), decisionComparison(row), steps, modelDetails(row, sources), sources);
+    body.append(nextActionCard(row, steps), decisionComparison(row), steps,
+      classificationDetails(row, sources, citations), linkingDetails(row, citations), sources);
   }
   if (card.open) mount();
   card.addEventListener("toggle", () => {
@@ -490,18 +492,7 @@ function engagementPanel(row, insights) {
 
   const content = element("div", "engagement-content");
   content.append(element("p", "field-note", "Loading engagement matches…"));
-  const metadata = disclosure("Proposal status and saved engagement");
-  metadata.classList.add("engagement-meta");
-  addField(metadata, "Automatic proposal status", row.link_status);
-  addField(metadata, "Base name used for search", row.link_supplier_name);
-  addField(metadata, "Model recommendation", row.link_reason);
-  if (row.link_error) addField(metadata, "Finding error", row.link_error);
-  const saved = {};
-  for (const [key, value] of Object.entries(row)) {
-    if (key.startsWith("ENG_") && value !== "") saved[key.slice(4)] = value;
-  }
-  if (Object.keys(saved).length) metadata.append(engagementDetails(saved, "Saved selected engagement details"));
-  panel.append(content, insights, metadata);
+  panel.append(content, insights);
   queueMicrotask(() => loadEngagements(row, panel, content, insights));
   return panel;
 }
@@ -880,10 +871,23 @@ function renderEngagementComparison(wrapper, data, matches, differencesOnly) {
   if (!visibleFields) wrapper.append(element("p", "field-note", "No differing catalog fields. Clear the differences filter to inspect shared values."));
 }
 
-function modelDetails(row, sources) {
-  const details = disclosure("Model evidence and supplier details");
+function splitCitations(value) {
+  const citations = {classification: [], linking: [], unassigned: []};
+  for (const line of String(value || "").split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    if (line.startsWith("Classification:")) citations.classification.push(line);
+    else if (line.startsWith("Engagement:")) citations.linking.push(line);
+    else citations.unassigned.push(line);
+  }
+  return citations;
+}
+
+function classificationDetails(row, sources, citations) {
+  const details = disclosure("Classification evidence and supplier details");
+  details.classList.add("classification-evidence");
   const fields = element("div", "source-grid");
   addField(fields, "Processing status", row.processing_status);
+  addField(fields, "Original model classification", modelLabel(row));
   addField(fields, "Key root cause", row.key_root_cause);
   const evidence = element("section", "field evidence-links");
   evidence.append(element("h4", "", "Evidence columns · open source"));
@@ -902,11 +906,56 @@ function modelDetails(row, sources) {
   }
   if (!row.evidence_column.length) evidence.append(element("p", "field-note", "No evidence column names recorded."));
   fields.append(evidence);
-  addField(fields, "Model citations (not verified)", row.citations);
+  addField(fields, "Classification citations (not verified)", citations.classification.join("\n") || "No classification citations recorded.");
   if (row.classification === "SUPPLIER") {
     for (const [label, value] of [["Supplier base name", row.supplier_name], ["Product or service", row.supplier_product_or_service], ["Supplier action or failure", row.supplier_action_or_failure], ["Causal explanation", row.supplier_causal_explanation], ["Accountability reason", row.supplier_accountability_reason], ["Additional supplier information", row.supplier_more_info]]) addField(fields, label, value);
   }
   details.append(fields);
+  if (citations.unassigned.length) {
+    addField(details, "Unassigned legacy citations (stage unknown)", citations.unassigned.join("\n"));
+    details.append(element("p", "field-note", "These saved excerpts have no stage label. They are not assigned to Classification or Linking and are not verified."));
+  }
+  return details;
+}
+
+function linkingDetails(row, citations) {
+  const details = disclosure("Linking evidence and engagement details");
+  details.classList.add("linking-evidence");
+  const fields = element("div", "source-grid");
+  for (const [label, value] of [
+    ["Linking status", row.link_status],
+    ["Base name used for search", row.link_supplier_name],
+    ["Model default engagement", row.linked_engagement_id],
+    ["Model recommendation", row.link_reason],
+    ["Link evidence strength", evidenceStrength(row.link_confidence)],
+    ["Name matches", row.link_match_count],
+    ["LLM candidates", row.link_candidate_count],
+    ["Model suggestions", row.link_suggestion_count]
+  ]) addField(fields, label, value);
+  if (row.link_error) addField(fields, "Finding error", row.link_error);
+  addField(fields, "Linking citations (not verified)", citations.linking.join("\n") || "No linking citations recorded.");
+  details.append(fields);
+  if (row.link_status === "NOT_APPLICABLE" || row.link_status === "SKIPPED") {
+    details.append(element("p", "field-note", "Linking is not applicable or was skipped for the current classification. No current engagement proposal is available."));
+  }
+  for (let number = 1; number <= 5; number++) {
+    const prefix = "link_" + number + "_";
+    const id = row[prefix + "engagement_id"];
+    if (!id) continue;
+    const suggestion = disclosure("Model suggestion " + number + " · " + id);
+    addField(suggestion, "Reason", row[prefix + "reason"]);
+    addField(suggestion, "Link evidence strength", evidenceStrength(row[prefix + "evidence_strength"]));
+    details.append(suggestion);
+  }
+  const saved = {};
+  for (const [key, value] of Object.entries(row)) {
+    if (key.startsWith("ENG_") && value !== "") saved[key.slice(4)] = value;
+  }
+  if (Object.keys(saved).length) {
+    const snapshot = engagementDetails(saved, "Saved current engagement details");
+    snapshot.append(element("p", "field-note", "Catalog values for the saved selection. A human choice can differ from the model default above."));
+    details.append(snapshot);
+  }
   return details;
 }
 
