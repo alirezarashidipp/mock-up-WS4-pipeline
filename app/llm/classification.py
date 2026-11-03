@@ -84,6 +84,7 @@ def normalize_supplier_fields(result: Classification) -> Classification:
     if result.classification != "SUPPLIER":
         for name in SUPPLIER_FIELDS:
             setattr(result, name, None)
+        result.supplier_country = None
         return result
 
     for name in SUPPLIER_FIELDS:

@@ -16,7 +16,7 @@ For each CLEAN incident: classify -> save -> find engagements -> save -> next in
 
 The model returns HSBC, SUPPLIER, or UNCERTAIN. A Supplier result automatically enters engagement matching using its **base supplier name**, without waiting for human approval. Python finds matching ENG_ALL rows; the LLM suggests up to five engagements with reasons and selects its strongest proposal by default. A model default is saved, but human approval remains pending.
 
-The dashboard lists every initialized incident, including processing failures and rows waiting to run. Review classification first, supplier name second when applicable, and engagement third. Correcting the supplier name using the dropdown immediately reruns the same engagement function. Reviewers can inspect and choose from **all** Python matches, including those beyond the LLM shortlist.
+The dashboard lists every initialized incident, including processing failures and rows waiting to run. Review classification first, supplier name second when applicable, and engagement third. Correcting the supplier name using searchable catalog choices immediately reruns the same engagement function. Reviewers can inspect and choose from **all** Python matches, including those beyond the LLM shortlist.
 
 On desktop, Classification and Supplier name share the top review row; Engagement occupies a full-width row below. Engagement suggestions appear as cards with green shades based on evidence strength, with the model default labeled separately from human approval. A search field and native dropdown provide access to every Python match. Selecting a card or dropdown option only changes the pending choice; saving still requires an explicit review action.
 
@@ -43,7 +43,7 @@ All CSV files are local, comma-separated UTF-8 files. A UTF-8 BOM is accepted. K
 | --- | --- | --- |
 | `data/mockup/RAW.csv` | You | One incident per row. The preparation pipeline reads it. |
 | `data/mockup/ENG_ALL.csv` | You | One engagement per row, including its supplier entity and service context. The LLM pipeline and dashboard read it. |
-| `data/mockup/SUPPLIER_NAME.csv` | You | One supplier **base name** per row. The dashboard uses it for human supplier-name corrections. |
+| `data/mockup/SUPPLIER_NAME.csv` | You | Supplier **base names**, optionally with a COUNTRY column. The dashboard searches and filters these choices for human corrections. |
 | `data/run/CLEAN.csv` | Preparation pipeline | The incident rows after renaming and cleaning. The LLM pipeline reads it. |
 | `data/run/INCIDENTS.csv` | LLM pipeline; updated by human review | Original prepared incident values, AI results, engagement proposals, and saved human decisions. The dashboard reads and updates it. |
 
@@ -106,17 +106,26 @@ Python normalizes names only for matching, preserving catalog values. It searche
 
 ### 3. SUPPLIER_NAME.csv — human dropdown choices
 
-This is a **one-column file of base names**, not a list of engagements or country-specific legal entities. The header `SUPPLIER_NAME` is optional; including it makes the file easier to read.
+Keep supplier **base names** here; legal entities and individual engagements remain in ENG_ALL.csv. Both formats are supported:
 
-**Synthetic example — fictional supplier base names:**
+- Existing one-column files, with or without a `SUPPLIER_NAME` header.
+- A two-column file with `SUPPLIER_NAME,COUNTRY` headers. The two headers may be reversed and are case-insensitive. COUNTRY may be blank.
+
+**Synthetic example — fictional suppliers and illustrative country metadata:**
 
 ```csv
-SUPPLIER_NAME
-Atlas Cloud
-Nimbus Networks
+SUPPLIER_NAME,COUNTRY
+Atlas Cloud,United Kingdom
+Atlas Cloud,United States
+Nimbus Networks,United Kingdom
+Example Supplier,
 ```
 
-The base name Atlas Cloud can match both Atlas Cloud UK and Atlas Cloud US in ENG_ALL. Names in the two files do not have to be identical. The supplier-name file supplies correction choices in the dashboard; it is not an input to the automatic classification call. The dashboard trims outer whitespace and removes exact duplicate choices in memory. It never writes this catalog.
+Use one country per row and repeat the base name when several countries are relevant. The dashboard combines repeated exact names into one choice with its recorded countries. Use consistent country labels, preferably English country names. Countries describe the supplier entity or operations represented by your catalog; they do not automatically identify an incident's country or a supplier's headquarters.
+
+The correction form supports partial-name search, an optional country filter, and 50 results per page. It starts with all countries and preserves the selected name across searches and pages. Clearing the country filter also makes names without country metadata reachable. The server validates the exact current catalog name again when saving; a correction still requires a reason.
+
+The base name Atlas Cloud can match both Atlas Cloud UK and Atlas Cloud US in ENG_ALL. Names in the two files do not have to be identical. Country helps browse supplier names; it is not a hard engagement filter or a separate saved human decision. This catalog is not sent to classification, and the full supplier list is not sent to the LLM. Outer whitespace is trimmed in memory. The app never writes the catalog or invents missing countries.
 
 ### 4. CLEAN.csv — generated preparation output
 
@@ -136,7 +145,8 @@ The application creates this file and updates it after each processing or review
 | Column group | Contents |
 | --- | --- |
 | Prepared source fields | Every CLEAN.csv column, including `INCIDENT_ID`, with its prepared value preserved. |
-| Classification | `classification`, `key_root_cause`, `decision_rationale`, `attribution_evidence_strength`, `evidence_column`, and the six `supplier_*` fields. |
+| Classification | `classification`, `key_root_cause`, `decision_rationale`, `attribution_evidence_strength`, `evidence_column`, and the original six supplier-detail fields. |
+| Extracted context | `incident_country`, `supplier_country`, `causing_party`, `affected_party`, and `resolving_party`; documented facts only, blank when unknown. |
 | Citations | One shared `citations` cell with Classification: and Engagement: lines; excerpts are model-provided and unverified. |
 | Processing | `processing_status` and `error`. |
 | Engagement proposal | `link_supplier_name`, `link_status`, `linked_engagement_id`, `link_reason`, `link_confidence`, the three candidate/suggestion counts, and catalog/error information. |
@@ -153,6 +163,8 @@ SYNTHETIC-002,SUPPLIER,Atlas Cloud,READY,DEMO-ENG-001,pending,pending,pending,
 ```
 
 Attribution and link evidence scores use 0-4, not probabilities. Link evidence stays blank when no linking call occurs. Evidence column names share one `evidence_column` cell; suggestions use flat columns rather than JSON cells.
+
+Classification now returns 17 fields, including the shared citations field and five country/actor context fields. Incident country and supplier country have different meanings. Resolving or suffering a problem does not establish responsibility for causing it. These are model extracts, not human-confirmed facts.
 
 The saved model default is not human approval. The dashboard records human choices separately. See [classification fields](docs/llm.md#classification-response), [linking fields](docs/linking.md#saved-linking-fields), and [human-review fields](docs/dashboard_app.md#saved-fields) for the full field definitions.
 
@@ -184,7 +196,7 @@ The new output is **data/run/INCIDENTS.csv**. It contains original incident valu
 
 Initialization saves all source incidents as pending. Each classification and link result is saved before the next incident. A failed request saves its failure and stops the batch. Rerunning retries unfinished/failed model work that has no human classification decision, preserves completed results, and adds new IDs. Changed source values, output columns, or engagement columns require a fresh output; preserve earlier batches. Output/catalog paths live in `app/incidents.py`; CLEAN input and definitions live in `app/llm/pipeline.py`. Restart the dashboard after changing paths.
 
-Existing unified INCIDENTS.csv files without citations remain readable with blank excerpts; the next normal save adds that column without rerunning completed model work.
+Existing unified INCIDENTS.csv files missing citations or any of the five country/actor fields remain readable with those fields blank in memory. Reading does not rewrite the file or rerun completed model work. The next normal save adds the missing supported columns while preserving source values and human decisions. Historical output formats are not imported.
 
 The CSV stores current decisions, not an audit-history log. File locking, atomic saves, and per-row versions protect concurrent pipeline/dashboard updates; stale model results or browser decisions cannot replace newer human changes.
 
@@ -277,4 +289,4 @@ Current source-backed diagrams:
 - [Automatic incident processing](.archify/workflow-ws4-current-20261102-190621/ws4-pipeline.html)
 - [Three ordered human decisions](.archify/workflow-ws4-current-20261102-190621/ws4-human-review.html)
 
-These diagrams describe the single LLM pipeline, automatic Supplier suggestions, and the incident dashboard. Earlier diagram folders and their frozen documents are historical snapshots.
+These diagrams describe the single LLM pipeline, automatic Supplier suggestions, and the incident dashboard at their pinned source revision. They do not yet illustrate the country/actor fields or paged supplier search; the documents above describe those additions. Earlier diagram folders and their frozen documents remain historical snapshots.

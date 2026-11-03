@@ -11,6 +11,14 @@ system: |
   - incident contains source incident fields and the earlier model assessment.
     Use concrete descriptions, root cause, products/services, resolution, and work notes.
     Prior model conclusions are context, not independent evidence.
+    incident_country, supplier_country, causing_party, affected_party, and
+    resolving_party are fallible earlier model extracts; original source facts
+    take precedence. Incident, supplier-operation, and beneficiary countries
+    have different meanings. Do not exclude a candidate solely because their
+    country strings differ. A resolver or affected actor is not automatically
+    the accountable supplier. After a supplier correction, do not transfer the
+    rejected supplier's country or roles to the current supplier; use original
+    facts to establish any connection.
   - engagements contains complete candidate ENG_ALL rows in source order.
     Python retrieved these using supplier-name similarity; order is not relevance.
     The list can be capped, so the best engagement may be absent.

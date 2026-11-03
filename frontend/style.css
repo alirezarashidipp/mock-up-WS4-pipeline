@@ -85,6 +85,12 @@ summary::-webkit-details-marker { display:none; }
 .form-label { display:block; margin-bottom:12px; font-size:12px; font-weight:600; }
 .form-label textarea,.form-label select { font-weight:400; }
 .form-error { color:#a11c2a; font-size:12px; overflow-wrap:anywhere; margin:12px 0; }
+.supplier-picker { min-width:0; padding:14px; margin:8px 0 16px; background:#f7f9fb; border:1px solid var(--line); border-radius:6px; }
+.supplier-search-filters { display:grid; grid-template-columns:minmax(0,3fr) minmax(0,2fr); gap:12px; }
+.supplier-picker .field-note { margin:0 0 12px; }
+.supplier-selection { margin:10px 0; padding-left:10px; border-left:3px solid #547793; font-size:12px; overflow-wrap:anywhere; }
+.supplier-pagination { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; margin-top:12px; }
+@media(max-width:1100px) { .supplier-search-filters { grid-template-columns:1fr; gap:0; } }
 .match-counts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; max-width:840px; margin-top:16px; padding-bottom:16px; }
 .match-counts > div { display:flex; align-items:baseline; gap:9px; min-width:0; padding:0 16px 0 0; border-right:1px solid var(--line); }
 .match-counts > div:last-child { border-right:0; }

@@ -9,7 +9,7 @@ from pathlib import Path
 from threading import Lock
 
 from app.csv_files import write_records
-from app.models import Classification, empty_link
+from app.models import CLASSIFICATION_CONTEXT_FIELDS, Classification, empty_link
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -116,11 +116,12 @@ def read_incidents(path=RESULTS_FILE):
         reader = csv.DictReader(file, strict=True)
         columns = reader.fieldnames or []
         rows = list(reader)
-    # Older unified outputs have no citations; reads remain non-mutating.
-    if "citations" not in columns:
-        columns.append("citations")
-        for row in rows:
-            row["citations"] = ""
+    # Older unified outputs lack these columns. Add them only in memory.
+    for name in ("citations", *CLASSIFICATION_CONTEXT_FIELDS):
+        if name not in columns:
+            columns.append(name)
+            for row in rows:
+                row[name] = ""
     validate_rows(rows, columns)
     return rows
 

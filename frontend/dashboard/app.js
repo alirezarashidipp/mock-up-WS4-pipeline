@@ -1,6 +1,7 @@
 const $ = id => document.getElementById(id);
 let records = [];
-let supplierNames = [];
+let supplierCatalogCount = 0;
+let supplierCountries = [];
 let activeFilter = "total";
 let expandedId = readHash();
 let busy = false;
@@ -269,6 +270,17 @@ function classificationPanel(row) {
   if (row.processing_status === "success") {
     addField(panel, "Attribution evidence strength", evidenceStrength(row.attribution_evidence_strength));
     addField(panel, "Model rationale", row.decision_rationale);
+    const context = disclosure("Countries and incident roles · model extraction");
+    const facts = element("div", "source-grid");
+    for (const [label, value] of [
+      ["Incident country", row.incident_country],
+      ["Supplier country", row.supplier_country],
+      ["Causing party", row.causing_party],
+      ["Affected party", row.affected_party],
+      ["Resolving party", row.resolving_party]
+    ]) addField(facts, label, value);
+    context.append(facts, element("p", "field-note", "Model-extracted facts, not independently verified. The affected party and the party restoring service are not necessarily responsible. Missing facts stay unrecorded."));
+    panel.append(context);
   }
   if (row.processing_status === "pending") {
     panel.append(element("p", "field-note", "Waiting for automatic classification before human review."));
@@ -302,6 +314,7 @@ function classificationPanel(row) {
 function supplierPanel(row) {
   const panel = panelHeader(row, "supplier", "2", "Supplier name", row.supplier_complete && row.effective_classification === "SUPPLIER");
   addField(panel, "Model base name", row.supplier_name);
+  if (row.classification === "SUPPLIER") addField(panel, "Model supplier country", row.supplier_country);
   if (!row.classification_complete || row.effective_classification !== "SUPPLIER") {
     const note = row.classification_complete && row.effective_classification === "HSBC"
       ? "HSBC needs no supplier or engagement review."
@@ -315,24 +328,144 @@ function supplierPanel(row) {
   approve.disabled = !usableModelSupplier(row) || row.supplier_review_status === "approved";
   const form = element("form", "correction-form");
   form.hidden = true;
-  const options = [["", "Select a base supplier name"], ...supplierNames.map(name => [name, name])];
-  const select = selectField(form, "Supplier catalog", options, row.supplier_review_status === "disagree" ? row.reviewed_supplier_name : "");
-  select.required = true;
-  select.disabled = !supplierNames.length;
+  const initialName = row.supplier_review_status === "disagree" ? row.reviewed_supplier_name : "";
+  const picker = supplierPicker(form, initialName);
   const reason = reasonField(form, row.supplier_review_reason || "");
   const submit = element("button", "button primary", "Save name and find engagements");
   submit.type = "submit";
-  submit.disabled = !supplierNames.length;
+  submit.disabled = !supplierCatalogCount;
   form.append(submit);
   form.addEventListener("submit", event => {
     event.preventDefault();
     if (!requireReason(reason)) return;
-    saveReview(row, "supplier", {decision: "disagree", supplier_name: select.value, reason: reason.value}, panel, error);
+    saveReview(row, "supplier", {decision: "disagree", supplier_name: picker.select.value, reason: reason.value}, panel, error);
   });
-  actions.append(approve, button("Change supplier", () => { form.hidden = !form.hidden; if (!form.hidden) select.focus(); }));
+  actions.append(approve, button("Change supplier", () => {
+    form.hidden = !form.hidden;
+    if (!form.hidden) {
+      picker.open();
+      picker.search.focus();
+    }
+  }));
   panel.append(actions, form, element("p", "field-note", "A changed base name reruns engagement finding now and resets engagement approval."));
-  if (!supplierNames.length) panel.append(element("p", "notice", "No supplier catalog options are available. An existing usable model name can still be approved."));
+  if (!supplierCatalogCount) panel.append(element("p", "notice", "No supplier catalog options are available. An existing usable model name can still be approved."));
   return panel;
+}
+
+function supplierPicker(form, initialName) {
+  const wrapper = element("div", "supplier-picker");
+  const filters = element("div", "supplier-search-filters");
+  const label = element("label", "form-label", "Search " + supplierCatalogCount.toLocaleString() + " supplier names");
+  const search = element("input");
+  search.type = "search";
+  search.placeholder = "Type part of a supplier name…";
+  search.maxLength = 200;
+  search.autocomplete = "off";
+  label.append(search);
+  filters.append(label);
+  const countryOptions = [["", "All countries"], ...supplierCountries.map(name => [name, name])];
+  const country = selectField(filters, "Catalog country (optional)", countryOptions);
+  country.disabled = !supplierCountries.length;
+  wrapper.append(filters);
+  wrapper.append(element("p", "field-note", "Country narrows this name list only. It is not the incident location or an engagement restriction. Use All countries to include suppliers without a recorded country."));
+  const select = selectField(wrapper, "Supplier catalog", [["", "Select a supplier name"]]);
+  select.required = true;
+  select.disabled = !supplierCatalogCount;
+  const selected = element("p", "supplier-selection");
+  const status = element("p", "field-note supplier-search-status");
+  status.setAttribute("role", "status");
+  const pagination = element("div", "supplier-pagination");
+  const previous = button("Previous 50", () => loadOptions(Math.max(0, offset - 50)));
+  const next = button("Next 50", () => loadOptions(offset + 50));
+  previous.disabled = true;
+  next.disabled = true;
+  pagination.append(previous, next);
+  wrapper.append(selected, status, pagination);
+  form.append(wrapper);
+
+  let selectedName = initialName;
+  let offset = 0;
+  let controller;
+  let timer;
+
+  function showOptions(options) {
+    select.replaceChildren();
+    const placeholder = element("option", "", "Select a supplier name");
+    placeholder.value = "";
+    select.append(placeholder);
+    for (const supplier of options) {
+      const countries = supplier.countries.length ? supplier.countries.join(", ") : "Country not recorded";
+      const option = element("option", "", supplier.name + " · " + countries);
+      option.value = supplier.name;
+      select.append(option);
+    }
+    if (selectedName && !options.some(item => item.name === selectedName)) {
+      const current = element("option", "", selectedName + " · current selection, outside this page/filter");
+      current.value = selectedName;
+      select.append(current);
+    }
+    select.value = selectedName;
+    selected.textContent = selectedName ? "Selected supplier: " + selectedName : "No replacement selected. Choose a name and give a reason below.";
+  }
+
+  async function loadOptions(start) {
+    if (!wrapper.isConnected) return;
+    if (busy) {
+      status.textContent = "Wait for the current save, then press Enter in the search field to retry.";
+      return;
+    }
+    clearTimeout(timer);
+    if (controller) controller.abort();
+    const request = new AbortController();
+    controller = request;
+    previous.disabled = true;
+    next.disabled = true;
+    status.className = "field-note supplier-search-status";
+    status.textContent = "Searching the supplier catalog…";
+    showOptions([]);
+    const params = new URLSearchParams({q: search.value, country: country.value, offset: String(start)});
+    try {
+      const response = await fetch("/api/suppliers?" + params, {signal: request.signal, cache: "no-store"});
+      const data = await response.json();
+      if (!response.ok) throw new Error(apiError(data, "Could not search suppliers. Try again."));
+      if (request.signal.aborted || !wrapper.isConnected) return;
+      if (start > 0 && !data.suppliers.length) return loadOptions(0);
+      offset = data.offset;
+      showOptions(data.suppliers);
+      status.textContent = data.total
+        ? "Showing " + (offset + 1) + "–" + (offset + data.suppliers.length) + " of " + data.total.toLocaleString() + " matching names. Search keeps your selected name."
+        : "No matching names. Clear the search or choose All countries. Your selected name is kept.";
+      previous.disabled = busy || offset === 0;
+      next.disabled = busy || !data.has_more;
+    } catch (failure) {
+      if (request.signal.aborted || !wrapper.isConnected) return;
+      status.className = "form-error supplier-search-status";
+      status.textContent = failure.message;
+    }
+  }
+
+  search.addEventListener("input", () => {
+    clearTimeout(timer);
+    if (controller) controller.abort();
+    showOptions([]);
+    previous.disabled = true;
+    next.disabled = true;
+    status.textContent = "Searching the supplier catalog…";
+    timer = setTimeout(() => loadOptions(0), 250);
+  });
+  search.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      loadOptions(0);
+    }
+  });
+  country.addEventListener("change", () => loadOptions(0));
+  select.addEventListener("change", () => {
+    selectedName = select.value;
+    selected.textContent = selectedName ? "Selected supplier: " + selectedName : "No replacement selected. Choose a name and give a reason below.";
+  });
+  showOptions([]);
+  return {select, search, open() { loadOptions(0); }};
 }
 
 function engagementPanel(row, insights) {
@@ -921,7 +1054,8 @@ function renderRecords() {
 
 function showDashboard(data) {
   records = data.incidents || [];
-  supplierNames = data.supplier_names || [];
+  supplierCatalogCount = data.supplier_catalog_count || 0;
+  supplierCountries = data.supplier_countries || [];
   engagementCache.clear();
   $("mode").textContent = data.demo ? "Synthetic demonstration" : "Incident review";
   $("demo-note").hidden = !data.demo;

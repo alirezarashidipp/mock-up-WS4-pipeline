@@ -1,6 +1,8 @@
 """Human decisions and engagement refresh, independent of the HTTP app."""
 
 import csv
+import re
+import unicodedata
 
 from app.incidents import (
     CLASSES, REVIEW_DEFAULTS, SUPPLIERS_FILE, apply_link_result,
@@ -11,28 +13,78 @@ from app.linking.linking import catalog_hash, find_engagements, load_max_candida
 from app.models import empty_link
 
 
-def supplier_options(path=SUPPLIERS_FILE):
+def normalize_supplier_search(value):
+    text = unicodedata.normalize("NFKD", value).casefold()
+    text = "".join(character for character in text if not unicodedata.combining(character))
+    return " ".join(re.findall(r"[^\W_]+", text))
+
+
+def read_supplier_catalog(path=SUPPLIERS_FILE):
+    """Read base names and optional countries without changing the source file."""
     try:
         with path.open(encoding="utf-8-sig", newline="") as file:
-            rows = list(csv.reader(file, strict=True))
-        names = []
-        for row in rows:
-            if not row:
-                continue
-            if len(row) != 1:
-                raise ValueError
-            name = row[0].strip()
-            if not name or (not names and name.casefold() == "supplier_name"):
-                continue
-            if name not in names:
-                names.append(name)
-        if not names:
+            rows = [row for row in csv.reader(file, strict=True) if any(value.strip() for value in row)]
+        if not rows:
             return [], "SUPPLIER_NAME.csv has no base names. Add names before correcting a supplier."
-        return names, ""
+
+        header = [value.strip().casefold() for value in rows[0]]
+        name_index = 0
+        country_index = None
+        column_count = 1
+        if header == ["supplier_name"]:
+            rows = rows[1:]
+        elif len(header) != 1:
+            if len(header) != 2 or set(header) != {"supplier_name", "country"}:
+                raise ValueError
+            name_index = header.index("supplier_name")
+            country_index = header.index("country")
+            column_count = 2
+            rows = rows[1:]
+
+        suppliers = {}
+        for row in rows:
+            if len(row) != column_count:
+                raise ValueError
+            name = row[name_index].strip()
+            country = row[country_index].strip() if country_index is not None else ""
+            if not name:
+                if country:
+                    raise ValueError
+                continue
+            if name not in suppliers:
+                suppliers[name] = {"name": name, "countries": []}
+            countries = suppliers[name]["countries"]
+            country_key = normalize_supplier_search(country)
+            if country_key and all(normalize_supplier_search(value) != country_key for value in countries):
+                countries.append(country)
+        if not suppliers:
+            return [], "SUPPLIER_NAME.csv has no base names. Add names before correcting a supplier."
+        return list(suppliers.values()), ""
     except FileNotFoundError:
         return [], "SUPPLIER_NAME.csv is missing. Supplier corrections require the base-name catalog."
     except (OSError, UnicodeError, csv.Error, ValueError):
-        return [], "SUPPLIER_NAME.csv must be a UTF-8 CSV with one supplier-name column."
+        return [], "SUPPLIER_NAME.csv needs one base-name column, or SUPPLIER_NAME and COUNTRY headers with one country per row."
+
+
+def search_supplier_catalog(suppliers, query, country, offset):
+    terms = normalize_supplier_search(query).split()
+    country_key = normalize_supplier_search(country)
+    matches = []
+    for supplier in suppliers:
+        name = normalize_supplier_search(supplier["name"])
+        if not all(term in name for term in terms):
+            continue
+        countries = supplier["countries"]
+        if country_key and not any(normalize_supplier_search(value) == country_key for value in countries):
+            continue
+        matches.append(supplier)
+    return {
+        "suppliers": matches[offset:offset + 50],
+        "total": len(matches),
+        "offset": offset,
+        "has_more": offset + 50 < len(matches),
+        "error": "",
+    }
 
 
 def usable_supplier_name(name):
@@ -180,7 +232,8 @@ def save_review(decision, results_file, suppliers_file, engagements_file):
     if decision.target == "classification":
         updated = apply_classification_review(row, decision)
     elif decision.target == "supplier":
-        names, _ = supplier_options(suppliers_file)
+        catalog, _ = read_supplier_catalog(suppliers_file)
+        names = {supplier["name"] for supplier in catalog}
         updated = apply_supplier_review(row, decision, names)
     else:
         updated = apply_engagement_review(row, decision, engagements_file)

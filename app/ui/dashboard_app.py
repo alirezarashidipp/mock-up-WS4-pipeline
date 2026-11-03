@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Literal
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -19,7 +19,8 @@ from app.linking.candidates import explain_candidate_match, find_candidates, nor
 from app.linking.linking import catalog_hash, read_engagements
 from app.review import (
     classification_complete, effective_classification, effective_supplier_name,
-    refresh_engagements, review_complete, save_review, supplier_complete, supplier_options,
+    normalize_supplier_search, read_supplier_catalog, refresh_engagements, review_complete,
+    save_review, search_supplier_catalog, supplier_complete,
 )
 
 
@@ -168,7 +169,11 @@ def count_incidents(incidents):
 
 def get_dashboard_data(path=RESULTS_FILE, suppliers_path=SUPPLIERS_FILE, engagements_path=ENGAGEMENT_FILE):
     rows = read_incidents(path)
-    names, supplier_note = supplier_options(suppliers_path)
+    suppliers, supplier_note = read_supplier_catalog(suppliers_path)
+    countries = {}
+    for supplier in suppliers:
+        for country in supplier["countries"]:
+            countries.setdefault(normalize_supplier_search(country), country)
     engagement_note = ""
     try:
         read_engagements(engagements_path)
@@ -180,7 +185,8 @@ def get_dashboard_data(path=RESULTS_FILE, suppliers_path=SUPPLIERS_FILE, engagem
     return {
         "incidents": incidents,
         "counts": counts,
-        "supplier_names": names,
+        "supplier_catalog_count": len(suppliers),
+        "supplier_countries": sorted(countries.values(), key=str.casefold),
         "overview": overview_text(counts),
         "bottlenecks": bottlenecks,
         "supplier_catalog_note": supplier_note,
@@ -250,6 +256,8 @@ async def local_requests(request: Request, call_next):
 
 @app.exception_handler(RequestValidationError)
 async def invalid_request(request, error):
+    if request.url.path == "/api/suppliers":
+        return JSONResponse({"error": "Supplier search requires a query up to 200 characters, a country up to 100 characters, and a nonnegative offset."}, status_code=422)
     return JSONResponse({"error": "Invalid review request. Supply a decision and the current incident version."}, status_code=422)
 
 
@@ -275,6 +283,18 @@ def incident_engagements(incident_id: str):
         return JSONResponse(engagement_data(row))
     except (ValueError, OSError, UnicodeError, csv.Error) as error:
         return error_response(error)
+
+
+@app.get("/api/suppliers")
+def supplier_search(
+    q: str = Query(default="", max_length=200),
+    country: str = Query(default="", max_length=100),
+    offset: int = Query(default=0, ge=0),
+):
+    suppliers, note = read_supplier_catalog(app.state.suppliers_file)
+    if note:
+        return JSONResponse({"error": note}, status_code=422)
+    return JSONResponse(search_supplier_catalog(suppliers, q, country, offset))
 
 
 @app.post("/api/review")

@@ -13,6 +13,13 @@ SUPPLIER_FIELDS = (
     "supplier_accountability_reason",
     "supplier_more_info",
 )
+CLASSIFICATION_CONTEXT_FIELDS = (
+    "incident_country",
+    "supplier_country",
+    "causing_party",
+    "affected_party",
+    "resolving_party",
+)
 
 
 class InputField(BaseModel):
@@ -63,6 +70,21 @@ class Classification(BaseModel):
     )
     supplier_more_info: str | None = Field(
         description="For SUPPLIER, additional recorded facts not covered by the other fields; null for other classifications or when nothing else is recorded."
+    )
+    incident_country: str | None = Field(
+        description="Documented country of the incident or affected service, not the supplier's headquarters. Use an unambiguous English country name; separate multiple documented countries with semicolons. Null when absent or conflicting."
+    )
+    supplier_country: str | None = Field(
+        description="For SUPPLIER, the documented country of the involved supplier entity or service operation, not automatically the incident country or global headquarters. Use English country names separated by semicolons when multiple are documented. Otherwise null."
+    )
+    causing_party: str | None = Field(
+        description="Actor explicitly documented as causing the incident; null when absent or conflicting. Affected or resolving actors are not automatically the cause. Separate documented joint actors with semicolons."
+    )
+    affected_party: str | None = Field(
+        description="Actor or group explicitly documented as affected by the incident; null when absent or conflicting. Being affected does not establish accountability. Separate multiple documented actors with semicolons."
+    )
+    resolving_party: str | None = Field(
+        description="Actor explicitly documented as restoring service or resolving the incident; null when absent or conflicting. Resolution does not establish who caused the incident. Separate multiple documented actors with semicolons."
     )
 
 

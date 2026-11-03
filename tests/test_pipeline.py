@@ -14,7 +14,7 @@ from pydantic import ValidationError
 from app.csv_files import read_records
 from app.data_preparation import pipeline as preparation
 from app.llm import classification, pipeline
-from app.models import Classification, SUPPLIER_FIELDS
+from app.models import CLASSIFICATION_CONTEXT_FIELDS, Classification, SUPPLIER_FIELDS
 from app.ui.dashboard_app import get_dashboard_data
 
 
@@ -31,6 +31,8 @@ def example_response(label):
         "attribution_evidence_strength": 3,
     }
     for name in SUPPLIER_FIELDS:
+        result[name] = None
+    for name in CLASSIFICATION_CONTEXT_FIELDS:
         result[name] = None
     if label == "UNCERTAIN":
         result["key_root_cause"] = None

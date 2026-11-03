@@ -23,7 +23,7 @@ Model input order is narrative, recorded causes, closure/resolution, investigati
 
 ## Classification response
 
-The model returns these 12 fields in this order:
+The model returns these 17 required fields in this order. The original 12 retain their order; five nullable context fields follow them:
 
 | Field | Meaning |
 | --- | --- |
@@ -39,19 +39,28 @@ The model returns these 12 fields in this order:
 | `supplier_causal_explanation` | How the supplier action caused the incident, or Unknown. |
 | `supplier_accountability_reason` | Why responsibility belongs to the supplier, or Unknown. |
 | `supplier_more_info` | Additional nonduplicated supplier facts, or null. |
+| `incident_country` | Documented country of the incident or affected service, or null. |
+| `supplier_country` | For SUPPLIER, documented country of the involved supplier entity or operations; otherwise null. |
+| `causing_party` | Actor explicitly recorded as causing the problem, or null when not established. |
+| `affected_party` | Party explicitly recorded as affected by the problem, or null. |
+| `resolving_party` | Actor explicitly recorded as restoring service or resolving the problem, or null. |
 
 HSBC/SUPPLIER represent causal accountability. Use UNCERTAIN when the record cannot support choosing a party, and describe the missing or conflicting facts. UNCERTAIN is a successful result, not a processing failure. A missing supplier name alone does not require UNCERTAIN when supplier responsibility is otherwise supported.
 
 For SUPPLIER, extract the base name only when supported by the record; do not invent a parent company. Preserve useful documented legal-entity or country details in `supplier_more_info`. The source text remains unchanged. The base name enables retrieval of related ENG_ALL names; it does not prove an engagement match.
 
-All six supplier fields become null for HSBC and UNCERTAIN. Blank core Supplier fields become Unknown; empty `supplier_more_info` stays null. CSV nulls are saved as blank cells. Rationale is a concise decision summary, not a detailed internal thought process.
+The original six supplier fields and `supplier_country` become null for HSBC and UNCERTAIN. Blank core Supplier fields become Unknown; empty `supplier_more_info` stays null. CSV nulls are saved as blank cells. Rationale is a concise decision summary, not a detailed internal thought process.
+
+The five new fields extract documented context; they do not create another classification. Return null when facts are absent, ambiguous, or conflicting. Incident geography and supplier geography must not be copied into one another or inferred from a headquarters, currency, company name, or unrelated location. Use English country names when the source is unambiguous; separate multiple explicitly relevant countries with a semicolon. Role fields may remain factual for any class: being affected or restoring service does not make an actor responsible for the cause. A mere name mention does not establish a role.
+
+The supplier-name catalog is not supplied to classification. Its countries are human-browsing metadata, not evidence to fill the model's country fields. Original incident values remain the evidence source.
 
 ## Validation and evidence
 
 | Check | Behavior |
 | --- | --- |
 | Completion | Require a choice, `finish_reason=stop`, nonempty content, and no refusal. |
-| Structure | Require the 12 schema fields and their types; reject additional JSON fields. |
+| Structure | Require the 17 schema fields and their types; reject additional JSON fields. |
 | Class and score | HSBC/SUPPLIER allow 1-4; UNCERTAIN allows 0-2. Reject inconsistent results without changing class or score. |
 | Score type | Reject strings, booleans, floats, and integers outside 0-4. |
 | Root cause and rationale | Root cause is a nonempty string or null; rationale is a nonempty string. |
@@ -59,6 +68,7 @@ All six supplier fields become null for HSBC and UNCERTAIN. Blank core Supplier 
 | Evidence names | Do not check source-name membership, spelling, uniqueness, or blank individual strings. Do not trim, correct, or deduplicate entries. |
 | Citations | Require a list of strings; [] is valid. Do not check exact quote matching, source labels, duplicates, blank strings, or length. |
 | Supplier fields | Require strings or null and apply the class-specific normalization above. |
+| Country/actor context | Require all five keys with string or null values. Unknown facts stay null; these extracts are not independently verified. |
 
 The prompt asks for relevant evidence-column names. Python preserves the returned order and joins them with comma and space in one CSV cell. An empty list saves a blank cell. Source values remain in their own columns. Source excerpts go only in the shared `citations` cell. No numbered evidence columns, definitions, prompt text, or JSON blobs are written to the CSV.
 
@@ -84,7 +94,7 @@ Requests omit `temperature`, `max_tokens`, and `max_completion_tokens`. There is
 
 `app/llm/pipeline.py` starts with `run_llm_pipeline`: read source rows, read definitions, read engagements, load the candidate limit, then process incidents. Its per-row coordinator calls `classify_and_save` for the classification request and immediate save, then `link_incident` for reusable `find_engagements` and proposal saving. These functions stay together in the existing pipeline module. Before requests begin, all current CLEAN rows are saved as pending incidents so the dashboard can show the complete batch. Each incident then progresses through classification and, for SUPPLIER, engagement suggestions before the next row starts.
 
-`INCIDENTS.csv` contains all source columns, the 12 classification fields (including the shared `citations` column), `processing_status` and `error`, 25 flat linking fields, nine human-review fields, and a Python-managed row_revision. It also contains an `ENG_`-prefixed column for each ENG_ALL field. These cells copy the actual selected engagement row: initially the model default, then the accepted human choice when changed. No selection leaves them blank. Model proposal IDs, reasons, and scores remain separate from human decisions. The dashboard also reads the current catalog when browsing alternatives.
+`INCIDENTS.csv` contains all source columns, the 17 classification fields (including the shared `citations` column), `processing_status` and `error`, 25 flat linking fields, nine human-review fields, and a Python-managed row_revision. It also contains an `ENG_`-prefixed column for each ENG_ALL field. These cells copy the actual selected engagement row: initially the model default, then the accepted human choice when changed. No selection leaves them blank. Model proposal IDs, reasons, and scores remain separate from human decisions. The dashboard also reads the current catalog when browsing alternatives.
 
 Classification processing is `pending`, `success`, or `failed`. Classification and linking failures are saved where possible and stop the batch; earlier results remain saved. Rerunning retries unfinished or failed work without repeating a successful classification unnecessarily. Rows with a recorded human classification decision are skipped, preventing a model rerun from replacing human work.
 
@@ -92,7 +102,7 @@ Pydantic classification failures record only recognized response field names and
 
 The incident store checks schema, nonblank unique IDs, and unchanged source values. Changed source rows or columns require a fresh batch output. This processing-stage validation does not change the cleaning pipeline. Writes use an operating-system lock, atomic replacement, and a current row-version check that includes the incrementing revision so dashboard and CLI saves cannot silently overwrite each other.
 
-An existing unified `INCIDENTS.csv` without `citations` reads with a blank in-memory value. Reading does not write the file or rerun models. The next normal save adds the column while preserving other rows and decisions. Other incompatible schema changes still require a fresh output.
+An existing unified `INCIDENTS.csv` missing `citations` or any of `incident_country`, `supplier_country`, `causing_party`, `affected_party`, and `resolving_party` reads with those missing columns blank in memory. Reading does not write the file, infer old facts, or rerun models. The next normal save adds the missing supported columns while preserving source values, other rows, and decisions. Malformed rows and other incompatible schema changes are still rejected.
 
 Older `LLM_OUTPUT.csv`, `INC_LINKED.csv`, `CLASSIFICATION_REVIEW.csv`, `HUMAN_REVIEW.csv`, and other historical CSVs remain untouched and are not automatically imported. Use the new `INCIDENTS.csv` workflow; old confidence values are not converted to the new evidence scales.
 
