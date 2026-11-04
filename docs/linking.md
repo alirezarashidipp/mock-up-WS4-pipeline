@@ -1,80 +1,107 @@
-# Incident-to-engagement linking
+# Engagement suggestions and review
 
-Run `python -m app.linking.pipeline` from the project root, after classification.
+Engagement finding is part of the single `python -m app.llm.pipeline` workflow. There is no separate linking CLI or engagement dashboard.
 
 ```text
-data/run/LLM_OUTPUT.csv + data/mockup/ENG_ALL.csv
-    -> find supplier candidates -> ask LLM -> save data/run/INC_LINKED.csv
+classify one incident -> save classification
+    SUPPLIER -> Python name search -> LLM suggestions -> save default proposal
+    HSBC     -> NOT_APPLICABLE, no search or call
+    UNCERTAIN -> SKIPPED, wait for a definite human classification
 ```
 
-## Candidate limit
+`app/linking/linking.py:find_engagements` serves both automatic processing and the [incident dashboard](dashboard_app.md). It accepts the incident, ENG_ALL rows, current base supplier name, and candidate cap; it returns flat result fields without saving files. The batch pipeline or `app/review.py` saves them through `app/incidents.py` in `data/run/INCIDENTS.csv`.
 
-Set the maximum candidates per incident in the project `.env`:
+## Three different counts
 
-```dotenv
-LINK_MAX_CANDIDATES=70
-```
-
-The pipeline loads this setting before candidate search. It must be a positive integer and defaults to 70 when omitted. Keep the first matching rows in ENG_ALL.csv order and stop when the limit is reached. This is a row-count cap, not a relevance ranking or token limit; a relevant engagement later in the file can be excluded.
-
-## Request defaults
-
-Linking uses provider defaults for temperature and output length, with no local token-counting step or tokenizer download. Requests preserve the complete shortlisted rows; the provider's model limits still apply. `LINK_MAX_CANDIDATES` remains a row-count cap, not a token budget. Incomplete or invalid output still fails validation. See [request defaults](llm.md#request-defaults).
-
-## Per incident
-
-1. Keep the complete LLM_OUTPUT row, including `evidence_column` and `attribution_evidence_strength` in new classifications. Only successful SUPPLIER classifications enter matching. A successful UNCERTAIN classification skips candidate search and the linking request; it is not a processing failure and does not stop the batch.
-2. For each ENG_ALL row, compare `supplier_name` with `THIRD_PARTY_NAME` first; check `THIRD_PARTY_NORMALISED_NAME` only if the first name does not match. Add the row once if either matches, then move to the next row until the candidate limit is reached. Apply the same normalization to supplier and candidate names: Unicode NFKD, ASCII folding (remaining non-ASCII characters are dropped), lowercase, then join ASCII letter/number tokens with single spaces. Extra spaces and punctuation are removed as separators; words remain separated. Synthetic name example: `Google UK` becomes `google uk`, not `googleuk`. Match by whole-word containment or fuzzy similarity at 0.8. Name similarity retrieves candidates, not a confirmed link. Blank/Unknown names produce no candidates. Lexical matching can miss aliases such as EY versus Ernst & Young.
-3. Send the incident fields, prior model results, all shortlisted candidate rows, and `prompts/linking.yml` together in one LLM request per eligible incident. Candidate rows keep their original values; normalization is only for matching. Keep INCIDENT_ID local. Prior model results are context, not proof. Reuse `app/llm/llm_connection.py` and its OpenAI/Azure settings.
-4. The model chooses one candidate ENGAGEMENT_ID or null when evidence is insufficient or ambiguous. Return a short reason, `link_confidence` as an integer from 0 to 4 using the link evidence rubric below, and separate incident/engagement source-column name lists, without quotes. This score concerns the engagement match; it is separate from classification's attribution evidence strength. Strong Supplier attribution does not by itself establish an engagement match.
-5. Validate the response structure and selected ID against exactly one candidate. Evidence fields must be lists of strings; both lists must be nonempty for a selected engagement. Source names are not checked against input headers, deduplicated, or corrected. Reject noninteger scores, values outside 0-4, a selected engagement with score 0, and a null selection with score 3 or 4. Do not repair the selection or score. Copy the selected engagement's actual CSV values; do not generate its details with the model.
-6. Save that row before processing the next incident. Never modify either input CSV.
-
-## Remaining output checks
-
-| Check | Current behavior |
+| Saved field | What it counts |
 | --- | --- |
-| Completion | Require a choice, `finish_reason=stop`, nonempty content, and no refusal. |
-| JSON schema | Require the five defined fields and their types; reject extra JSON fields. |
-| Reason | Require a string that is not empty or whitespace-only. |
-| Evidence strength | Require a strict integer 0-4; selected links allow 1-4 and null selections allow 0-2. |
-| Selected engagement | Require null or an ID matching exactly one supplied candidate; a selected ID cannot be blank. |
-| Evidence lists | Require lists of strings; both lists must be nonempty when an engagement is selected. |
-| Evidence names | No Python check of source membership, spelling, duplicates, or blank individual strings. |
+| `link_match_count` | All ENG_ALL rows matching the normalized supplier name. The user can browse all of them. |
+| `link_candidate_count` | The first matching rows prepared for the model, after the configured cap. |
+| `link_suggestion_count` | Zero to five candidates recommended by the model. |
 
-The five JSON field names remain part of the response schema. The removed checks concern source names inside the two evidence lists. CSV schema and conflicting-ID checks remain separate.
+Set `LINK_MAX_CANDIDATES=70` in `.env`. The shared `load_max_candidates` function requires a positive integer and defaults to 70. This is a row cap, not a relevance ranking or token budget.
 
-## Link evidence strength
+Synthetic example: AXA matches 100 ENG_ALL rows. The dashboard can browse all 100; the LLM receives the first 70; it may suggest three. The saved counts are 100, 70, and 3. A relevant engagement later in source order can be excluded from the model shortlist but remains available for human selection.
 
-The field name remains `link_confidence`, but new responses measure recorded evidence for a unique engagement link, not probability or measured accuracy.
+Counts are blank when search has not run. No lexical matches produce zeros and no model call. Counts already prepared remain recorded if a request or response fails; they do not prove successful delivery to the provider.
 
-| Score | Display label | Recorded support for the link |
-| --- | --- | --- |
-| 0 | Unsupported | No recorded evidence supports a unique engagement; return null. |
-| 1 | Weak | Only indirect references or a general fit support a candidate. |
-| 2 | Moderate | Relevant service or context matches, but material gaps or ambiguity remain. |
-| 3 | Strong | Concrete incident and engagement facts distinguish the selected candidate. |
-| 4 | Very strong | An explicit documented connection has consistent supporting details and no unresolved material contradiction among the supplied candidates. |
+## Python retrieval
 
-A selected engagement allows scores 1-4; a null selection allows 0-2. For a null selection, the score describes available evidence for linking, not confidence in abstaining. A score of 4 is not 100% accuracy. Return the integer only; the dashboard derives its label. Pydantic requires an integer and rejects strings, booleans, and floats. When no linking LLM call occurs, leave the score blank rather than inventing a score.
+1. Read ENG_ALL as UTF-8 CSV. Require nonblank unique `ENGAGEMENT_ID` values, consistent rows, and at least one of `THIRD_PARTY_NAME` or `THIRD_PARTY_NORMALISED_NAME`. Reject malformed input before making a model call.
+2. Normalize the current supplier base name and candidate names for matching only: Unicode NFKD, ASCII folding, lowercase, then letter/number tokens joined with single spaces. Original values and IDs remain unchanged.
+3. For each row, check `THIRD_PARTY_NAME` first, then `THIRD_PARTY_NORMALISED_NAME`. Add the row once if either name matches by whole-word containment or fuzzy similarity at 0.8.
+4. Keep all matches in ENG_ALL order. `find_candidates(..., max_candidates=None)` returns them all; the service slices the list to the LLM cap separately.
 
-## Output
+The dashboard explains each match using the same Python helper as retrieval: original and normalized names, the first matching column, and the containment or fuzzy rule. Explanations are read-only and add no saved columns.
 
-- Preserve every original LLM_OUTPUT column. Add every ENG_ALL column with an `ENG_` prefix; for example, `ENG_ENGAGEMENT_ID` and `ENG_THIRD_PARTY_NAME`. Leave these cells empty when no engagement is selected.
-- The LLM returns five fields: `linked_engagement_id`, `link_reason`, `link_confidence`, `link_incident_columns`, and `link_engagement_columns`.
-- Python adds `link_status`, `link_error`, and `link_confidence_scale`. New rows use `link_confidence_scale=0-4`, including rows with a blank score. The scale marker is not generated by the LLM.
-- Join source-column lists with comma and space in their respective cells. Store no JSON, prompt, or evidence quotes.
+Blank and placeholder names such as Unknown produce no candidates. Lexical retrieval can miss aliases such as EY versus Ernst & Young. Name similarity supplies options, not proof of an incident relationship.
 
-| link_status | Meaning |
+Synthetic example: base name AXA can retrieve both AXA Insurance and AXA Com. The incident's insurance or communications facts determine which engagement is plausible. Supplier catalog names and engagement entity names do not need to be identical.
+
+## Linking request and response
+
+`prompts/linking.yml` supplies the instructions. A Pydantic `LinkInput` contains the current `supplier_name`, incident context, and complete capped engagement rows. It is serialized inside `<link_request>` tags; the prompt treats all contents as data. `INCIDENT_ID`, previous linking fields, the shared `citations` value, and human-review bookkeeping stay out of the model payload.
+
+The explicit current supplier name overrides a conflicting earlier model supplier name. Original incident facts remain the basis for matching; descriptions of a rejected supplier are not assumed applicable. Classification country and actor fields are fallible model extracts, not additional verified sources. Check original incident facts; do not transfer the previous supplier's country or role to a corrected supplier. The prompt defines engagement fields, warns against supplier-name-only matches, distinguishes beneficiary geography from incident and supplier geography, and asks for concise supported reasons. The optional country filter in supplier-name correction only helps browse that catalog. It does not exclude engagement candidates or change the existing matching rules.
+
+The `LinkInput`, `EngagementSuggestion`, and `EngagementSuggestions` contracts live in `app/models.py`. The strict structured response has four top-level fields:
+
+| Field | Contract |
 | --- | --- |
-| MATCHED | The model selected one supplied engagement. |
-| UNDECIDED | No name candidates, unknown supplier, or insufficient evidence to select one. |
-| NOT_APPLICABLE | The incident was classified HSBC; no linking request. |
-| SKIPPED | Classification did not succeed or its valid result was UNCERTAIN; no candidate search or linking request. |
-| FAILED | The linking request or response failed validation. |
+| `suggestions` | Zero to five items, each containing `engagement_id`, `reason`, and `evidence_strength`. |
+| `selected_engagement_id` | The strongest suggestion's exact ID, or null when suggestions is empty. |
+| `reason` | Concise explanation of the default, alternatives, or why no candidate is supported. |
+| `citations` | List of short excerpts labeled `INCIDENT.<column>` or `<ENGAGEMENT_ID>.<column>`; [] when none are available. |
 
-Provider/invalid-response failures are saved where possible, then stop the batch; earlier rows remain saved. The shared writer retains schema and conflicting-ID checks. Use a separate output file for changed decisions rather than overwriting saved results.
+Each suggestion must identify a distinct supplied candidate and contain a nonblank reason. Suggestions use strict integer scores 1-4: weak, moderate, strong, very strong. Unsupported candidates have conceptual score 0 and are omitted. An empty list is valid when none fits.
 
-Old INC_LINKED.csv files without `link_confidence_scale` retain their original 0-100 confidence values. Never convert them or infer the scale from the number: an old value of 3 is not a new 3/4 evidence score. The dashboard labels these values as legacy confidence. The added marker changes the CSV schema, so the writer rejects appending new rows to an old-schema file. Use a fresh output file or batch folder, update `OUTPUT_FILE` in `app/linking/pipeline.py` and `RESULTS_FILE` in `app/ui/engagement_dashboard.py`, and preserve older files.
+The default must belong to the suggestions and have the highest evidence score. When scores tie, the model selects its best factual fit and explains ambiguity. The default is a proposal awaiting human approval. The prompt asks for strongest-first order; Python validates the default's score and candidate membership without silently repairing an invalid response.
 
-The classification dashboard reads only LLM_OUTPUT.csv. The separate [engagement dashboard](engagement_dashboard.md) reads INC_LINKED.csv and groups linked incidents under engagements. Candidate retrieval is a simple lexical demo and does not guarantee all relevant engagements are found. Offline simulated checks do not establish live matching accuracy.
+Pydantic rejects additional fields, incorrect types, more than five suggestions, and out-of-range scores. Python also rejects duplicate or out-of-shortlist IDs, whitespace-only reasons, missing/default mismatches, and a weaker default. Responses need a completed non-refused choice. The shared `app.models.remove_schema_limits` helper removes Azure-unsupported min/max schema keywords recursively from the provider schema; Python still enforces these limits.
+
+Citation strings refer to original incident or candidate values, not earlier model summaries. Python checks only the list/string structure; it does not verify exact quotation, source labels, duplicates, blank entries, or length.
+
+Provider settings, `store=False`, timeout, retry, and omitted temperature/token parameters are shared with [classification](llm.md#provider-defaults). No input token counter or tokenizer download is added.
+
+## Saved linking fields
+
+The service returns 25 linking fields plus `citations`, shared with classification in the final CSV:
+
+| Fields | Meaning |
+| --- | --- |
+| `link_supplier_name` | Base name used for this lookup. |
+| `link_status` | Processing/proposal status below. |
+| `linked_engagement_id` | Model-selected default proposal, not a human-confirmed link. |
+| `link_reason`, `link_confidence` | Overall decision summary and default evidence strength. |
+| `link_match_count`, `link_candidate_count`, `link_suggestion_count` | Distinct counts described above. |
+| `link_error` | Exception type only on failure. |
+| `link_catalog_hash` | SHA-256 of the complete catalog rows, including order, for stale-proposal detection. |
+| `link_1_engagement_id`, `link_1_reason`, `link_1_evidence_strength` through slot 5 | Five fixed suggestion slots; unused slots are blank. |
+
+The caller combines model excerpts into exactly one `citations` cell, with `Classification:` and `Engagement:` line prefixes. A new lookup replaces the Engagement part; proposal resets and failed/no-call lookups clear it while keeping classification excerpts. The dashboard shows `Engagement:` excerpts in **Linking evidence and engagement details**, alongside link status, the lookup supplier, default proposal, reasons, evidence scores, and counts. Classification excerpts have their own dropdown. Both remain unverified; unprefixed legacy excerpts are explicitly unassigned rather than guessed to belong to a stage. CSV storage and model requests are unchanged by this display separation.
+
+`link_confidence` is the selected suggestion's 1-4 evidence score. A model response with no suggestions saves 0; no linking call leaves it blank. It is not a probability. Classification evidence and engagement evidence measure different claims.
+
+| `link_status` | Meaning |
+| --- | --- |
+| PENDING | Engagement work has not started. |
+| RUNNING | A lookup has started; no new completed proposal is saved yet. |
+| READY | One to five suggestions and a model default are available. |
+| NO_MATCH | No lexical matches, or the model found no supported suggestions. |
+| FAILED | Catalog preparation, request, or response validation failed. |
+| NOT_APPLICABLE | The effective classification is HSBC. |
+| SKIPPED | Classification remains unresolved; supplier linking is unavailable. |
+
+Suggestion IDs, scores, and reasons are flat CSV cells, without JSON blobs. The caller additionally saves an `ENG_`-prefixed snapshot of every actual catalog field for the current selected engagement. Initially this is the model default; a different accepted human choice replaces the snapshot, while the original model default ID and reasons remain separate. No selection or a no-link decision clears the snapshot. The API joins proposal IDs with the current catalog when displaying alternatives and also exposes the saved snapshot. Source engagement files are never written. Historical linking outputs remain untouched and are not migrated into the new schema.
+
+## Human decisions and immediate supplier changes
+
+The single dashboard shows all incidents. `app/review.py` owns the human decision rules and immediate refresh flow, using explicit file paths supplied by the HTTP app. Review proceeds left to right:
+
+1. **Classification:** approve a model HSBC/SUPPLIER decision, or disagree with a reason and select a corrected class. UNCERTAIN remains blocked until the human chooses a definite HSBC or SUPPLIER result. Processing failures can be resolved manually with a reason.
+2. **Supplier name:** for a reviewed Supplier incident, approve the usable model base name or choose a replacement from `SUPPLIER_NAME.csv` and give a reason. The file contains base names with optional COUNTRY metadata and is read-only. The correction form searches names and optionally filters countries, showing 50 choices per page while retaining the selected name. Country is not a separate saved review decision. A changed name immediately runs the same `find_engagements` function and replaces the current suggestions/default; engagement approval resets.
+3. **Engagement:** explicitly approve the default or select a different matching engagement with a reason. The reviewer can inspect every Python match, including candidates beyond the model cap. The accepted choice is stored separately as `reviewed_engagement_id`; the model default remains in `linked_engagement_id`. A reviewer can also disagree with all matches and save no link with a reason.
+
+Changing classification resets downstream reviews. HSBC has no supplier/engagement review; an unresolved class cannot advance. Rejecting or changing an engagement does not reject the classification. A model default or merely opening the page never counts as human approval.
+
+The nine review fields are the status, selected value, and reason for classification, supplier, and engagement. The incident store uses atomic replacement, a cross-process lock, and row-version checks. Catalog fingerprints prevent accepting proposals against a changed catalog until lookup is refreshed. Pipeline failures save and stop; unfinished/failed work can be retried without overwriting a recorded human classification decision. See [classification saving](llm.md#saving-stopping-and-resuming) and the [dashboard](dashboard_app.md) for the remaining workflow rules.

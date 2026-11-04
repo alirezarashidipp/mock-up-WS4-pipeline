@@ -32,9 +32,11 @@ class FrontendTests(unittest.TestCase):
         self.assertIn("/api/dashboard", script)
         self.assertIn("row.supplier_more_info", script)
         self.assertIn("row.evidence_column", script)
-        self.assertIn("text.textContent = columnName", script)
+        self.assertIn("node.textContent = text", script)
+        self.assertNotIn("innerHTML", script)
         self.assertNotIn("item.quote", script)
-        self.assertNotIn("/api/review", script)
+        self.assertIn("/api/review", script)
+        self.assertIn("refresh-links", script)
         self.assertNotIn('id="decision-form"', html)
         self.assertNotIn("8765", html)
 

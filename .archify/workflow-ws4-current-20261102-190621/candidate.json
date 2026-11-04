@@ -1,0 +1,388 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "WS4 — Automatic incident processing",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-ws4-current-20261102-190621/ws4-pipeline.html",
+    "repository": {
+      "url": "https://github.com/alirezarashidipp/mock-up-WS4-pipeline.git",
+      "revision": "b224acc7f480d6a41aa69fc9be6410112f09082b"
+    },
+    "legend": {
+      "entries": {
+        "database": {
+          "label": "CSV / saved state"
+        },
+        "backend": {
+          "label": "Python logic"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "setup",
+      "label": "Preparation + batch setup"
+    },
+    {
+      "id": "classify",
+      "label": "One incident at a time"
+    },
+    {
+      "id": "link",
+      "label": "Automatic Supplier linking"
+    },
+    {
+      "id": "recovery",
+      "label": "Failure + retry",
+      "variant": "exception"
+    }
+  ],
+  "mainPath": [
+    "clean",
+    "load",
+    "initialize",
+    "classify",
+    "search",
+    "suggest",
+    "save",
+    "advance"
+  ],
+  "nodes": [
+    {
+      "id": "clean",
+      "lane": "setup",
+      "col": 0,
+      "type": "backend",
+      "label": "Unchanged Cleaning",
+      "sublabel": "RAW→rename→clean→CLEAN",
+      "sources": [
+        {
+          "path": "app/data_preparation/pipeline.py",
+          "line": 15,
+          "end_line": 20
+        }
+      ]
+    },
+    {
+      "id": "load",
+      "lane": "setup",
+      "col": 1,
+      "type": "backend",
+      "label": "Read inputs",
+      "sublabel": "CLEAN+definitions+ENG_ALL",
+      "sources": [
+        {
+          "path": "app/llm/pipeline.py",
+          "line": 22,
+          "end_line": 31
+        }
+      ]
+    },
+    {
+      "id": "initialize",
+      "lane": "setup",
+      "col": 2,
+      "type": "database",
+      "label": "Initialize output",
+      "sublabel": "INCIDENTS.csv: all pending",
+      "sources": [
+        {
+          "path": "app/llm/pipeline.py",
+          "line": 34,
+          "end_line": 43
+        },
+        {
+          "path": "app/incidents.py",
+          "line": 124,
+          "end_line": 155
+        }
+      ]
+    },
+    {
+      "id": "classify",
+      "lane": "classify",
+      "col": 2,
+      "type": "backend",
+      "label": "Classify + save",
+      "sublabel": "HSBC / SUPPLIER / UNCERTAIN",
+      "sources": [
+        {
+          "path": "app/llm/pipeline.py",
+          "line": 70,
+          "end_line": 87
+        },
+        {
+          "path": "app/llm/classification.py",
+          "line": 55,
+          "end_line": 85
+        },
+        {
+          "path": "app/incidents.py",
+          "line": 158,
+          "end_line": 174
+        }
+      ]
+    },
+    {
+      "id": "no-link",
+      "lane": "classify",
+      "col": 3,
+      "type": "backend",
+      "label": "No supplier link",
+      "sublabel": "HSBC N/A; UNCERTAIN skipped",
+      "sources": [
+        {
+          "path": "app/llm/pipeline.py",
+          "line": 81,
+          "end_line": 87
+        }
+      ]
+    },
+    {
+      "id": "search",
+      "lane": "link",
+      "col": 2,
+      "type": "backend",
+      "label": "Find all name matches",
+      "sublabel": "Base name against ENG_ALL",
+      "sources": [
+        {
+          "path": "app/linking/candidates.py",
+          "line": 6,
+          "end_line": 46
+        },
+        {
+          "path": "app/linking/linking.py",
+          "line": 202,
+          "end_line": 218
+        }
+      ]
+    },
+    {
+      "id": "suggest",
+      "lane": "link",
+      "col": 3,
+      "type": "backend",
+      "label": "Request suggestions",
+      "sublabel": "Capped input → ≤5 results",
+      "sources": [
+        {
+          "path": "app/linking/linking.py",
+          "line": 149,
+          "end_line": 199
+        },
+        {
+          "path": "app/linking/linking.py",
+          "line": 202,
+          "end_line": 237
+        },
+        {
+          "path": "app/linking/linking.py",
+          "line": 43,
+          "end_line": 59
+        }
+      ]
+    },
+    {
+      "id": "save",
+      "lane": "link",
+      "col": 4,
+      "type": "database",
+      "label": "Save link result",
+      "sublabel": "Default + reasons + ENG_*",
+      "sources": [
+        {
+          "path": "app/llm/pipeline.py",
+          "line": 90,
+          "end_line": 99
+        },
+        {
+          "path": "app/incidents.py",
+          "line": 158,
+          "end_line": 185
+        }
+      ]
+    },
+    {
+      "id": "advance",
+      "lane": "link",
+      "col": 5,
+      "type": "backend",
+      "label": "Continue batch",
+      "sublabel": "Next eligible incident",
+      "sources": [
+        {
+          "path": "app/llm/pipeline.py",
+          "line": 45,
+          "end_line": 67
+        }
+      ]
+    },
+    {
+      "id": "stop",
+      "lane": "recovery",
+      "col": 1,
+      "type": "backend",
+      "label": "Stop after saved failure",
+      "sublabel": "Earlier results remain available",
+      "sources": [
+        {
+          "path": "app/llm/pipeline.py",
+          "line": 53,
+          "end_line": 64
+        },
+        {
+          "path": "app/linking/linking.py",
+          "line": 220,
+          "end_line": 224
+        }
+      ]
+    },
+    {
+      "id": "retry",
+      "lane": "classify",
+      "col": 1,
+      "type": "backend",
+      "label": "Rerun unfinished",
+      "sublabel": "Skip human-reviewed rows",
+      "sources": [
+        {
+          "path": "app/llm/pipeline.py",
+          "line": 45,
+          "end_line": 64
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "clean-load",
+      "from": "clean",
+      "to": "load",
+      "label": "CLEAN.csv",
+      "role": "main"
+    },
+    {
+      "id": "load-initialize",
+      "from": "load",
+      "to": "initialize",
+      "role": "main"
+    },
+    {
+      "id": "initialize-classify",
+      "from": "initialize",
+      "to": "classify",
+      "role": "main"
+    },
+    {
+      "id": "classify-no-link",
+      "from": "classify",
+      "to": "no-link",
+      "label": "HSBC / UNCERTAIN",
+      "role": "branch"
+    },
+    {
+      "id": "classify-search",
+      "from": "classify",
+      "to": "search",
+      "label": "SUPPLIER",
+      "role": "main"
+    },
+    {
+      "id": "search-suggest",
+      "from": "search",
+      "to": "suggest",
+      "label": "Candidates",
+      "role": "main"
+    },
+    {
+      "id": "search-save",
+      "from": "search",
+      "to": "save",
+      "label": "No matches",
+      "role": "branch"
+    },
+    {
+      "id": "suggest-save",
+      "from": "suggest",
+      "to": "save",
+      "label": "Result / failure",
+      "role": "main"
+    },
+    {
+      "id": "save-advance",
+      "from": "save",
+      "to": "advance",
+      "label": "Not FAILED",
+      "role": "main"
+    },
+    {
+      "id": "no-link-advance",
+      "from": "no-link",
+      "to": "advance",
+      "role": "branch"
+    },
+    {
+      "id": "classify-stop",
+      "from": "classify",
+      "to": "stop",
+      "label": "Failed",
+      "role": "error"
+    },
+    {
+      "id": "save-stop",
+      "from": "save",
+      "to": "stop",
+      "label": "FAILED",
+      "role": "error"
+    },
+    {
+      "id": "stop-retry",
+      "from": "stop",
+      "to": "retry",
+      "label": "Rerun",
+      "role": "return"
+    },
+    {
+      "id": "retry-classify",
+      "from": "retry",
+      "to": "classify",
+      "label": "If unfinished",
+      "role": "return"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "One sequential LLM pipeline",
+      "items": [
+        "python -m app.llm.pipeline processes classification, then Supplier linking, then the next row.",
+        "Classification is saved before linking. Every link result is saved before advancing.",
+        "Automatic suggestions never wait for human approval. The default remains a proposal.",
+        "Reruns resume unfinished classification or linking and skip incidents with human decisions."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "All matches ≠ model candidates ≠ suggestions",
+      "items": [
+        "Matching checks THIRD_PARTY_NAME first, then THIRD_PARTY_NORMALISED_NAME; each ENG_ALL row appears once.",
+        "Normalization uses ASCII folding, lowercase and word spacing. Original source names stay unchanged.",
+        "LINK_MAX_CANDIDATES defaults to 70. The first rows follow source order, not relevance rank. Zero candidates means no linking request.",
+        "The model returns 0–5 supported suggestions. Its default has the highest evidence strength, 1–4, not a probability."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "One output, one dashboard",
+      "items": [
+        "INCIDENTS.csv holds source facts, classification, link proposals, review decisions, row revision and selected ENG_* values.",
+        "The incident dashboard on 127.0.0.1:8766 can read progress while the batch runs. Human review is shown in the companion diagram.",
+        "Configured OpenAI or Azure calls use YAML instructions and strict structured output. This diagram is source-backed, not a live API execution trace."
+      ]
+    }
+  ]
+}

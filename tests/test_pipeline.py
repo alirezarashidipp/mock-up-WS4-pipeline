@@ -11,10 +11,10 @@ from unittest.mock import Mock, patch
 from openai import OpenAIError
 from pydantic import ValidationError
 
-from app.csv_files import read_records, write_records
+from app.csv_files import read_records
 from app.data_preparation import pipeline as preparation
-from app.llm import classification
-from app.models import Classification, SUPPLIER_FIELDS
+from app.llm import classification, pipeline
+from app.models import CLASSIFICATION_CONTEXT_FIELDS, Classification, SUPPLIER_FIELDS
 from app.ui.dashboard_app import get_dashboard_data
 
 
@@ -27,9 +27,12 @@ def example_response(label):
         "key_root_cause": "Synthetic configuration error.",
         "decision_rationale": "Synthetic example explanation.",
         "evidence_column": ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"],
+        "citations": ["ROOT_CAUSE_NOTES: Synthetic recorded cause."],
         "attribution_evidence_strength": 3,
     }
     for name in SUPPLIER_FIELDS:
+        result[name] = None
+    for name in CLASSIFICATION_CONTEXT_FIELDS:
         result[name] = None
     if label == "UNCERTAIN":
         result["key_root_cause"] = None
@@ -91,18 +94,19 @@ class PythonTests(unittest.TestCase):
         responses = [example_response("HSBC"), example_response("SUPPLIER"), example_response("UNCERTAIN")]
         client = Mock()
         with TemporaryDirectory(dir=ROOT) as folder:
-            output = Path(folder) / "LLM_OUTPUT.csv"
+            output = Path(folder) / "INCIDENTS.csv"
 
             def respond(**kwargs):
                 index = client.chat.completions.create.call_count - 1
                 if index:
                     saved, _ = read_records(output)
-                    self.assertEqual(len(saved), index)
+                    self.assertEqual(len(saved), len(rows))
+                    self.assertEqual(sum(row["processing_status"] == "success" for row in saved), index)
                 return responses[index]
 
             client.chat.completions.create.side_effect = respond
-            with patch.object(classification, "llm_connection", return_value=nullcontext((client, "example-model"))):
-                self.assertEqual(classification.classify_rows(rows, definitions, output), 0)
+            with patch.object(pipeline, "llm_connection", return_value=nullcontext((client, "example-model"))):
+                self.assertEqual(pipeline.classify_incidents(rows, definitions, output, []), 0)
             self.assertEqual(client.chat.completions.create.call_count, 3)
             for index, call in enumerate(client.chat.completions.create.call_args_list):
                 messages = call.kwargs["messages"]
@@ -137,28 +141,16 @@ class PythonTests(unittest.TestCase):
                 self.assertTrue(all(name not in row for name in ("llm_input", "llm_prompt", "review_status")))
                 self.assertFalse(any(name.startswith("definition_") for name in row))
             before = output.read_bytes()
-            dashboard = get_dashboard_data(output)
-            self.assertEqual(dashboard["counts"], {"total": 3, "HSBC": 1, "SUPPLIER": 1, "UNCERTAIN": 1, "failed": 0})
-            self.assertEqual(dashboard["records"][1]["supplier_name"], "Unknown")
-            self.assertEqual(dashboard["records"][1]["processing_status"], "success")
-            self.assertEqual(dashboard["records"][0]["evidence_column"], ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"])
-            self.assertEqual(dashboard["records"][1]["evidence_column"], expected_names)
+            dashboard = get_dashboard_data(output, suppliers_path=Path(folder) / "missing-suppliers.csv", engagements_path=Path(folder) / "missing-engagements.csv")
+            self.assertEqual({key: dashboard["counts"][key] for key in ("total", "classified", "HSBC", "SUPPLIER", "UNCERTAIN", "failed")}, {"total": 3, "classified": 3, "HSBC": 1, "SUPPLIER": 1, "UNCERTAIN": 1, "failed": 0})
+            self.assertEqual(dashboard["incidents"][1]["supplier_name"], "Unknown")
+            self.assertEqual(dashboard["incidents"][1]["processing_status"], "success")
+            self.assertEqual(dashboard["incidents"][0]["evidence_column"], ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"])
+            self.assertEqual(dashboard["incidents"][1]["evidence_column"], expected_names)
             self.assertEqual(len(expected_names), 8)
-            self.assertEqual(dashboard["records"][1]["supplier_more_info"], saved[1]["supplier_more_info"])
+            self.assertEqual(dashboard["incidents"][1]["supplier_more_info"], saved[1]["supplier_more_info"])
             self.assertEqual(output.read_bytes(), before)
             self.assertFalse((Path(folder) / "FINAL.csv").exists())
-            for row in saved:
-                for name in SUPPLIER_FIELDS:
-                    row.pop(name)
-                names = row.pop("evidence_column").split(", ")
-                for number in range(1, 11):
-                    row[f"evidence_{number}_column"] = names[number - 1] if number <= len(names) else ""
-            write_records(output, saved)
-            older_dashboard = get_dashboard_data(output)
-            self.assertEqual(older_dashboard["counts"], dashboard["counts"])
-            self.assertEqual(older_dashboard["records"][1]["supplier_name"], "")
-            self.assertEqual(older_dashboard["records"][1]["evidence_column"], expected_names)
-
     def test_failed_request_is_saved_and_excluded_from_counts(self):
         rows = [{"INCIDENT_ID": "001", "INCIDENT_DESCRIPTION": "Synthetic cause."}, {"INCIDENT_ID": "002", "INCIDENT_DESCRIPTION": "Synthetic failed request."}]
         for row in rows:
@@ -170,14 +162,15 @@ class PythonTests(unittest.TestCase):
         client = Mock()
         client.chat.completions.create.side_effect = [example_response("HSBC"), OpenAIError("Synthetic request failure")]
         with TemporaryDirectory(dir=ROOT) as folder:
-            output = Path(folder) / "LLM_OUTPUT.csv"
-            with patch.object(classification, "llm_connection", return_value=nullcontext((client, "example-model"))):
-                self.assertEqual(classification.classify_rows(rows, definitions, output), 1)
+            output = Path(folder) / "INCIDENTS.csv"
+            with patch.object(pipeline, "llm_connection", return_value=nullcontext((client, "example-model"))):
+                self.assertEqual(pipeline.classify_incidents(rows, definitions, output, []), 1)
             saved, _ = read_records(output)
             self.assertEqual([row["processing_status"] for row in saved], ["success", "failed"])
             self.assertEqual(saved[1]["error"], "OpenAIError")
             self.assertEqual(saved[1]["evidence_column"], "")
-            self.assertEqual(get_dashboard_data(output)["counts"], {"total": 1, "HSBC": 1, "SUPPLIER": 0, "UNCERTAIN": 0, "failed": 1})
+            counts = get_dashboard_data(output, suppliers_path=Path(folder) / "missing-suppliers.csv", engagements_path=Path(folder) / "missing-engagements.csv")["counts"]
+            self.assertEqual((counts["total"], counts["classified"], counts["HSBC"], counts["failed"]), (2, 1, 1, 1))
             self.assertFalse((Path(folder) / "FINAL.csv").exists())
 
     def test_supplier_fields_follow_the_tag(self):

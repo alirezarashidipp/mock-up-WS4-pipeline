@@ -1,0 +1,444 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "WS4 — Three ordered human decisions",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-ws4-current-20261102-190621/ws4-human-review.html",
+    "repository": {
+      "url": "https://github.com/alirezarashidipp/mock-up-WS4-pipeline.git",
+      "revision": "b224acc7f480d6a41aa69fc9be6410112f09082b"
+    },
+    "legend": {
+      "entries": {
+        "frontend": {
+          "label": "Dashboard"
+        },
+        "backend": {
+          "label": "Python logic"
+        },
+        "database": {
+          "label": "CSV / saved state"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "hsbc-complete",
+      "label": "HSBC completion"
+    },
+    {
+      "id": "review",
+      "label": "Single incident dashboard"
+    },
+    {
+      "id": "choices",
+      "label": "Correction + recomputation"
+    },
+    {
+      "id": "outcomes",
+      "label": "Completion or unresolved"
+    }
+  ],
+  "mainPath": [
+    "dashboard",
+    "class",
+    "supplier",
+    "engagement",
+    "accepted"
+  ],
+  "nodes": [
+    {
+      "id": "dashboard",
+      "lane": "review",
+      "col": 0,
+      "type": "frontend",
+      "label": "All incidents",
+      "sublabel": "INCIDENTS.csv · :8766",
+      "sources": [
+        {
+          "path": "app/ui/dashboard_app.py",
+          "line": 57,
+          "end_line": 82
+        },
+        {
+          "path": "app/ui/dashboard_app.py",
+          "line": 294,
+          "end_line": 295
+        }
+      ]
+    },
+    {
+      "id": "class",
+      "lane": "review",
+      "col": 1,
+      "type": "frontend",
+      "label": "1. Classification",
+      "sublabel": "Approve or correct + reason",
+      "sources": [
+        {
+          "path": "app/incidents.py",
+          "line": 251,
+          "end_line": 275
+        },
+        {
+          "path": "app/ui/dashboard_app.py",
+          "line": 188,
+          "end_line": 191
+        }
+      ]
+    },
+    {
+      "id": "supplier",
+      "lane": "review",
+      "col": 2,
+      "type": "frontend",
+      "label": "2. Supplier name",
+      "sublabel": "Approve usable name or correct",
+      "sources": [
+        {
+          "path": "app/incidents.py",
+          "line": 278,
+          "end_line": 296
+        },
+        {
+          "path": "app/ui/dashboard_app.py",
+          "line": 209,
+          "end_line": 214
+        }
+      ]
+    },
+    {
+      "id": "engagement",
+      "lane": "review",
+      "col": 4,
+      "type": "frontend",
+      "label": "3. Engagement",
+      "sublabel": "Explicit decision required",
+      "sources": [
+        {
+          "path": "app/ui/dashboard_app.py",
+          "line": 137,
+          "end_line": 159
+        },
+        {
+          "path": "app/ui/dashboard_app.py",
+          "line": 112,
+          "end_line": 134
+        }
+      ]
+    },
+    {
+      "id": "accepted",
+      "lane": "review",
+      "col": 5,
+      "type": "database",
+      "label": "Accepted engagement",
+      "sublabel": "Save reviewed_engagement_id",
+      "sources": [
+        {
+          "path": "app/ui/dashboard_app.py",
+          "line": 137,
+          "end_line": 159
+        },
+        {
+          "path": "app/ui/dashboard_app.py",
+          "line": 209,
+          "end_line": 214
+        },
+        {
+          "path": "app/incidents.py",
+          "line": 158,
+          "end_line": 174
+        }
+      ]
+    },
+    {
+      "id": "catalog",
+      "lane": "choices",
+      "col": 2,
+      "type": "frontend",
+      "label": "Choose base name",
+      "sublabel": "SUPPLIER_NAME.csv + reason",
+      "sources": [
+        {
+          "path": "app/incidents.py",
+          "line": 188,
+          "end_line": 213
+        },
+        {
+          "path": "app/incidents.py",
+          "line": 278,
+          "end_line": 296
+        }
+      ]
+    },
+    {
+      "id": "refresh",
+      "lane": "choices",
+      "col": 3,
+      "type": "backend",
+      "label": "Save + find again",
+      "sublabel": "Clear approval; reuse finder",
+      "sources": [
+        {
+          "path": "app/ui/dashboard_app.py",
+          "line": 162,
+          "end_line": 185
+        },
+        {
+          "path": "app/ui/dashboard_app.py",
+          "line": 209,
+          "end_line": 214
+        },
+        {
+          "path": "app/linking/linking.py",
+          "line": 202,
+          "end_line": 237
+        }
+      ]
+    },
+    {
+      "id": "alternative",
+      "lane": "choices",
+      "col": 4,
+      "type": "frontend",
+      "label": "Another match or None",
+      "sublabel": "Browse ALL matches; give reason",
+      "sources": [
+        {
+          "path": "app/ui/dashboard_app.py",
+          "line": 112,
+          "end_line": 159
+        },
+        {
+          "path": "app/ui/dashboard_app.py",
+          "line": 188,
+          "end_line": 191
+        }
+      ]
+    },
+    {
+      "id": "hsbc",
+      "lane": "hsbc-complete",
+      "col": 1,
+      "type": "database",
+      "label": "HSBC complete",
+      "sublabel": "No name or link review",
+      "sources": [
+        {
+          "path": "app/incidents.py",
+          "line": 216,
+          "end_line": 248
+        },
+        {
+          "path": "app/incidents.py",
+          "line": 251,
+          "end_line": 275
+        }
+      ]
+    },
+    {
+      "id": "uncertain",
+      "lane": "outcomes",
+      "col": 1,
+      "type": "frontend",
+      "label": "UNCERTAIN unresolved",
+      "sublabel": "Stay at classification",
+      "sources": [
+        {
+          "path": "app/incidents.py",
+          "line": 216,
+          "end_line": 248
+        },
+        {
+          "path": "app/incidents.py",
+          "line": 251,
+          "end_line": 275
+        }
+      ]
+    },
+    {
+      "id": "failed",
+      "lane": "outcomes",
+      "col": 3,
+      "type": "backend",
+      "label": "Finding failed",
+      "sublabel": "Name kept; retry lookup",
+      "sources": [
+        {
+          "path": "app/ui/dashboard_app.py",
+          "line": 162,
+          "end_line": 185
+        },
+        {
+          "path": "app/ui/dashboard_app.py",
+          "line": 281,
+          "end_line": 288
+        }
+      ]
+    },
+    {
+      "id": "none",
+      "lane": "outcomes",
+      "col": 5,
+      "type": "database",
+      "label": "Complete without link",
+      "sublabel": "None of these + reason",
+      "sources": [
+        {
+          "path": "app/ui/dashboard_app.py",
+          "line": 137,
+          "end_line": 159
+        },
+        {
+          "path": "app/incidents.py",
+          "line": 243,
+          "end_line": 248
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "dashboard-class",
+      "from": "dashboard",
+      "to": "class",
+      "role": "main"
+    },
+    {
+      "id": "class-supplier",
+      "from": "class",
+      "to": "supplier",
+      "label": "Saved SUPPLIER",
+      "role": "main"
+    },
+    {
+      "id": "class-hsbc",
+      "from": "class",
+      "to": "hsbc",
+      "label": "Saved HSBC",
+      "role": "branch",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "route": "straight"
+    },
+    {
+      "id": "class-uncertain",
+      "from": "class",
+      "to": "uncertain",
+      "label": "UNCERTAIN",
+      "role": "branch"
+    },
+    {
+      "id": "supplier-engagement",
+      "from": "supplier",
+      "to": "engagement",
+      "label": "Same name + proposal",
+      "role": "main"
+    },
+    {
+      "id": "supplier-catalog",
+      "from": "supplier",
+      "to": "catalog",
+      "label": "Correct name",
+      "role": "branch"
+    },
+    {
+      "id": "supplier-refresh",
+      "from": "supplier",
+      "to": "refresh",
+      "label": "Missing proposal",
+      "role": "branch"
+    },
+    {
+      "id": "catalog-refresh",
+      "from": "catalog",
+      "to": "refresh",
+      "label": "Save correction",
+      "role": "main"
+    },
+    {
+      "id": "refresh-engagement",
+      "from": "refresh",
+      "to": "engagement",
+      "label": "Lookup complete",
+      "role": "main"
+    },
+    {
+      "id": "refresh-failed",
+      "from": "refresh",
+      "to": "failed",
+      "label": "FAILED",
+      "role": "error"
+    },
+    {
+      "id": "failed-refresh",
+      "from": "failed",
+      "to": "refresh",
+      "label": "Retry",
+      "role": "return"
+    },
+    {
+      "id": "engagement-accepted",
+      "from": "engagement",
+      "to": "accepted",
+      "label": "Approve default",
+      "role": "main"
+    },
+    {
+      "id": "engagement-alternative",
+      "from": "engagement",
+      "to": "alternative",
+      "label": "Disagree",
+      "role": "branch"
+    },
+    {
+      "id": "alternative-accepted",
+      "from": "alternative",
+      "to": "accepted",
+      "label": "Selected match",
+      "role": "branch"
+    },
+    {
+      "id": "alternative-none",
+      "from": "alternative",
+      "to": "none",
+      "label": "None",
+      "role": "branch"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Classification is the first gate",
+      "items": [
+        "Approve is available for successful HSBC or SUPPLIER. UNCERTAIN needs a definite correction to advance.",
+        "Disagree requires a reason and a selected class. Failed processing can be corrected manually; pending processing cannot.",
+        "Every classification save resets downstream reviews. Saving HSBC or UNCERTAIN clears the active proposal."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Supplier decisions can rerun linking",
+      "items": [
+        "Approve accepts a usable original model Supplier name. Unknown or blank requires an exact catalog choice and reason.",
+        "After changing HSBC/UNCERTAIN/failed to Supplier, choose a base name because there is no usable model Supplier name.",
+        "A changed name is saved before the shared finder runs. Same-name approval reruns only missing proposals; failed/no-match results allow explicit retry.",
+        "Every supplier decision resets engagement approval. A lookup failure preserves the supplier correction."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Human choice remains separate",
+      "items": [
+        "The model default is not human approval. The reviewer can inspect every Python match, including rows outside the LLM cap.",
+        "A current catalog and saved classification/name decisions are required. Engagement decisions wait while finding is running.",
+        "All Disagree decisions require reasons. None of these completes review but creates no accepted link.",
+        "Saves check row versions and catalog freshness. Changing an engagement leaves classification and supplier decisions unchanged."
+      ]
+    }
+  ]
+}

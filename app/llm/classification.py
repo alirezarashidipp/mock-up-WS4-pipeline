@@ -1,50 +1,26 @@
 import json
 from pathlib import Path
 
-import yaml
-from openai import OpenAI, OpenAIError
+from openai import OpenAI
 from pydantic import ValidationError
 
-from app.llm.prepare_fields import prepare_fields
-from app.llm.llm_connection import llm_connection
-from app.models import Classification, SUPPLIER_FIELDS
-from app.llm.save_csv import save_result
+from app.models import Classification, SUPPLIER_FIELDS, format_citations, remove_schema_limits
 
 
 PROMPT_FILE = Path(__file__).resolve().parents[2] / "prompts/classification.yml"
 
 
-def classify_rows(rows, definitions, output_file):
-    if not rows:
-        return 1
-    missing = set(rows[0]) - {"INCIDENT_ID"} - definitions.keys()
-    if missing:
-        print("Add definitions for: " + ", ".join(sorted(missing)))
-        return 1
-    prompt_text = PROMPT_FILE.read_text(encoding="utf-8")
-    prompt = yaml.safe_load(prompt_text)["system"]
-
-    with llm_connection() as (client, model):
-        for row in rows:
-            fields = prepare_fields(row, definitions)
-            try:
-                result = classify_row(client, model, fields, prompt)
-            except ValidationError as error:
-                message = validation_error_summary(error)
-                save_result(output_file, row, None, message)
-                print(f"Stopped: {message}. Earlier results are saved.")
-                return 1
-            except (OpenAIError, ValueError) as error:
-                save_result(output_file, row, None, type(error).__name__)
-                print(f"Stopped: {type(error).__name__}. Earlier results are saved.")
-                return 1
-            saved = save_result(output_file, row, result)
-            if not saved or result is None:
-                print("Stopped. Check the saved results.")
-                return 1
-            print(f"Saved incident {row['INCIDENT_ID']}")
-    print(f"Output: {output_file}")
-    return 0
+def classification_values(result, error=""):
+    values = {name: "" for name in Classification.model_fields}
+    values["processing_status"] = "failed"
+    values["error"] = error or "Invalid model output"
+    if result is not None:
+        values.update(result.model_dump())
+        values["evidence_column"] = ", ".join(result.evidence_column)
+        values["citations"] = format_citations(result.citations, "Classification")
+        values["processing_status"] = "success"
+        values["error"] = ""
+    return values
 
 
 def validation_error_summary(error: ValidationError) -> str:
@@ -59,16 +35,8 @@ def validation_error_summary(error: ValidationError) -> str:
 
 def classification_schema() -> dict:
     schema = Classification.model_json_schema()
-    fields = list(schema["properties"].values())
-    # Azure's schema subset omits these limits; Pydantic still validates them locally.
-    for field in fields:
-        variants = [field]
-        variants.extend(field.get("anyOf", []))
-        for variant in variants:
-            for keyword in ("minLength", "minItems", "maxItems", "minimum", "maximum"):
-                variant.pop(keyword, None)
+    remove_schema_limits(schema)
     return schema
-
 
 def classify_row(client: OpenAI, model: str, fields: list[dict], prompt: str) -> Classification | None:
     payload = json.dumps(fields, ensure_ascii=False)
@@ -116,6 +84,7 @@ def normalize_supplier_fields(result: Classification) -> Classification:
     if result.classification != "SUPPLIER":
         for name in SUPPLIER_FIELDS:
             setattr(result, name, None)
+        result.supplier_country = None
         return result
 
     for name in SUPPLIER_FIELDS:

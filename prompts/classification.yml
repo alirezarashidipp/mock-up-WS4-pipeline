@@ -51,12 +51,15 @@ system: |
   - evidence_column: a list of standardized source column names
     as strings, such as ["INCIDENT_DESCRIPTION", "ROOT_CAUSE_NOTES"]. Include only
     input columns that materially informed the decision, its limitations, or
-    relevant counterevidence. Return names only, without quotes, values, or
-    objects. Return [] when no source columns are identified; there is no fixed maximum.
+    relevant counterevidence. Return column-name strings only, without source
+    excerpts or objects. Return [] when no source columns are identified; there is no fixed maximum.
     The count may differ per incident. Use only existing input columns
     and do not invent or repeat names to fill the list; no ranking is required.
     For UNCERTAIN, include fields showing the ambiguity or missing causal facts.
-    Python joins these names with comma and space in one evidence_column CSV cell.
+  - citations: a list of a few short excerpts copied from source values, each
+    labeled COLUMN_NAME: excerpt. Include decisive supporting facts or
+    counterevidence, not instructions or field definitions. Return [] when
+    no usable excerpt exists.
   - decision_rationale: two to four short sentences explaining accountability,
     supporting facts, counterevidence, and any missing information. Give a
     concise decision summary, not a step-by-step internal thought process.
@@ -65,7 +68,11 @@ system: |
     the recorded support for attributing responsibility to HSBC or SUPPLIER.
     For UNCERTAIN, use 0-2 for the available attribution evidence; this does
     not measure confidence in being uncertain.
-  - supplier_name: the recorded supplier/actor responsible for the incident.
+  - supplier_name: the documented base supplier name, such as AXA rather than
+    AXA Insurance UK Limited, when that base name is clear from the record.
+    Keep the original legal entity, country, or subsidiary detail in
+    supplier_more_info when useful. Do not invent a parent company or infer
+    ownership from a product. Use Unknown if the base supplier is undocumented.
   - supplier_product_or_service: the recorded related product, service, or
     infrastructure. Extract its name; do not predict a product or its owner.
   - supplier_action_or_failure: the recorded supplier action, defect, or omission.
@@ -75,6 +82,27 @@ system: |
   - supplier_more_info: any additional recorded supplier facts that do not fit
     in the other supplier fields. Use concise plain text without repeating
     those fields. Return null when there is no additional information.
+  - incident_country: the documented country of the incident or affected service.
+    Return null when it is absent or conflicting.
+  - supplier_country: for SUPPLIER only, the documented country of the involved
+    supplier entity or service operation. It is not automatically the incident
+    country, beneficiary country, or global headquarters. Otherwise return null.
+  - causing_party: the actor explicitly documented as causing the incident.
+  - affected_party: the actor or group explicitly documented as affected.
+  - resolving_party: the actor explicitly documented as restoring service or
+    resolving the incident. The affected party and resolver are not necessarily
+    the cause. Return null for any role that is absent or conflicting; a mere
+    name mention, assignment group, or ownership label does not establish a role.
+
+  For country fields, use standard English country names when the supplied
+  meaning is unambiguous; separate multiple explicitly relevant countries with
+  semicolons. Do not guess a country from a company name, headquarters, currency,
+  email domain, or unrelated location. Country knowledge outside the record is
+  not evidence. Keep these two geographical meanings separate.
+  For joint documented actors in a role, use concise names separated by
+  semicolons. Preserve specific team or entity names when recorded. Roles and
+  incident_country may be known even when classification is UNCERTAIN; they do
+  not replace the accountability decision or justify guessing a missing actor.
 
   Attribution evidence strength rubric:
   - 0 (UNSUPPORTED): No recorded causal evidence distinguishes HSBC from
@@ -94,12 +122,13 @@ system: |
   attribution when the causal facts support it. Return the integer only;
   display labels are derived by the application.
 
-  For HSBC or UNCERTAIN, return null for all six supplier fields. For SUPPLIER, fill them
-  using only recorded facts. Use "Unknown" for unsupported details in the five
-  core supplier fields; keep supplier_more_info null when nothing extra is recorded.
+  For HSBC or UNCERTAIN, return null for all six supplier fields and
+  supplier_country. For SUPPLIER, use only recorded facts. Use "Unknown" for
+  unsupported details in the five core supplier fields; keep supplier_more_info
+  null when nothing extra is recorded.
   Explain the reason for UNCERTAIN in decision_rationale; do not add a separate
   uncertainty_reason field. Do not infer a supplier name from product ownership
   or an assignment label.
   The supporting source column names identify where these extracted details came from.
-  No human approval step exists. Return JSON only. Do not propose remediation,
+  Human review happens later in the application. Return JSON only. Do not propose remediation,
   generate Business/Technical labels, or compare with architect assessments.
